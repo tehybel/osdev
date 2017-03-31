@@ -81,6 +81,7 @@ i386_detect_memory(void)
 static void boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm);
 static void check_page_free_list(bool only_low_memory);
 static void check_page_alloc(void);
+static void stress_test_page_alloc(void);
 static void check_kern_pgdir(void);
 static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
 static void check_page(void);
@@ -188,6 +189,7 @@ mem_init(void)
 
 	check_page_free_list(1);
 	check_page_alloc();
+
 	panic("mem_init: This function is not finished\n");
 	check_page();
 
@@ -263,47 +265,40 @@ mem_init(void)
 void
 page_init(void)
 {
-	uint32_t boot_alloc_mem_end = PADDR(boot_alloc(0));
+	physaddr_t boot_alloc_mem_end = PADDR(boot_alloc(0));
 	boot_alloc_should_not_be_called = 1;
 
-	// The example code here marks all physical pages as free.
-	// However this is not truly the case.  What memory is free?
-	//  1) Mark physical page 0 as in use.
-	//     This way we preserve the real-mode IDT and BIOS structures
-	//     in case we ever need them.  (Currently we don't, but...)
-	//  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE)
-	//     is free.
-	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must
-	//     never be allocated.
-	//  4) Then extended memory [EXTPHYSMEM, ...).
-	//     Some of it is in use, some is free. Where is the kernel
-	//     in physical memory?  Which pages are already in use for
-	//     page tables and other data structures?
-	//
-	// Change the code to reflect this.
-	// NB: DO NOT actually touch the physical memory corresponding to
-	// free pages!
+	// add the pages which represent valid free memory to the free list
+	// however some ranges are in use (e.g. because the kernel is there) so we
+	// should avoid allocating those.
+
+	// NOTE: we *cannot* actually touch the physical pages yet! We are still
+	// using our rudimentary page table, which only maps 0-0x400000. The rest
+	// will be mapped soon.
 	size_t i;
 	for (i = 0; i < npages; i++) {
+		struct PageInfo * pageinfo = &pages[i];
+
+		physaddr_t addr = page2pa(pageinfo);
 
 		// mark physical page 0 as in use
-		if (i == 0)
+		if (addr == 0)
 			continue;
 
 		// the range [IOPHYSMEM, EXTPHYSMEM] is reserved for IO
-		if (i >= IOPHYSMEM/PGSIZE && i < EXTPHYSMEM/PGSIZE)
+		if (addr >= IOPHYSMEM && addr < EXTPHYSMEM)
 			continue;
 
 		// the kernel should not be mapped.
 		// it ends after its bss section, but the memory after that could have
 		// been allocated by boot_init, so we must not mark that as free,
 		// either.
-		if (i >= KERNPHYSBASE/PGSIZE && i < boot_alloc_mem_end/PGSIZE)
+		if (addr >= KERNPHYSBASE && addr < boot_alloc_mem_end)
 			continue;
 
-		pages[i].pp_ref = MAGIC2;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+		pageinfo->pp_ref = MAGIC2;
+		pageinfo->pp_link = page_free_list;
+		page_free_list = pageinfo;
 	}
 }
 
@@ -321,6 +316,7 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	struct PageInfo * pginfo = take_pageinfo();
+	cprintf("page_alloc took out 0x%x\n", pginfo);
 	if (!pginfo)
 		return NULL;
 
@@ -564,6 +560,7 @@ check_page_free_list(bool only_low_memory)
 	assert(nfree_basemem > 0);
 	assert(nfree_extmem > 0);
 }
+
 
 //
 // Check the physical page allocator (page_alloc(), page_free(),
