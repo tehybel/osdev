@@ -18,6 +18,23 @@ pde_t *kern_pgdir;		// Kernel's initial page directory
 struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
 
+// the pp_link field of PageInfo structs are set to this upon allocation so
+// that we can check for invalid frees in page_free()
+#define MAGIC1 ((struct PageInfo *) 0xfffffff7)
+
+// similar idea, but for pp_ref
+#define MAGIC2 0xffff
+
+// takes a single PageInfo struct off of the page_free_list
+static struct PageInfo * take_pageinfo() {
+	if (!page_free_list)
+		return NULL;
+	
+	struct PageInfo * result = page_free_list;
+	page_free_list = page_free_list->pp_link;
+	return result;
+}
+
 
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
@@ -111,12 +128,10 @@ boot_alloc(uint32_t n)
 	result = nextfree;
 	nextfree += ROUNDUP(n, PGSIZE);
 
-	// TODO: is this the right way to check for oom conditions?
+	// todo: is this the right way to check for oom conditions?
 	if (nextfree >= (char *) 0xf0400000) {
 		panic("boot_alloc ran out of memory!");
 	}
-
-	cprintf("boot_alloc allocated 0x%x\n", result);
 
 	return result;
 }
@@ -172,8 +187,8 @@ mem_init(void)
 	page_init();
 
 	check_page_free_list(1);
-	panic("mem_init: This function is not finished\n");
 	check_page_alloc();
+	panic("mem_init: This function is not finished\n");
 	check_page();
 
 	//////////////////////////////////////////////////////////////////////
@@ -248,7 +263,7 @@ mem_init(void)
 void
 page_init(void)
 {
-	uint32_t boot_alloc_mem_end = (uint32_t) (boot_alloc(0) - KERNBASE);
+	uint32_t boot_alloc_mem_end = PADDR(boot_alloc(0));
 	boot_alloc_should_not_be_called = 1;
 
 	// The example code here marks all physical pages as free.
@@ -286,7 +301,7 @@ page_init(void)
 		if (i >= KERNPHYSBASE/PGSIZE && i < boot_alloc_mem_end/PGSIZE)
 			continue;
 
-		pages[i].pp_ref = 0;
+		pages[i].pp_ref = MAGIC2;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
@@ -302,13 +317,28 @@ page_init(void)
 // page_free can check for double-free bugs.
 //
 // Returns NULL if out of free memory.
-//
-// Hint: use page2kva and memset
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+	struct PageInfo * pginfo = take_pageinfo();
+	if (!pginfo)
+		return NULL;
+
+	if (pginfo->pp_ref != MAGIC2)
+		panic("bad take_pageinfo: 0x%x", pginfo);
+
+	pginfo->pp_link = MAGIC1;
+	pginfo->pp_ref = 0;
+	
+	void * mem = page2kva(pginfo);
+	
+	if (alloc_flags & ALLOC_ZERO)
+		memset(mem, '\0', PGSIZE);
+	else
+		// fill it with nonsense to catch uninitialized variable usage early
+		memset(mem, '\x42', PGSIZE);
+	
+	return pginfo;
 }
 
 //
@@ -316,11 +346,19 @@ page_alloc(int alloc_flags)
 // (This function should only be called when pp->pp_ref reaches 0.)
 //
 void
-page_free(struct PageInfo *pp)
+page_free(struct PageInfo *pageinfo)
 {
-	// Fill this function in
-	// Hint: You may want to panic if pp->pp_ref is nonzero or
-	// pp->pp_link is not NULL.
+	if (pageinfo->pp_link != MAGIC1)
+		panic("invalid free: 0x%x (bad pp_link)", pageinfo);
+	
+	if (pageinfo->pp_ref != 0)
+		panic("invalid free: 0x%x (bad pp_ref: %d)", 
+			pageinfo, pageinfo->pp_ref);
+	
+	pageinfo->pp_link = page_free_list;
+	pageinfo->pp_ref = MAGIC2;
+
+	page_free_list = pageinfo;
 }
 
 //
