@@ -92,6 +92,8 @@
 #define IOPHYSMEM	0x0A0000
 #define EXTPHYSMEM	0x100000
 
+#define KERNPHYSBASE 	0x100000
+
 // Kernel stack.
 #define KSTACKTOP	KERNBASE
 #define KSTKSIZE	(8*PGSIZE)   		// size of a kernel stack

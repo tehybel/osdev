@@ -69,6 +69,8 @@ static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
 static void check_page(void);
 static void check_page_installed_pgdir(void);
 
+bool boot_alloc_should_not_be_called;
+
 // This simple physical memory allocator is used only while JOS is setting
 // up its virtual memory system.  page_alloc() is the real allocator.
 //
@@ -97,13 +99,26 @@ boot_alloc(uint32_t n)
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 
+	if (n == 0)
+		return nextfree;
+
+	if (boot_alloc_should_not_be_called)
+		panic("boot_alloc was called after page_init()");
+
 	// Allocate a chunk large enough to hold 'n' bytes, then update
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
-	//
-	// LAB 2: Your code here.
+	result = nextfree;
+	nextfree += ROUNDUP(n, PGSIZE);
 
-	return NULL;
+	// TODO: is this the right way to check for oom conditions?
+	if (nextfree >= (char *) 0xf0400000) {
+		panic("boot_alloc ran out of memory!");
+	}
+
+	cprintf("boot_alloc allocated 0x%x\n", result);
+
+	return result;
 }
 
 // Set up a two-level page table:
@@ -124,8 +139,6 @@ mem_init(void)
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
 
-	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -147,8 +160,8 @@ mem_init(void)
 	// each physical page, there is a corresponding struct PageInfo in this
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
-	// Your code goes here:
-
+	pages = boot_alloc(npages * sizeof(struct PageInfo));
+	memset(pages, '\0', npages * sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -159,6 +172,7 @@ mem_init(void)
 	page_init();
 
 	check_page_free_list(1);
+	panic("mem_init: This function is not finished\n");
 	check_page_alloc();
 	check_page();
 
@@ -234,6 +248,9 @@ mem_init(void)
 void
 page_init(void)
 {
+	uint32_t boot_alloc_mem_end = (uint32_t) (boot_alloc(0) - KERNBASE);
+	boot_alloc_should_not_be_called = 1;
+
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
 	//  1) Mark physical page 0 as in use.
@@ -253,6 +270,22 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
+
+		// mark physical page 0 as in use
+		if (i == 0)
+			continue;
+
+		// the range [IOPHYSMEM, EXTPHYSMEM] is reserved for IO
+		if (i >= IOPHYSMEM/PGSIZE && i < EXTPHYSMEM/PGSIZE)
+			continue;
+
+		// the kernel should not be mapped.
+		// it ends after its bss section, but the memory after that could have
+		// been allocated by boot_init, so we must not mark that as free,
+		// either.
+		if (i >= KERNPHYSBASE/PGSIZE && i < boot_alloc_mem_end/PGSIZE)
+			continue;
+
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
