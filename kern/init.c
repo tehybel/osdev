@@ -21,6 +21,8 @@ i386_init(void)
 	// initialize the console; cprintf will not work before we do this
 	cons_init();
 
+	// initialize the physical page management system 
+	// also initialize the page table to support proper virtual memory
 	mem_init();
 
 	// Drop into the kernel monitor.

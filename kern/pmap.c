@@ -190,6 +190,8 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 
+	// pgdir_walk boot_map_region page_lookup page_remove page_insert
+
 	panic("mem_init: This function is not finished\n");
 	check_page();
 
@@ -316,7 +318,6 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	struct PageInfo * pginfo = take_pageinfo();
-	cprintf("page_alloc took out 0x%x\n", pginfo);
 	if (!pginfo)
 		return NULL;
 
@@ -380,21 +381,36 @@ page_decref(struct PageInfo* pp)
 //	the page is cleared,
 //	and pgdir_walk returns a pointer into the new page table page.
 //
-// Hint 1: you can turn a PageInfo * into the physical address of the
-// page it refers to with page2pa() from kern/pmap.h.
-//
-// Hint 2: the x86 MMU checks permission bits in both the page directory
-// and the page table, so it's safe to leave permissions in the page
-// directory more permissive than strictly necessary.
-//
-// Hint 3: look at inc/mmu.h for useful macros that mainipulate page
-// table and page directory entries.
-//
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+	// find the PTE at the first level of the tree
+	pde_t *pte = &pgdir[PDX(va)];
+
+	// if the PTE is not present, try to create it
+	if (!(*pte & PTE_P)) {
+		if (!create)
+			return NULL;
+
+		struct PageInfo *pinfo = page_alloc(ALLOC_ZERO);
+		if (!pinfo)
+			return NULL;
+
+		pinfo->pp_ref++;
+		physaddr_t pa = page2pa(pinfo);
+
+		// mark it present and writable
+		*pte = pa | PTE_P | PTE_W;
+	}
+
+	// by now we're guaranteed that the PTE is valid and present
+	assert(pte);
+	assert(*pte & PTE_P);
+
+	// go to the next level of the tree
+	pte = KADDR(PTE_ADDR(*pte));
+
+	return pte;
 }
 
 //
@@ -407,11 +423,22 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 // above UTOP. As such, it should *not* change the pp_ref field on the
 // mapped pages.
 //
-// Hint: the TA solution uses pgdir_walk
 static void
-boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
+boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, 
+				int perm)
 {
-	// Fill this function in
+	// alignment checks
+	assert(PGOFF(size) == 0);
+	assert(PGOFF(va) == 0);
+	assert(PGOFF(pa) == 0);
+	assert(size != 0);
+
+	// fix the PTEs one at a time, looking up each and creating it if needed
+	size_t offset;
+	for (offset = 0; offset < size; offset += PGSIZE) {
+		pte_t *pte = pgdir_walk(pgdir, (void *) (va + offset), 1);
+		*pte = (pa + offset) | perm | PTE_P;
+	}
 }
 
 //
