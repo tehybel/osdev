@@ -71,8 +71,13 @@ The format of a PTE is here:
 
 === Part 3 ===
 
+20-21
 
+In part 3 we use the functions we implemented in part 2 to set up a page table
+which properly maps all of the kernel memory, and which makes the page table
+accessible to userspace.
 
-
+After initializing this page table we switch to it by setting $cr3. Now
+user-mode programs cannot read kernel memory!
 
 
