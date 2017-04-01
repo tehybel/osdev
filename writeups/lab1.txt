@@ -1,5 +1,21 @@
 
 
+Time spent: 14-20, with a couple of short breaks.
+
+This lab mainly involved reading and understanding text and code. There was
+not much programming necessary. However I am already familiar with C, gdb,
+assembly etc. so the time I took is likely not representative.
+
+I think this lab is intended as a gentle warmup.
+
+
+------------
+
+
+Explanation of what is happening:
+
+
+
 The BIOS is the first code that runs. It does some initialization (which?) and
 finds a bootable medium (e.g. the HDD), loads the boot loader from it and
 jumps to it.
@@ -152,16 +168,6 @@ The stack grows down, so of course the stack pointer initially points at
 
 
 
-
-
-
-Time spent: 14-20, with a couple of short breaks.
-
-This lab mainly involved reading and understanding text and code. There was
-not much programming necessary. However I am already familiar with C, gdb,
-assembly etc. so the time I took is likely not representative.
-
-I think this lab is intended as a gentle warmup.
 
 
 
