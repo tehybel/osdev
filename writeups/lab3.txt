@@ -1,2 +1,28 @@
 
+Time: 21-00:30, TODO
+
+
+In the first part of this lab we implement functions for manipulating
+"environments"; an environment is more-or-less a synonym for "process", but we
+call them environments because there are differences.
+
+An environment holds things like the register state for a thread, a pointer to
+its page directory, etc.
+
+We also implemented a function, load_icode(), which will load an ELF file into
+a user land address space.
+
+Thus we can now create a new environment, load code into it, and even do a
+context switch to run code in userland!
+
+Unfortunately interrupts are not possible, so the processor is stuck in
+userland; it will crash on the first int 0xXX instruction. Handling interrupts
+is the next part of the lab.
+
+
+---------
+
+
+
+
 
