@@ -177,11 +177,22 @@ env_setup_vm(struct Env *e)
 	// set up the UPAGES area by using the page table of the kernel
 	pte = kern_pgdir[PDX(UPAGES)];
 	e->env_pgdir[PDX(UPAGES)] = pte;
-	// note: no need to incref because the page is above UTOP
+	page_incref(KADDR(PTE_ADDR(pte)));
 
 	// set up the UENVS area by using the page table of the kernel
 	pte = kern_pgdir[PDX(UENVS)];
 	e->env_pgdir[PDX(UENVS)] = pte;
+	page_incref(KADDR(PTE_ADDR(pte)));
+
+	// do the same thing for KERNBASE; we need this, because otherwise when we
+	// update cr3 we immediately fault because the next instruction isn't
+	// mapped.
+	// Unfortunately this lets userland programs modify kernelland. We don't
+	// want that. TODO set up a trampoline page instead.
+	pte = kern_pgdir[PDX(KERNBASE)];
+	e->env_pgdir[PDX(KERNBASE)] = pte;
+	page_incref(KADDR(PTE_ADDR(pte)));
+
 
 
 	//
@@ -286,9 +297,6 @@ region_alloc(pde_t *pgdir, uintptr_t va, size_t len)
 	va = ROUNDDOWN(va, PGSIZE);
 	len = ROUNDUP(len, PGSIZE);
 
-	// pgdir is meant to be an environment page directory, not the kernel one
-	assert(pgdir != kern_pgdir);
-
 	// allocate a page at a time,
 	// then insert it into both the given pgdir and the kernel pgdir
 	for (cur = va; cur < va + len; cur += PGSIZE) {
@@ -296,8 +304,6 @@ region_alloc(pde_t *pgdir, uintptr_t va, size_t len)
 		if (!pp)
 			goto bad;
 		if (page_insert(pgdir, pp, (void *) cur, PTE_U | PTE_W | PTE_P))
-			goto bad;
-		if (page_insert(kern_pgdir, pp, (void *) cur, PTE_U | PTE_W | PTE_P))
 			goto bad;
 	}
 
@@ -309,8 +315,7 @@ bad:
 
 // This function is given a single program header from an ELF file.
 // The program header specifies a segment which should be loaded.
-// This function does so, adding the segment both to the given page directory
-// 'pgdir' and to the kernel page directory.
+// This function does so, adding the segment to the given page directory.
 static void 
 load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
 	size_t memsize = ROUNDUP(ph->p_memsz, PGSIZE);
@@ -318,16 +323,17 @@ load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
 	uint8_t *src = binary + ph->p_offset;
 	uintptr_t va = ph->p_va;
 
+	cprintf("segment with va=0x%x, src=0x%x, memsize=0x%x, filesize=0x%x\n",
+		va, src, memsize, filesize);
+
 	// allocate the segment
 	region_alloc(pgdir, va, memsize);
 
-	// initialize the memory
+	// zero out the memory
+	memset((uint8_t *) ROUNDDOWN(va, PGSIZE), '\0', memsize);
+
+	// initialize (some of) the memory
 	memcpy((uint8_t *) va, src, filesize);
-
-	// zero out the rest of the segment
-	assert(filesize < memsize);
-	memset((uint8_t *) (va + filesize), '\0', memsize - filesize);
-
 }
 
 //
@@ -390,7 +396,15 @@ load_icode(struct Env *env, uint8_t *binary)
 	if (elf->e_magic != ELF_MAGIC)
 		panic("not a valid ELF file");
 	
+
 	// parse the ELF file, loading one segment at a time
+	cprintf("loading ELF segments...\n");
+
+	// switch to the userland page directory first, so that we can copy data
+	// directly with memcpy during load_segment
+	lcr3(PADDR(pgdir));
+
+	// do the actual loading of each segment
 	// TODO: add size checks so we don't go oob
 	ph = (struct Proghdr *) (binary + elf->e_phoff);
 	ph_end = ph + elf->e_phnum;
@@ -398,6 +412,11 @@ load_icode(struct Env *env, uint8_t *binary)
 		if (ph->p_type == ELF_PROG_LOAD)
 			load_segment(pgdir, binary, ph);
 	}
+
+	// switch back to the kernel page directory
+	lcr3(PADDR(kern_pgdir));
+
+	cprintf("done loading ELF.\n");
 
 	// initialize the trap frame according to the ELF entry point
 	// so that the environment starts executing at the right place
@@ -416,7 +435,7 @@ load_icode(struct Env *env, uint8_t *binary)
 	// set up the trap frame with the new stack
 	env->env_tf.tf_esp = USTACKTOP;
 
-	// TODO: what about processor flags?
+	// fields like 'ss' and 'ds' were already set in env_alloc.
 
 	return;
 
@@ -434,7 +453,14 @@ bad:
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// LAB 3: Your code here.
+	struct Env *env;
+
+	// this will allocate envs[0], that's why we don't return anything.
+	int res = env_alloc(&env, 0);
+	if (res)
+		panic("env_alloc failed: %e", res);
+	
+	load_icode(env, binary);
 }
 
 //
@@ -525,33 +551,31 @@ env_pop_tf(struct Trapframe *tf)
 }
 
 //
-// Context switch from curenv to env e.
-// Note: if this is the first call to env_run, curenv is NULL.
+// Context switch from curenv to env.
 //
 // This function does not return.
 //
 void
-env_run(struct Env *e)
+env_run(struct Env *new)
 {
-	// Step 1: If this is a context switch (a new environment is running):
-	//	   1. Set the current environment (if any) back to
-	//	      ENV_RUNNABLE if it is ENV_RUNNING (think about
-	//	      what other states it can be in),
-	//	   2. Set 'curenv' to the new environment,
-	//	   3. Set its status to ENV_RUNNING,
-	//	   4. Update its 'env_runs' counter,
-	//	   5. Use lcr3() to switch to its address space.
-	// Step 2: Use env_pop_tf() to restore the environment's
-	//	   registers and drop into user mode in the
-	//	   environment.
+	struct Env *old = curenv;
 
-	// Hint: This function loads the new environment's state from
-	//	e->env_tf.  Go back through the code you wrote above
-	//	and make sure you have set the relevant parts of
-	//	e->env_tf to sensible values.
+	// update the old environment's status
+	if (old && old->env_status == ENV_RUNNING)
+		old->env_status = ENV_RUNNABLE;
+	else
+		; // nothing; it's ENV_DYING or such.
+	
+	// set the new environment as the current one and update its fields
+	curenv = new;
+	new->env_status = ENV_RUNNING;
+	new->env_runs++;
 
-	// LAB 3: Your code here.
+	// switch to the new address space
+	// TODO: won't we die here? The $pc value will no longer be mapped..?
+	lcr3(PADDR(new->env_pgdir));
 
-	panic("env_run not yet implemented");
+	// context switch to user mode
+	env_pop_tf(&new->env_tf);
 }
 
