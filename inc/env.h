@@ -48,8 +48,13 @@ struct Env {
 	struct Env *env_link;		// Next free Env
 	envid_t env_id;			// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
-	enum EnvType env_type;		// Indicates special system environments
-	unsigned env_status;		// Status of the environment
+
+	// Indicates special system environments; not used yet.
+	enum EnvType env_type;		
+
+	// Status of the environment, e.g. ENV_FREE, ENV_RUNNING etc.
+	unsigned env_status;		
+
 	uint32_t env_runs;		// Number of times environment has run
 
 	// Address space

@@ -183,7 +183,8 @@ mem_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
-	// LAB 3: Your code here.
+	envs = boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, '\0', NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -197,7 +198,6 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
-
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -217,7 +217,8 @@ mem_init(void)
 	// Permissions:
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
-	// LAB 3: Your code here.
+	assert(PGOFF(envs) == 0);
+	boot_map_region(kern_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -785,14 +786,10 @@ check_kern_pgdir(void)
 
 	
 	// check envs array (new test for lab 3)
-	/* TODO: reenable this..
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE) {
-		cprintf("checking 0x%x -- 0x%x\n", UENVS + i, envs);
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
 	}
-
-	*/
 
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE) {
@@ -811,10 +808,7 @@ check_kern_pgdir(void)
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
 		case PDX(UENVS):
-			/* TODO reenable this 
 			assert(pgdir[i] & PTE_P);
-
-			*/
 			break;
 		default:
 			if (i >= PDX(KERNBASE)) {

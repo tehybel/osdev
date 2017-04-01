@@ -13,7 +13,10 @@
 #include <kern/monitor.h>
 
 struct Env *envs = NULL;		// All environments
-struct Env *curenv = NULL;		// The current env
+
+// the currently executing environment
+struct Env *curenv = NULL;		
+
 static struct Env *env_free_list;	// Free environment list
 					// (linked by Env->env_link)
 
