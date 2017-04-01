@@ -112,10 +112,15 @@
  */
 
 // User read-only virtual page table (see 'uvpt' below)
+// this is basically a read-only copy of the user env's page table
 #define UVPT		(ULIM - PTSIZE)
+
 // Read-only copies of the Page structures
+// this is a read-only copy of the kernel's page table
 #define UPAGES		(UVPT - PTSIZE)
+
 // Read-only copies of the global env structures
+// this is a read-only copy of the array of Env structs
 #define UENVS		(UPAGES - PTSIZE)
 
 /*

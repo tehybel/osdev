@@ -12,7 +12,8 @@
 #include <kern/trap.h>
 #include <kern/monitor.h>
 
-struct Env *envs = NULL;		// All environments
+// an array of all the environments
+struct Env *envs = NULL;		
 
 // the currently executing environment
 struct Env *curenv = NULL;		
@@ -117,8 +118,13 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 void
 env_init(void)
 {
-	// Set up envs array
-	// LAB 3: Your code here.
+	struct Env *cur;
+	for (cur = envs + NENV - 1; cur >= envs; cur--) {
+		cur->env_status = ENV_FREE;
+		cur->env_id = 0;
+		cur->env_link = env_free_list;
+		env_free_list = cur;
+	}
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -158,14 +164,29 @@ env_init_percpu(void)
 static int
 env_setup_vm(struct Env *e)
 {
-	int i;
-	struct PageInfo *p = NULL;
+	struct PageInfo *user_pgdir;
+	pte_t pte;
 
 	// Allocate a page for the page directory
-	if (!(p = page_alloc(ALLOC_ZERO)))
+	if (!(user_pgdir = page_alloc(ALLOC_ZERO)))
 		return -E_NO_MEM;
+	
+	// Now, set e->env_pgdir and initialize the user page directory.
+	e->env_pgdir = page2kva(user_pgdir);
 
-	// Now, set e->env_pgdir and initialize the page directory.
+	// incref it so that env_free will properly free it
+	page_incref(user_pgdir);
+
+	// set up the UPAGES area by using the page table of the kernel
+	pte = kern_pgdir[PDX(UPAGES)];
+	e->env_pgdir[PDX(UPAGES)] = pte;
+	// note: no need to incref because the page is above UTOP
+
+	// set up the UENVS area by using the page table of the kernel
+	pte = kern_pgdir[PDX(UENVS)];
+	e->env_pgdir[PDX(UENVS)] = pte;
+
+
 	//
 	// Hint:
 	//    - The VA space of all envs is identical above UTOP
@@ -180,8 +201,8 @@ env_setup_vm(struct Env *e)
 	//	is an exception -- you need to increment env_pgdir's
 	//	pp_ref for env_free to work correctly.
 	//    - The functions in kern/pmap.h are handy.
+	// TODO ^ remove that
 
-	// LAB 3: Your code here.
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R

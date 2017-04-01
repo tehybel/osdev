@@ -157,7 +157,6 @@ mem_init(void)
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
 
-
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
@@ -460,6 +459,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
 	size_t offset;
 	for (offset = 0; offset < size; offset += PGSIZE) {
 		pte_t *pte = pgdir_walk(pgdir, (void *) (va + offset), 1);
+		if (!pte)
+			panic("boot_map_region allocation failed");
 		*pte = (pa + offset) | perm | PTE_P;
 	}
 }
