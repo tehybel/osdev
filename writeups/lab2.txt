@@ -1,0 +1,73 @@
+
+
+=== Part 1 ===
+
+
+The first half of this lab is about physical page management. We need to
+implement a subsystem which allows us to allocate and free physical pages.
+
+First we write a rudimentary allocator,box
+cd la	
+boot_alloc(), which allocates memory
+from the end of the .bss section of the kernel. We need this simple allocator
+to allocate data structures for the more advanced one.
+
+Then we write a more sophisticated allocator, with page_alloc() and
+page_free() as interface. Each physical page has a corresponding PageInfo
+struct which holds its metadata: this is currently just a refcount. These
+PageInfo structs are stored in a large array, allocated with boot_alloc().
+
+The free pages have their corresponding PageInfo structs stored in a singly
+linked list.
+
+I also added checks for double frees and other (accidental) memory corruption.
+
+Note that we still haven't set up the page table, so many of the pages which
+are now marked as free may not be touched yet.
+
+Time spent: 20-24.
+
+This part was not conceptually difficult. It wasn't a lot of code either, but it
+took a while to familiarize myself with the code base enough to add to it.
+
+
+
+
+=== Part 2 ===
+
+16:30-
+
+
+There is the concept of a "page table"; it is simply an array of 1k "page
+specifiers". These "specifiers" are actually called Page Table Entries (PTEs);
+they are 32 bits in size, but since all addressing is page aligned, the lower
+12 bits are free to be used as flags. To sum up: a page table is an array
+holding 1k PTEs.
+
+On x86, address translation uses two levels of page tables. The higher level
+is called the page directory. It is itself a page table. Hence the page
+directory holds 1k PTEs, each of which specifies a page table.
+
+How do we find the root (i.e., the page directory)? The control register $cr3
+holds it.
+
+The format of a PTE is here:
+
+	https://pdos.csail.mit.edu/6.828/2016/readings/i386/s05_02.htm
+
+
+
+
+
+
+
+
+
+
+much more conceptually difficult.
+
+
+
+
+
+
