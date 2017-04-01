@@ -17,19 +17,16 @@ i386_init(void)
 {
 	extern char edata[], end[];
 
-	// Before doing anything else, complete the ELF loading process.
-	// Clear the uninitialized global data (BSS) section of our program.
-	// This ensures that all static/global variables start out zero.
+	// clear out the .bss
 	memset(edata, 0, end - edata);
 
-	// Initialize the console.
-	// Can't call cprintf until after we do this!
+	// initialize the console; cprintf will not work before we do this
 	cons_init();
 
-	cprintf("6828 decimal is %o octal!\n", 6828);
-
-	// Lab 2 memory management initialization functions
+	// initialize the physical page management system 
+	// also initialize the page table to support proper virtual memory
 	mem_init();
+	cprintf("Kernel memory management system initialized.\n");
 
 	// Lab 3 user environment initialization functions
 	env_init();
@@ -70,11 +67,15 @@ _panic(const char *file, int line, const char *fmt,...)
 	// Be extra sure that the machine is in as reasonable state
 	asm volatile("cli; cld");
 
+	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("!!!!!\n");
 	va_start(ap, fmt);
-	cprintf("kernel panic at %s:%d: ", file, line);
+	cprintf("!!!!! kernel panic at %s:%d: ", file, line);
 	vcprintf(fmt, ap);
-	cprintf("\n");
 	va_end(ap);
+	cprintf("\n!!!!!\n");
+	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("\nDropping into the monitor.\n");
 
 dead:
 	/* break into the kernel monitor */

@@ -42,6 +42,8 @@ _kaddr(const char *file, int line, physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
 		_panic(file, line, "KADDR called with invalid pa %08lx", pa);
+	if (pa + KERNBASE < pa)
+		_panic(file, line, "KADDR overflow: 0x%x", pa);
 	return (void *)(pa + KERNBASE);
 }
 

@@ -51,7 +51,7 @@
  *                     |          RO PAGES            | R-/R-  PTSIZE
  *    UPAGES    ---->  +------------------------------+ 0xef000000
  *                     |           RO ENVS            | R-/R-  PTSIZE
- * UTOP,UENVS ------>  +------------------------------+ 0xeec00000
+ * UTOP, UENVS ----->  +------------------------------+ 0xeec00000
  * UXSTACKTOP -/       |     User Exception Stack     | RW/RW  PGSIZE
  *                     +------------------------------+ 0xeebff000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
@@ -85,12 +85,15 @@
 
 // All physical memory mapped at this address
 #define	KERNBASE	0xF0000000
+#define KERNSIZE	0x10000000
 
 // At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
 // IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
 // at physical address EXTPHYSMEM.
 #define IOPHYSMEM	0x0A0000
 #define EXTPHYSMEM	0x100000
+
+#define KERNPHYSBASE 	0x100000
 
 // Kernel stack.
 #define KSTACKTOP	KERNBASE
