@@ -3,7 +3,7 @@
 === Part 1 ===
 
 
-The first half of this lab is about physical page management. We need to
+The first part of this lab is about physical page management. We need to
 implement a subsystem which allows us to allocate and free physical pages.
 
 First we write a rudimentary allocator,box
@@ -35,8 +35,19 @@ took a while to familiarize myself with the code base enough to add to it.
 
 === Part 2 ===
 
-16:30-
+16:30-19:30
 
+The second part of the lab is about page table management. We need to
+implement functions which can walk the page table structure, insert mappings,
+remove mappings, etc.
+
+This requires understanding the theory behind address translation on the x86.
+
+Part 2 involved quite some programming, but the tricky part was understanding
+the concepts.
+
+
+Here's some theory needed in part 2:
 
 There is the concept of a "page table"; it is simply an array of 1k "page
 specifiers". These "specifiers" are actually called Page Table Entries (PTEs);
@@ -44,9 +55,9 @@ they are 32 bits in size, but since all addressing is page aligned, the lower
 12 bits are free to be used as flags. To sum up: a page table is an array
 holding 1k PTEs.
 
-On x86, address translation uses two levels of page tables. The higher level
-is called the page directory. It is itself a page table. Hence the page
-directory holds 1k PTEs, each of which specifies a page table.
+On x86, address translation uses two levels of page tables. The upper level is
+called the page directory. It is itself a page table. Hence the page directory
+holds 1k PTEs, each of which specifies a page table on the lower level.
 
 How do we find the root (i.e., the page directory)? The control register $cr3
 holds it.
@@ -58,13 +69,7 @@ The format of a PTE is here:
 
 
 
-
-
-
-
-
-
-much more conceptually difficult.
+=== Part 3 ===
 
 
 
