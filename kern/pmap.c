@@ -117,6 +117,9 @@ boot_alloc(uint32_t n)
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 
+	// nextfree should always stay page aligned
+	assert(PGOFF(nextfree) == 0);
+
 	if (n == 0)
 		return nextfree;
 
@@ -192,7 +195,6 @@ mem_init(void)
 	check_page_alloc();
 	check_page();
 
-	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -203,7 +205,8 @@ mem_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-	// Your code goes here:
+	assert(PGOFF(pages) == 0);
+	boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -215,7 +218,9 @@ mem_init(void)
 	//       the kernel overflows its stack, it will fault rather than
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
-	// Your code goes here:
+	assert(PGOFF(bootstack) == 0);
+	boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, 
+			KSTKSIZE, PADDR(bootstack), PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -224,7 +229,7 @@ mem_init(void)
 	// We might not have 2^32 - KERNBASE bytes of physical memory, but
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
-	// Your code goes here:
+	boot_map_region(kern_pgdir, KERNBASE, KERNSIZE, 0, PTE_P | PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -949,11 +954,11 @@ check_page_installed_pgdir(void)
 	page_insert(kern_pgdir, pp2, (void*) PGSIZE, PTE_W);
 	assert(*(uint32_t *)PGSIZE == 0x02020202U);
 	assert(pp2->pp_ref == 1);
-	assert(pp1->pp_ref == 0);
+	assert(pp1->pp_ref == MAGIC2);
 	*(uint32_t *)PGSIZE = 0x03030303U;
 	assert(*(uint32_t *)page2kva(pp2) == 0x03030303U);
 	page_remove(kern_pgdir, (void*) PGSIZE);
-	assert(pp2->pp_ref == 0);
+	assert(pp2->pp_ref == MAGIC2);
 
 	// forcibly take pp0 back
 	assert(PTE_ADDR(kern_pgdir[0]) == page2pa(pp0));

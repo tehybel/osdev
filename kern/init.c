@@ -24,6 +24,7 @@ i386_init(void)
 	// initialize the physical page management system 
 	// also initialize the page table to support proper virtual memory
 	mem_init();
+	cprintf("Kernel memory management system initialized.\n");
 
 	// Drop into the kernel monitor.
 	while (1)
