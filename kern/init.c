@@ -28,7 +28,7 @@ i386_init(void)
 	mem_init();
 	cprintf("Kernel memory management system initialized.\n");
 
-	// Lab 3 user environment initialization functions
+	// user environment initialization functions
 	env_init();
 	trap_init();
 

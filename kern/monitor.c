@@ -56,18 +56,18 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-static void print_trapframe(struct Trapframe * tf) {
+static void print_stackframe(struct stackframe * sf) {
 	struct Eipdebuginfo info;
 	int i;
 
-	debuginfo_eip(tf->eip, &info);
+	debuginfo_eip(sf->eip, &info);
 
-	cprintf("ebp=0x%08x, ", tf->ebp);
-	cprintf("eip=0x%08x, ", tf->eip);
+	cprintf("ebp=0x%08x, ", sf->ebp);
+	cprintf("eip=0x%08x, ", sf->eip);
 	cprintf("args={");
 #define NUM_ARGS 3
 	for (i = 0; i < NUM_ARGS; i++) {
-		cprintf("0x%08x%s", tf->args[i], i == NUM_ARGS - 1 ? "" : ", ");
+		cprintf("0x%08x%s", sf->args[i], i == NUM_ARGS - 1 ? "" : ", ");
 	}
 #undef NUM_ARGS
 	cprintf("} %.*s\n", info.eip_fn_namelen, info.eip_fn_name);
@@ -77,9 +77,9 @@ static void print_trapframe(struct Trapframe * tf) {
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-
-	for (tf = (struct Trapframe *) read_ebp(); tf; tf = tf->ebp)
-		print_trapframe(tf);
+	struct stackframe *sf;
+	for (sf = (struct stackframe *) read_ebp(); sf; sf = sf->ebp)
+		print_stackframe(sf);
 
 	return 0;
 }
