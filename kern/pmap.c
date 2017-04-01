@@ -23,7 +23,7 @@ static struct PageInfo *page_free_list;	// Free list of physical pages
 #define MAGIC1 ((struct PageInfo *) 0xfffffff7)
 
 // similar idea, but for pp_ref
-#define MAGIC2 0xffff
+#define MAGIC2 0xfff0
 
 // takes a single PageInfo struct off of the page_free_list
 static struct PageInfo * take_pageinfo() {
@@ -187,13 +187,12 @@ mem_init(void)
 	// or page_insert
 	page_init();
 
+	// perform various tests of code sanity
 	check_page_free_list(1);
 	check_page_alloc();
-
-	// pgdir_walk boot_map_region page_lookup page_remove page_insert
+	check_page();
 
 	panic("mem_init: This function is not finished\n");
-	check_page();
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -369,6 +368,11 @@ page_decref(struct PageInfo* pp)
 		page_free(pp);
 }
 
+void page_incref(struct PageInfo* pinfo) {
+	if (pinfo->pp_ref++ == 0xffff) 
+		panic("page_incref overflow: 0x%x", pinfo);
+}
+
 // Given 'pgdir', a pointer to a page directory, pgdir_walk returns
 // a pointer to the page table entry (PTE) for linear address 'va'.
 // This requires walking the two-level page table structure.
@@ -396,21 +400,23 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		if (!pinfo)
 			return NULL;
 
-		pinfo->pp_ref++;
+		page_incref(pinfo);
 		physaddr_t pa = page2pa(pinfo);
 
 		// mark it present and writable
-		*pte = pa | PTE_P | PTE_W;
+		*pte = pa | PTE_P | PTE_W | PTE_U;
 	}
 
-	// by now we're guaranteed that the PTE is valid and present
+	// by now we're guaranteed that the PTE of the first level
+	// is valid and present
 	assert(pte);
 	assert(*pte & PTE_P);
 
 	// go to the next level of the tree
 	pte = KADDR(PTE_ADDR(*pte));
 
-	return pte;
+	// the final PTE is at offset PTX(va)
+	return &pte[PTX(va)];
 }
 
 //
@@ -461,15 +467,30 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
 //
 // RETURNS:
 //   0 on success
-//   -E_NO_MEM, if page table couldn't be allocated
-//
-// Hint: The TA solution is implemented using pgdir_walk, page_remove,
-// and page2pa.
+//   -E_NO_MEM, if page table couldn't be allocated. In this case the old
+//   			mapping is _not_ invalidated.
 //
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+	// find the PTE, creating its page table if needed
+	pte_t *pte = pgdir_walk(pgdir, va, 1);
+
+	// did allocation fail?
+	if (!pte) 
+		return -E_NO_MEM;
+
+	// update the refcnt early, so that if 'pp' is removed by 
+	// page_remove, it will not get freed.
+	page_incref(pp);
+
+	// in case there is already a page mapped at va, remove it
+	page_remove(pgdir, va);
+
+	// set up the mapping to 'pa'
+	physaddr_t pa = page2pa(pp);
+	*pte = pa | perm | PTE_P;
+
 	return 0;
 }
 
@@ -482,13 +503,18 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 //
 // Return NULL if there is no page mapped at va.
 //
-// Hint: the TA solution uses pgdir_walk and pa2page.
-//
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+	pte_t *pte = pgdir_walk(pgdir, va, 0);
+	if (!pte)
+		return NULL;
+	
+	if (pte_store)
+		*pte_store = pte;
+
+	physaddr_t pa = PTE_ADDR(*pte);
+	return pa2page(pa);
 }
 
 //
@@ -503,13 +529,21 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 //   - The TLB must be invalidated if you remove an entry from
 //     the page table.
 //
-// Hint: The TA solution is implemented using page_lookup,
-// 	tlb_invalidate, and page_decref.
-//
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+	pte_t *pte = NULL;
+	struct PageInfo *pinfo = page_lookup(pgdir, va, &pte);
+	if (!pinfo)
+		return;
+	
+	// decref and free if pp_refcnt reaches 0
+	page_decref(pinfo);
+
+	// invalidate the PTE
+	assert(pte);
+	*pte = 0;
+	tlb_invalidate(pgdir, va);
 }
 
 //
@@ -782,7 +816,7 @@ check_page(void)
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
 	assert(page_insert(kern_pgdir, pp2, (void*) PGSIZE, PTE_W) == 0);
-	assert(check_va2pa(kern_pgdir, PGSIZE) == page2pa(pp2));
+	assert(check_va2pa(kern_pgdir, PGSIZE) == page2pa(pp2)); // <---
 	assert(pp2->pp_ref == 1);
 
 	// should be no free memory
@@ -825,7 +859,7 @@ check_page(void)
 	assert(check_va2pa(kern_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
 	assert(pp1->pp_ref == 2);
-	assert(pp2->pp_ref == 0);
+	assert(pp2->pp_ref == MAGIC2);
 
 	// pp2 should be returned by page_alloc
 	assert((pp = page_alloc(0)) && pp == pp2);
@@ -840,13 +874,13 @@ check_page(void)
 	// test re-inserting pp1 at PGSIZE
 	assert(page_insert(kern_pgdir, pp1, (void*) PGSIZE, 0) == 0);
 	assert(pp1->pp_ref);
-	assert(pp1->pp_link == NULL);
+	assert(pp1->pp_link == MAGIC1);
 
 	// unmapping pp1 at PGSIZE should free it
 	page_remove(kern_pgdir, (void*) PGSIZE);
 	assert(check_va2pa(kern_pgdir, 0x0) == ~0);
 	assert(check_va2pa(kern_pgdir, PGSIZE) == ~0);
-	assert(pp1->pp_ref == 0);
+	assert(pp1->pp_ref == MAGIC2);
 	assert(pp2->pp_ref == 0);
 
 	// so it should be returned by page_alloc
