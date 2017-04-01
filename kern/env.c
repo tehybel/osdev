@@ -152,11 +152,8 @@ env_init_percpu(void)
 }
 
 //
-// Initialize the kernel virtual memory layout for environment e.
-// Allocate a page directory, set e->env_pgdir accordingly,
-// and initialize the kernel portion of the new environment's address space.
-// Do NOT (yet) map anything into the user portion
-// of the environment's virtual address space.
+// Given an environment, allocate its page directory, then set up the kernel
+// space part of it.
 //
 // Returns 0 on success, < 0 on error.  Errors include:
 //	-E_NO_MEM if page directory or table could not be allocated.
@@ -278,21 +275,64 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 // Allocate len bytes of physical memory for environment env,
 // and map it at virtual address va in the environment's address space.
 // Does not zero or otherwise initialize the mapped pages in any way.
-// Pages should be writable by user and kernel.
+// Pages will be made writable by both user and kernel.
 // Panic if any allocation attempt fails.
 //
 static void
-region_alloc(struct Env *e, void *va, size_t len)
+region_alloc(pde_t *pgdir, uintptr_t va, size_t len)
 {
-	// LAB 3: Your code here.
-	// (But only if you need it for load_icode.)
-	//
-	// Hint: It is easier to use region_alloc if the caller can pass
-	//   'va' and 'len' values that are not page-aligned.
-	//   You should round va down, and round (va + len) up.
-	//   (Watch out for corner-cases!)
+	uintptr_t cur;
+
+	va = ROUNDDOWN(va, PGSIZE);
+	len = ROUNDUP(len, PGSIZE);
+
+	// pgdir is meant to be an environment page directory, not the kernel one
+	assert(pgdir != kern_pgdir);
+
+	// allocate a page at a time,
+	// then insert it into both the given pgdir and the kernel pgdir
+	for (cur = va; cur < va + len; cur += PGSIZE) {
+		struct PageInfo *pp = page_alloc(0);
+		if (!pp)
+			goto bad;
+		if (page_insert(pgdir, pp, (void *) cur, PTE_U | PTE_W | PTE_P))
+			goto bad;
+		if (page_insert(kern_pgdir, pp, (void *) cur, PTE_U | PTE_W | PTE_P))
+			goto bad;
+	}
+
+	return;
+
+bad:
+	panic("failed allocation during region_alloc");
 }
 
+// This function is given a single program header from an ELF file.
+// The program header specifies a segment which should be loaded.
+// This function does so, adding the segment both to the given page directory
+// 'pgdir' and to the kernel page directory.
+static void 
+load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
+	size_t memsize = ROUNDUP(ph->p_memsz, PGSIZE);
+	size_t filesize = ph->p_filesz;
+	uint8_t *src = binary + ph->p_offset;
+	uintptr_t va = ph->p_va;
+
+	// allocate the segment
+	region_alloc(pgdir, va, memsize);
+
+	// initialize the memory
+	memcpy((uint8_t *) va, src, filesize);
+
+	// zero out the rest of the segment
+	assert(filesize < memsize);
+	memset((uint8_t *) (va + filesize), '\0', memsize - filesize);
+
+}
+
+//
+// All in all: loads an ELF file into a user address space, updating 'env'
+// accordingly.
 //
 // Set up the initial program binary, stack, and processor flags
 // for a user process.
@@ -304,19 +344,14 @@ region_alloc(struct Env *e, void *va, size_t len)
 // virtual addresses indicated in the ELF program header.
 // At the same time it clears to zero any portions of these segments
 // that are marked in the program header as being mapped
-// but not actually present in the ELF file - i.e., the program's bss section.
-//
-// All this is very similar to what our boot loader does, except the boot
-// loader also needs to read the code from disk.  Take a look at
-// boot/main.c to get ideas.
+// but not actually present in the ELF file - e.g., the program's bss section.
 //
 // Finally, this function maps one page for the program's initial stack.
 //
 // load_icode panics if it encounters problems.
-//  - How might load_icode fail?  What might be wrong with the given input?
 //
 static void
-load_icode(struct Env *e, uint8_t *binary)
+load_icode(struct Env *env, uint8_t *binary)
 {
 	// Hints:
 	//  Load each program segment into virtual memory
@@ -345,13 +380,48 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
+	// TODO ^ remove that
 
-	// LAB 3: Your code here.
+	pde_t *pgdir = env->env_pgdir;
+
+	struct Proghdr *ph, *ph_end;
+	struct Elf *elf = (struct Elf *) binary;
+
+	if (elf->e_magic != ELF_MAGIC)
+		panic("not a valid ELF file");
+	
+	// parse the ELF file, loading one segment at a time
+	// TODO: add size checks so we don't go oob
+	ph = (struct Proghdr *) (binary + elf->e_phoff);
+	ph_end = ph + elf->e_phnum;
+	for (; ph < ph_end; ph++) {
+		if (ph->p_type == ELF_PROG_LOAD)
+			load_segment(pgdir, binary, ph);
+	}
+
+	// initialize the trap frame according to the ELF entry point
+	// so that the environment starts executing at the right place
+	assert(elf->e_entry < UTOP);
+	env->env_tf.tf_eip = elf->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
+	struct PageInfo *pp = page_alloc(ALLOC_ZERO);
+	if (!pp) 
+		goto bad;
+	if (page_insert(pgdir, pp, (void *) (USTACKTOP - PGSIZE), 
+					PTE_P | PTE_U | PTE_W)) 
+		goto bad;
+	
+	// set up the trap frame with the new stack
+	env->env_tf.tf_esp = USTACKTOP;
 
-	// LAB 3: Your code here.
+	// TODO: what about processor flags?
+
+	return;
+
+bad:
+	panic("allocation failed during load_icode");
 }
 
 //
