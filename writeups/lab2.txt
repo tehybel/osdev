@@ -6,9 +6,7 @@
 The first part of this lab is about physical page management. We need to
 implement a subsystem which allows us to allocate and free physical pages.
 
-First we write a rudimentary allocator,box
-cd la	
-boot_alloc(), which allocates memory
+First we write a rudimentary allocator, boot_alloc(), which allocates memory
 from the end of the .bss section of the kernel. We need this simple allocator
 to allocate data structures for the more advanced one.
 
