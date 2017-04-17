@@ -396,7 +396,6 @@ load_icode(struct Env *env, uint8_t *binary)
 	if (elf->e_magic != ELF_MAGIC)
 		panic("not a valid ELF file");
 	
-
 	// parse the ELF file, loading one segment at a time
 	cprintf("loading ELF segments...\n");
 
@@ -455,8 +454,12 @@ env_create(uint8_t *binary, enum EnvType type)
 {
 	struct Env *env;
 
-	// this will allocate envs[0], that's why we don't return anything.
-	int res = env_alloc(&env, 0);
+	envid_t parent_id = 0;
+
+	// we assume this will always allocate envs[0], 
+	// that's why we don't return anything; the caller knows where to find the
+	// created env.
+	int res = env_alloc(&env, parent_id);
 	if (res)
 		panic("env_alloc failed: %e", res);
 	
@@ -572,7 +575,6 @@ env_run(struct Env *new)
 	new->env_runs++;
 
 	// switch to the new address space
-	// TODO: won't we die here? The $pc value will no longer be mapped..?
 	lcr3(PADDR(new->env_pgdir));
 
 	// context switch to user mode

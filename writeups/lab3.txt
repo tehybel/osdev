@@ -4,7 +4,12 @@ Time: 21-00:30, TODO
 
 In the first part of this lab we implement functions for manipulating
 "environments"; an environment is more-or-less a synonym for "process", but we
-call them environments because there are differences.
+call them environments because there are differences:
+
+	 We introduce the term "environment" instead of the traditional term
+	 "process" in order to stress the point that JOS environments and UNIX
+	 processes provide different interfaces, and do not provide the same
+	 semantics. 
 
 An environment holds things like the register state for a thread, a pointer to
 its page directory, etc.
@@ -18,7 +23,6 @@ context switch to run code in userland!
 Unfortunately interrupts are not possible, so the processor is stuck in
 userland; it will crash on the first int 0xXX instruction. Handling interrupts
 is the next part of the lab.
-
 
 ---------
 
