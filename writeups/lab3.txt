@@ -96,3 +96,16 @@ exceptions.
 
 
 
+.....
+
+TODO: figure out this weird pagefault.
+
+clues:
+- qemu can log triple faults
+- cr2 is getting set to effffffc, that's the kernel stack base minus 4
+- the triple fault is with error 0xe, a page fault
+- if we fault in kernel land, everything is fine
+- maybe search more for "interrupt handler cr3"
+
+http://stackoverflow.com/questions/32598810/does-cr3-change-when-an-interrupt-is-fired-on-x86-machines
+

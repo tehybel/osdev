@@ -43,6 +43,11 @@
 
 .text
 
+// used to handle bad traps; just spin in place.
+.globl badint
+.type badint, @function
+badint: jmp badint
+
 // generate entry points for all the different exceptions
 // a table showing which of these push error codes can be found here:
 // http://wiki.osdev.org/Exceptions
