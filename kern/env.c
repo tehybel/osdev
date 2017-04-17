@@ -189,6 +189,7 @@ env_setup_vm(struct Env *e)
 	// mapped.
 	// Unfortunately this lets userland programs modify kernelland. We don't
 	// want that. TODO set up a trampoline page instead.
+	// or can we use GD_UD and friends?
 	pte = kern_pgdir[PDX(KERNBASE)];
 	e->env_pgdir[PDX(KERNBASE)] = pte;
 	page_incref(KADDR(PTE_ADDR(pte)));

@@ -96,13 +96,3 @@ exceptions.
 
 
 
-
-
-
-
-
-
-
-
-Questions:
-- how does the interrupt handler know which stack to use?
