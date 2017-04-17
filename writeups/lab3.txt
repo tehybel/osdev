@@ -22,13 +22,14 @@ context switch to run code in userland!
 
 Unfortunately interrupts are not yet handled properly, so the processor is
 stuck in userland; it will crash on the first int 0xXX instruction. Handling
-interrupts is the next part of the lab.
+interrupts is the last part of this lab.
 
 ---------
 
 Time: 12:30-TODO
 
-In the second part of the lab we need to handle interrupts.
+In the second part of the lab our task is to extend the operating system to
+properly handle exceptions.
 
 To program this we first need to understand some theory. We read about
 interrupts and exceptions in chapter 9 of the 80386 programmer's manual:
@@ -39,12 +40,13 @@ Other useful links:
 
 	http://stackoverflow.com/questions/3149175/what-is-the-difference-between-trap-and-interrupt
 	http://wiki.osdev.org/Exceptions
+	https://en.wikipedia.org/wiki/Task_state_segment
 
 There are two concepts: interrupts and exceptions. An exception is a type of
 interrupt. The processor can raise an exception due to executing an
 instruction. For example "int3" will trigger a breakpoint exception. But
-interrupts can also happen for other reasons, e.g. when receiving a network
-packet.
+interrupts can also happen for asynchronous reasons that have nothing to do
+with the currently executing code, e.g. when receiving a network packet.
 
 Exceptions are further split into three categories:
 - A trap is an exception which increments the $pc, e.g. int3 for breakpoints
@@ -54,7 +56,8 @@ Exceptions are further split into three categories:
   be relevant to us.
 
 When an interrupt happens, the processor performs a "light context switch",
-transferring execution to an interrupt handler, a special chunk of code.
+transferring execution to an interrupt handler, a special chunk of code. This
+code is typically run in kernel mode, not user mode.
 
 How does the processor know where to jump to when an interrupt occurs? Each
 interrupt has a number, for example a breakpoint interrupt has number 3. The
@@ -67,9 +70,39 @@ a descriptor is here:
 
 	https://pdos.csail.mit.edu/6.828/2016/readings/i386/s09_05.htm
 
+A descriptor determines the $pc-value where the interrupt handler resides. It
+also determines whether the handler should run in kernel- or user-mode.
+
+The code of the interrupt handler needs a stack it can use while executing.
+How does the processor know which value to put into the $sp register when it
+switches to the interrupt handler? There is a structure called the Task State
+Segment (TSS) which holds this information, along with many other things.
+
+The processor has a Task Register (TR) which contains a segment selector, just
+like the $cs and $ss registers do. This corresponds to an entry in the GDT.
+The TR can be loaded with the LTR instruction. 
+
+So to switch to an interrupt handler, the processor finds a selector in the
+TR, looks it up in the GDT, finds a TSS struct in the corresponding segment,
+and there it finds the needed $sp-value.
+
+
+
+Returning from theory to practice, our task in this part of the lab is to
+handle exceptions, e.g. page faults (exception #14), debug exceptions
+(exception #3) and so on. Exceptions have numbers from 0 to 31. Other
+interrupts have numbers from 32 to 255. In this part of the lab we focus on
+exceptions.
 
 
 
 
 
 
+
+
+
+
+
+Questions:
+- how does the interrupt handler know which stack to use?
