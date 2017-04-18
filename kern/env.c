@@ -194,8 +194,6 @@ env_setup_vm(struct Env *env)
 			continue;
 		}
 
-		cprintf("setting a PDE at index %d: 0x%x\n", i, pde);
-
 		page_incref(pa2page(PTE_ADDR(pde)));
 		env->env_pgdir[i] = pde;
 	}
