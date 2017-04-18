@@ -101,7 +101,7 @@ init_idt(void)
 	SETGATE (idt[T_DIVIDE], 0, GD_KT, trap_divide, 0) 	// divide error
 	SETGATE (idt[T_DEBUG],  1, GD_KT, trap_debug,  0) 	// debug exception
 	SETGATE (idt[T_NMI],    0, GD_KT, trap_nmi,    0) 	// non-maskable interrupt
-	SETGATE (idt[T_BRKPT],  1, GD_KT, trap_brkpt,  0) 	// breakpoint
+	SETGATE (idt[T_BRKPT],  1, GD_KT, trap_brkpt,  3) 	// breakpoint
 	SETGATE (idt[T_OFLOW],  1, GD_KT, trap_oflow,  0) 	// overflow
 	SETGATE (idt[T_BOUND],  0, GD_KT, trap_bound,  0) 	// bounds check
 	SETGATE (idt[T_ILLOP],  0, GD_KT, trap_illop,  0) 	// illegal opcode
@@ -192,11 +192,17 @@ print_regs(struct PushRegs *regs)
 static void
 trap_dispatch(struct Trapframe *tf)
 {
-	// do special handling of page faults
+	// page faults are handled specially
 	if (tf->tf_trapno == T_PGFLT) {
 		page_fault_handler(tf);
 		return;
 	}
+
+	// breakpoints invoke the kernel monitor
+	if (tf->tf_trapno == T_BRKPT) {
+		monitor(tf); // never returns
+	}
+
 
 	// unexpected trap; the user process or the kernel has a bug.
 	print_trapframe(tf);
