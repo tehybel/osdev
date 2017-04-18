@@ -93,11 +93,11 @@ init_idt(void)
 		SETGATE (idt[i], 0, GD_KT, badint, 0);
 	}
 
-	// now set some specific handlers
+	// now set some specific handlers;
+	// these are defined in kern/trapentry.S
 
 	//                    istrap
 	//       interruptnum      sel    handler      privlvl
-	/*
 	SETGATE (idt[T_DIVIDE], 0, GD_KT, trap_divide, 0) 	// divide error
 	SETGATE (idt[T_DEBUG],  1, GD_KT, trap_debug,  0) 	// debug exception
 	SETGATE (idt[T_NMI],    0, GD_KT, trap_nmi,    0) 	// non-maskable interrupt
@@ -116,9 +116,7 @@ init_idt(void)
 	SETGATE (idt[T_ALIGN],  0, GD_KT, trap_align,  0) 	// aligment check
 	SETGATE (idt[T_MCHK],   0, GD_KT, trap_mchk,   0) 	// machine check
 	SETGATE (idt[T_SIMDERR],0, GD_KT, trap_simerr, 0)	// SIMD floating point err
-	*/
 
-	// Per-CPU setup 
 	init_idt_percpu();
 }
 

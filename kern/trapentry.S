@@ -82,7 +82,7 @@ pushal
 
 // load the kernel data segment selector into %ds and %es so we can access
 // kernel data
-mov GD_KD, %eax
+mov $GD_KD, %eax
 mov %ax, %ds
 mov %ax, %es
 
