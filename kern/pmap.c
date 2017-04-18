@@ -378,15 +378,17 @@ page_free(struct PageInfo *pageinfo)
 // freeing it if there are no more refs.
 //
 void
-page_decref(struct PageInfo* pp)
+page_decref(struct PageInfo* pinfo)
 {
-	if (--pp->pp_ref == 0)
-		page_free(pp);
+	assert (pinfo >= pages && pinfo <= &pages[npages]);
+	assert (pinfo->pp_ref <= MAGIC2);
+	if (--pinfo->pp_ref == 0)
+		page_free(pinfo);
 }
 
 void page_incref(struct PageInfo* pinfo) {
 	assert (pinfo >= pages && pinfo <= &pages[npages]);
-	if (pinfo->pp_ref++ >= 0xfff0) 
+	if (++pinfo->pp_ref >= MAGIC2) 
 		panic("page_incref overflow: 0x%x", pinfo);
 }
 

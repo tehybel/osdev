@@ -159,7 +159,7 @@ env_init_percpu(void)
 //	-E_NO_MEM if page directory or table could not be allocated.
 //
 static int
-env_setup_vm(struct Env *e)
+env_setup_vm(struct Env *env)
 {
 	struct PageInfo *user_pgdir;
 	pde_t pde;
@@ -170,68 +170,49 @@ env_setup_vm(struct Env *e)
 	if (!(user_pgdir = page_alloc(ALLOC_ZERO)))
 		return -E_NO_MEM;
 	
-	// Now, set e->env_pgdir and initialize the user page directory.
-	e->env_pgdir = page2kva(user_pgdir);
+	// Now, set env->env_pgdir and initialize the user page directory.
+	env->env_pgdir = page2kva(user_pgdir);
 
-	/*
 	// incref it so that env_free will properly free it
 	page_incref(user_pgdir);
 
+	// initialize the user pgdir to be identical to the kernel pgdir for now.
+	// This is necessary for several reasons:
+	// 
+	// (1) when we switch cr3 we are still running kernel-land code, so if the
+	// code isn't mapped in the user pgdir, it gets "pulled out from
+	// underneath us" resulting in a segfault, and
+	// (2) when an exception occurs, the interrupt handler needs use the
+	// kernel stack, which hence needs to be mapped.
+	// 
+	// This means that userland programs can access kernel space. We need a
+	// way to prevent this, perhaps with segmentation (GD_UD etc.)? TODO.
 	for (i = 0; i < NPDENTRIES; i++) {
 		pde = kern_pgdir[i];
-
-		// is it present?
-		if (!(pde & PTE_P))
+		if (!(pde & PTE_P)) {
+			// not present
 			continue;
+		}
 
-		
-		cprintf("PDE: 0x%x\n", pde);
+		cprintf("setting a PDE at index %d: 0x%x\n", i, pde);
+
+		page_incref(pa2page(PTE_ADDR(pde)));
+		env->env_pgdir[i] = pde;
 	}
-	*/
+	// TODO: pp_ref is only maintained for physical pages below UTOP, so
+	// should we only incref if this is the case?
 
+	// these should be initialized via the kernel page table
+	assert (env->env_pgdir[PDX(UPAGES)] & PTE_P);
+	assert (env->env_pgdir[PDX(UENVS)] & PTE_P);
 
-	// set up the UPAGES area by using the page table of the kernel
-	pte = kern_pgdir[PDX(UPAGES)];
-	e->env_pgdir[PDX(UPAGES)] = pte;
-	page_incref(pa2page(PTE_ADDR(pte)));
-
-	// set up the UENVS area by using the page table of the kernel
-	pte = kern_pgdir[PDX(UENVS)];
-	e->env_pgdir[PDX(UENVS)] = pte;
-	page_incref(pa2page(PTE_ADDR(pte)));
-
-	// do the same thing for KERNBASE; we need this, because otherwise when we
-	// update cr3 we immediately fault because the next instruction isn't
-	// mapped.
-	// Unfortunately this lets userland programs modify kernelland. We don't
-	// want that. TODO set up a trampoline page instead.
-	// or can we use GD_UD and friends?
-	pte = kern_pgdir[PDX(KERNBASE)];
-	e->env_pgdir[PDX(KERNBASE)] = pte;
-	page_incref(pa2page(PTE_ADDR(pte)));
-
-
-
-	//
-	// Hint:
-	//    - The VA space of all envs is identical above UTOP
-	//	(except at UVPT, which we've set below).
-	//	See inc/memlayout.h for permissions and layout.
-	//	Can you use kern_pgdir as a template?  Hint: Yes.
-	//	(Make sure you got the permissions right in Lab 2.)
-	//    - The initial VA below UTOP is empty.
-	//    - You do not need to make any more calls to page_alloc.
-	//    - Note: In general, pp_ref is not maintained for
-	//	physical pages mapped only above UTOP, but env_pgdir
-	//	is an exception -- you need to increment env_pgdir's
-	//	pp_ref for env_free to work correctly.
-	//    - The functions in kern/pmap.h are handy.
-	// TODO ^ remove that
-
+	// this is also needed, otherwise we'll segfault when we switch cr3
+	// because the code gets "pulled out under us".
+	assert (env->env_pgdir[PDX(KERNBASE)] & PTE_P);
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
+	env->env_pgdir[PDX(UVPT)] = PADDR(env->env_pgdir) | PTE_P | PTE_U;
 
 	return 0;
 }
