@@ -26,7 +26,7 @@ interrupts is the last part of this lab.
 
 ---------
 
-Time: 12:30-18, 11-TODO
+Time: 12:30-18, 11-13.
 
 In the second part of the lab our task is to extend the operating system to
 properly handle exceptions.
@@ -94,6 +94,11 @@ interrupts have numbers from 32 to 255. In this second part of the lab we
 focus on exceptions.
 
 
+---------
+
+Time: 13-16.
+
+- third part: getting syscalls working. TODO write this.
 
 
 
