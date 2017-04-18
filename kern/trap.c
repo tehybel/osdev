@@ -188,13 +188,17 @@ print_regs(struct PushRegs *regs)
 	cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
+// this function handles processor exceptions based on their type.
 static void
 trap_dispatch(struct Trapframe *tf)
 {
-	// Handle processor exceptions.
-	// LAB 3: Your code here.
+	// do special handling of page faults
+	if (tf->tf_trapno == T_PGFLT) {
+		page_fault_handler(tf);
+		return;
+	}
 
-	// Unexpected trap: The user process or the kernel has a bug.
+	// unexpected trap; the user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
 		panic("unhandled trap in kernel");
@@ -220,7 +224,8 @@ trap(struct Trapframe *tf)
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
-		assert(curenv);
+		assert (curenv);
+		assert (curenv->env_status == ENV_RUNNING);
 
 		// Copy trap frame (which is currently on the stack)
 		// into 'curenv->env_tf', so that running the environment
