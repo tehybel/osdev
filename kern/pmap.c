@@ -380,14 +380,19 @@ page_free(struct PageInfo *pageinfo)
 void
 page_decref(struct PageInfo* pinfo)
 {
+	if (pinfo->pp_ref == 0)
+		panic("decref on already-free page: 0x%x", pinfo);
+
 	assert (pinfo >= pages && pinfo <= &pages[npages]);
-	assert (pinfo->pp_ref <= MAGIC2);
+	assert (pinfo->pp_ref <= MAGIC2); // will detect underflows
+
 	if (--pinfo->pp_ref == 0)
 		page_free(pinfo);
 }
 
 void page_incref(struct PageInfo* pinfo) {
 	assert (pinfo >= pages && pinfo <= &pages[npages]);
+
 	if (++pinfo->pp_ref >= MAGIC2) 
 		panic("page_incref overflow: 0x%x", pinfo);
 }
@@ -556,6 +561,8 @@ page_remove(pde_t *pgdir, void *va)
 	pte_t *pte = NULL;
 	struct PageInfo *pinfo = page_lookup(pgdir, va, &pte);
 	if (!pinfo)
+		return;
+	if (!(*pte & PTE_P))
 		return;
 	
 	// decref and free if pp_refcnt reaches 0
