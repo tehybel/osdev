@@ -67,8 +67,8 @@ int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	
-	cprintf("syscall %d (0x%x, 0x%x, 0x%x, 0x%x, 0x%x)\n", 
-		syscallno, a1, a2, a3, a4, a5);
+	//cprintf("syscall %d (0x%x, 0x%x, 0x%x, 0x%x, 0x%x)\n", 
+	//	syscallno, a1, a2, a3, a4, a5);
 
 	switch (syscallno) {
 
