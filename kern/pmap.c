@@ -591,17 +591,12 @@ static uintptr_t user_mem_check_addr;
 //
 // Check that an environment is allowed to access the range of memory
 // [va, va+len) with permissions 'perm | PTE_P'.
-// Normally 'perm' will contain PTE_U at least, but this is not required.
-// 'va' and 'len' need not be page-aligned; you must test every page that
-// contains any of that range.  You will test either 'len/PGSIZE',
-// 'len/PGSIZE + 1', or 'len/PGSIZE + 2' pages.
 //
 // A user program can access a virtual address if (1) the address is below
-// ULIM, and (2) the page table gives it permission.  These are exactly
-// the tests you should implement here.
+// ULIM, and (2) the page table gives it permission.
 //
-// If there is an error, set the 'user_mem_check_addr' variable to the first
-// erroneous virtual address.
+// If there is an error, we set the 'user_mem_check_addr' variable to the
+// first erroneous virtual address.
 //
 // Returns 0 if the user program can access this range of addresses,
 // and -E_FAULT otherwise.
@@ -609,9 +604,35 @@ static uintptr_t user_mem_check_addr;
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	// LAB 3: Your code here.
+	uintptr_t offset = PGOFF(va);
+	void * cur = (void *) ROUNDDOWN(va, PGSIZE);
+	const void * end = ROUNDUP(va + len, PGSIZE);
+	pte_t *pte = NULL;
+
+	perm |= PTE_P;
+
+	for (; cur < end; cur += PGSIZE) {
+		// is it in kernel land?
+		if (cur >= (void *) ULIM)
+			goto bad;
+
+		// look it up in the page table
+		struct PageInfo* pageinfo = page_lookup(env->env_pgdir, cur, &pte);
+
+		// is it not present?
+		if (!pageinfo) 
+			goto bad;
+
+		// are the permissions wrong?
+		if ((*pte & perm) != perm) 
+			goto bad;
+	}
 
 	return 0;
+
+bad:
+	user_mem_check_addr = (uintptr_t) cur + offset;
+	return -E_FAULT;
 }
 
 //
@@ -627,7 +648,7 @@ user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->env_id, user_mem_check_addr);
-		env_destroy(env);	// may not return
+		env_destroy(env);	// might not return
 	}
 }
 

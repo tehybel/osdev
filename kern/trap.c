@@ -221,14 +221,11 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
-	// unexpected trap; the user process or the kernel has a bug.
+	assert (tf->tf_cs != GD_KT); // should have been caught earlier.
+
+	// unhandled trap; display it, then terminate the environment.
 	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
-	else {
-		env_destroy(curenv);
-		return;
-	}
+	env_destroy(curenv);
 }
 
 void
@@ -245,18 +242,24 @@ trap(struct Trapframe *tf)
 
 	cprintf("Incoming TRAP frame at %p\n", tf);
 
-	if ((tf->tf_cs & 3) == 3) {
-		// Trapped from user mode.
-		assert (curenv);
-		assert (curenv->env_status == ENV_RUNNING);
-
-		// Copy trap frame (which is currently on the stack)
-		// into 'curenv->env_tf', so that running the environment
-		// will restart at the trap point.
-		curenv->env_tf = *tf;
-		// The trapframe on the stack should be ignored from here on.
-		tf = &curenv->env_tf;
+	// trapped from kernel land
+	if ((tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT) {
+		print_trapframe(tf);
+		panic("trap in kernel mode");
 	}
+
+	// if we get here, we trapped from user mode.
+
+	assert (curenv);
+	assert (curenv->env_status == ENV_RUNNING);
+
+	// Copy trap frame (which is currently on the stack)
+	// into 'curenv->env_tf', so that running the environment
+	// will restart at the trap point.
+	curenv->env_tf = *tf;
+
+	// The trapframe on the stack should be ignored from here on.
+	tf = &curenv->env_tf;
 
 	// Record that tf is the last real trapframe so
 	// print_trapframe can print some additional information.
@@ -265,8 +268,7 @@ trap(struct Trapframe *tf)
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
-	// Return to the current environment, which should be running.
-	assert(curenv && curenv->env_status == ENV_RUNNING);
+	// Return to the current environment
 	env_run(curenv);
 }
 
