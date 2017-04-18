@@ -21,16 +21,17 @@ i386_init(void)
 	memset(edata, 0, end - edata);
 
 	// initialize the console; cprintf will not work before we do this
-	cons_init();
+	init_console();
 
 	// initialize the physical page management system 
 	// also initialize the page table to support proper virtual memory
-	mem_init();
-	cprintf("Kernel memory management system initialized.\n");
+	init_memory();
 
-	// user environment initialization functions
-	env_init();
-	trap_init();
+	// user environment initialization
+	init_environments();
+
+	// set up the IDT to handle exceptions and other interrupts
+	init_idt();
 
 #if defined(TEST)
 	// Don't touch -- used by grading script!

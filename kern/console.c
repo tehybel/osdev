@@ -439,7 +439,7 @@ cons_putc(int c)
 
 // initialize the console devices
 void
-cons_init(void)
+init_console(void)
 {
 	cga_init();
 	kbd_init();

@@ -87,25 +87,17 @@ TR, looks it up in the GDT, finds a TSS struct in the corresponding segment,
 and there it finds the needed $sp-value.
 
 
-
 Returning from theory to practice, our task in this part of the lab is to
 handle exceptions, e.g. page faults (exception #14), debug exceptions
 (exception #3) and so on. Exceptions have numbers from 0 to 31. Other
-interrupts have numbers from 32 to 255. In this part of the lab we focus on
-exceptions.
+interrupts have numbers from 32 to 255. In this second part of the lab we
+focus on exceptions.
 
 
 
-.....
 
-TODO: figure out this weird pagefault.
 
-clues:
-- qemu can log triple faults
-- cr2 is getting set to effffffc, that's the kernel stack base minus 4
-- the triple fault is with error 0xe, a page fault
-- if we fault in kernel land, everything is fine
-- maybe search more for "interrupt handler cr3"
-
-http://stackoverflow.com/questions/32598810/does-cr3-change-when-an-interrupt-is-fired-on-x86-machines
+TODO: write about these things:
+- bugs from previous labs caught up with me
+- triple fault, qemu logging, page tables.
 

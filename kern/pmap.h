@@ -53,7 +53,7 @@ enum {
 	ALLOC_ZERO = 1<<0,
 };
 
-void	mem_init(void);
+void	init_memory(void);
 
 void	page_init(void);
 struct PageInfo *page_alloc(int alloc_flags);

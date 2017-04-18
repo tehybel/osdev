@@ -116,7 +116,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 // env_alloc() returns envs[0]).
 //
 void
-env_init(void)
+init_environments(void)
 {
 	struct Env *cur;
 	for (cur = envs + NENV - 1; cur >= envs; cur--) {

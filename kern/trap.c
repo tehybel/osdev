@@ -83,7 +83,7 @@ void badint ();
 // this function initializes the IDT so that we can handle exceptions from the
 // processor.
 void
-trap_init(void)
+init_idt(void)
 {
 	extern struct Segdesc gdt[];
 
@@ -119,12 +119,12 @@ trap_init(void)
 	*/
 
 	// Per-CPU setup 
-	trap_init_percpu();
+	init_idt_percpu();
 }
 
 // Initialize and load the per-CPU TSS and IDT
 void
-trap_init_percpu(void)
+init_idt_percpu(void)
 {
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.

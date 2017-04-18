@@ -17,7 +17,7 @@
 #define CRT_COLS	80
 #define CRT_SIZE	(CRT_ROWS * CRT_COLS)
 
-void cons_init(void);
+void init_console(void);
 int cons_getc(void);
 
 void kbd_intr(void); // irq 1

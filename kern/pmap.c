@@ -149,7 +149,7 @@ boot_alloc(uint32_t n)
 // From UTOP to ULIM, the user is allowed to read but not write.
 // Above ULIM the user cannot read or write.
 void
-mem_init(void)
+init_memory(void)
 {
 	uint32_t cr0;
 	size_t n;
