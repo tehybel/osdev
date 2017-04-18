@@ -26,7 +26,7 @@ interrupts is the last part of this lab.
 
 ---------
 
-Time: 12:30-TODO
+Time: 12:30-18, 11-TODO
 
 In the second part of the lab our task is to extend the operating system to
 properly handle exceptions.

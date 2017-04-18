@@ -360,36 +360,7 @@ load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
 static void
 load_icode(struct Env *env, uint8_t *binary)
 {
-	// Hints:
-	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
-	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
-	//  Each segment's virtual address can be found in ph->p_va
-	//  and its size in memory can be found in ph->p_memsz.
-	//  The ph->p_filesz bytes from the ELF binary, starting at
-	//  'binary + ph->p_offset', should be copied to virtual address
-	//  ph->p_va.  Any remaining memory bytes should be cleared to zero.
-	//  (The ELF header should have ph->p_filesz <= ph->p_memsz.)
-	//  Use functions from the previous lab to allocate and map pages.
-	//
-	//  All page protection bits should be user read/write for now.
-	//  ELF segments are not necessarily page-aligned, but you can
-	//  assume for this function that no two segments will touch
-	//  the same virtual page.
-	//
-	//  You may find a function like region_alloc useful.
-	//
-	//  Loading the segments is much simpler if you can move data
-	//  directly into the virtual addresses stored in the ELF binary.
-	//  So which page directory should be in force during
-	//  this function?
-	//
-	//  You must also do something with the program's entry point,
-	//  to make sure that the environment starts executing there.
-	//  What?  (See env_run() and env_pop_tf() below.)
-	// TODO ^ remove that
-
-	pde_t *pgdir = env->env_pgdir;
+	pde_t *user_pgdir = env->env_pgdir;
 
 	struct Proghdr *ph, *ph_end;
 	struct Elf *elf = (struct Elf *) binary;
@@ -402,15 +373,15 @@ load_icode(struct Env *env, uint8_t *binary)
 
 	// switch to the userland page directory first, so that we can copy data
 	// directly with memcpy during load_segment
-	lcr3(PADDR(pgdir));
+	lcr3(PADDR(user_pgdir));
 
-	// do the actual loading of each segment
+	// perform the actual loading of each segment
 	// TODO: add size checks so we don't go oob
 	ph = (struct Proghdr *) (binary + elf->e_phoff);
 	ph_end = ph + elf->e_phnum;
 	for (; ph < ph_end; ph++) {
 		if (ph->p_type == ELF_PROG_LOAD)
-			load_segment(pgdir, binary, ph);
+			load_segment(user_pgdir, binary, ph);
 	}
 
 	// switch back to the kernel page directory
@@ -428,7 +399,7 @@ load_icode(struct Env *env, uint8_t *binary)
 	struct PageInfo *pp = page_alloc(ALLOC_ZERO);
 	if (!pp) 
 		goto bad;
-	if (page_insert(pgdir, pp, (void *) (USTACKTOP - PGSIZE), 
+	if (page_insert(user_pgdir, pp, (void *) (USTACKTOP - PGSIZE), 
 					PTE_P | PTE_U | PTE_W)) 
 		goto bad;
 	
