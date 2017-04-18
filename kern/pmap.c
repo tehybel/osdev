@@ -604,14 +604,13 @@ static uintptr_t user_mem_check_addr;
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	uintptr_t offset = PGOFF(va);
-	void * cur = (void *) ROUNDDOWN(va, PGSIZE);
+	void * cur;
 	const void * end = ROUNDUP(va + len, PGSIZE);
 	pte_t *pte = NULL;
 
 	perm |= PTE_P;
 
-	for (; cur < end; cur += PGSIZE) {
+	for (cur = (void *) va; cur < end; cur += PGSIZE) {
 		// is it in kernel land?
 		if (cur >= (void *) ULIM)
 			goto bad;
@@ -631,7 +630,8 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	return 0;
 
 bad:
-	user_mem_check_addr = (uintptr_t) cur + offset;
+	user_mem_check_addr = 
+		(uintptr_t) ((cur == va) ? cur : ROUNDDOWN(cur, PGSIZE));
 	return -E_FAULT;
 }
 
