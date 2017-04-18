@@ -100,4 +100,8 @@ focus on exceptions.
 TODO: write about these things:
 - bugs from previous labs caught up with me
 - triple fault, qemu logging, page tables.
+- setting up the IDT
+- breakpoint exceptions -> drop into monitor
+- handling syscalls, both from kernel- and userland
+- checking of userland pointers
 
