@@ -162,7 +162,9 @@ static int
 env_setup_vm(struct Env *e)
 {
 	struct PageInfo *user_pgdir;
+	pde_t pde;
 	pte_t pte;
+	int i;
 
 	// Allocate a page for the page directory
 	if (!(user_pgdir = page_alloc(ALLOC_ZERO)))
@@ -171,18 +173,32 @@ env_setup_vm(struct Env *e)
 	// Now, set e->env_pgdir and initialize the user page directory.
 	e->env_pgdir = page2kva(user_pgdir);
 
+	/*
 	// incref it so that env_free will properly free it
 	page_incref(user_pgdir);
+
+	for (i = 0; i < NPDENTRIES; i++) {
+		pde = kern_pgdir[i];
+
+		// is it present?
+		if (!(pde & PTE_P))
+			continue;
+
+		
+		cprintf("PDE: 0x%x\n", pde);
+	}
+	*/
+
 
 	// set up the UPAGES area by using the page table of the kernel
 	pte = kern_pgdir[PDX(UPAGES)];
 	e->env_pgdir[PDX(UPAGES)] = pte;
-	page_incref(KADDR(PTE_ADDR(pte)));
+	page_incref(pa2page(PTE_ADDR(pte)));
 
 	// set up the UENVS area by using the page table of the kernel
 	pte = kern_pgdir[PDX(UENVS)];
 	e->env_pgdir[PDX(UENVS)] = pte;
-	page_incref(KADDR(PTE_ADDR(pte)));
+	page_incref(pa2page(PTE_ADDR(pte)));
 
 	// do the same thing for KERNBASE; we need this, because otherwise when we
 	// update cr3 we immediately fault because the next instruction isn't
@@ -192,7 +208,7 @@ env_setup_vm(struct Env *e)
 	// or can we use GD_UD and friends?
 	pte = kern_pgdir[PDX(KERNBASE)];
 	e->env_pgdir[PDX(KERNBASE)] = pte;
-	page_incref(KADDR(PTE_ADDR(pte)));
+	page_incref(pa2page(PTE_ADDR(pte)));
 
 
 

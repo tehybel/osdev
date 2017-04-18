@@ -385,7 +385,8 @@ page_decref(struct PageInfo* pp)
 }
 
 void page_incref(struct PageInfo* pinfo) {
-	if (pinfo->pp_ref++ == 0xffff) 
+	assert (pinfo >= pages && pinfo <= &pages[npages]);
+	if (pinfo->pp_ref++ >= 0xfff0) 
 		panic("page_incref overflow: 0x%x", pinfo);
 }
 
