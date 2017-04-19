@@ -1,30 +1,47 @@
 
+
+In the previous lab, our kernel initialized various subsystems. Then it
+dropped into the kernel monitor, a small menu. 
+
+In this lab the kernel will execute a user-mode process instead of displaying
+the monitor. Making that work is the overall goal of the lab.
+
+
+
+--- part 1 ---
+
+
 Time: 21-00:30
 
+In this OS, we use the term "environment" rather than "process" because there
+are differences from the usual UNIX process. (I'm not yet sure which.)
 
-In the first part of this lab we implement functions for manipulating
-"environments"; an environment is more-or-less a synonym for "process", but we
-call them environments because there are differences:
+The goal in part 1 is to be able to allocate and manipulate data structures
+which keep track of these environments/processes, and to be able to load an
+ELF file into the address space of an environment.
 
-	 We introduce the term "environment" instead of the traditional term
-	 "process" in order to stress the point that JOS environments and UNIX
-	 processes provide different interfaces, and do not provide the same
-	 semantics. 
+Environments are kept track of with a "struct Env"; this struct holds things
+like the register state, the relevant page table, etc.
 
-An environment holds things like the register state for a thread, a pointer to
-its page directory, etc.
+To load an ELF file we wrote the function load_icode(). To load the ELF file
+we need to set up a separate page table for the environment. The ELF file
+tells us at which virtual address each segment should go, so we simply create
+the corresponding page table entries and copy the file contents to the pages.
 
-We also implemented a function, load_icode(), which will load an ELF file into
-a user land address space.
-
-Thus we can now create a new environment, load code into it, and even do a
-context switch to run code in userland!
+We can now create an environment and load a program into its virtual address
+space. The environment is ready to be run. We can context switch to it with
+the "iret" instruction.
 
 Unfortunately interrupts are not yet handled properly, so the processor is
-stuck in userland; it will crash on the first int 0xXX instruction. Handling
-interrupts is the last part of this lab.
+stuck in userland; it will crash on the first int 0xXX instruction, or the
+moment an exception happens (e.g. division by zero). Since there is no handler
+for these events, the machine will reboot.
 
----------
+Handling exceptions is the next part of this lab.
+
+
+
+--- part 2 ---
 
 Time: 12:30-18, 11-13.
 
@@ -42,11 +59,16 @@ Other useful links:
 	http://wiki.osdev.org/Exceptions
 	https://en.wikipedia.org/wiki/Task_state_segment
 
-There are two concepts: interrupts and exceptions. An exception is a type of
-interrupt. The processor can raise an exception due to executing an
-instruction. For example "int3" will trigger a breakpoint exception. But
-interrupts can also happen for asynchronous reasons that have nothing to do
-with the currently executing code, e.g. when receiving a network packet.
+There are two concepts: interrupts and exceptions. 
+
+An exception is a type of interrupt. The processor can raise an exception
+while executing an instruction. For example "int3" will trigger a breakpoint
+exception, and an "idiv" instruction can trigger a divide exception due to
+division by zero. 
+
+Interrupts, but not exceptions, can also happen for asynchronous reasons that
+have nothing to do with the currently executing code, e.g. when receiving a
+network packet.
 
 Exceptions are further split into three categories:
 - A trap is an exception which increments the $pc, e.g. int3 for breakpoints
@@ -60,10 +82,10 @@ transferring execution to an interrupt handler, a special chunk of code. This
 code is typically run in kernel mode, not user mode.
 
 How does the processor know where to jump to when an interrupt occurs? Each
-interrupt has a number, for example a breakpoint interrupt has number 3. The
-processor uses this number to index into a table of 8-byte entries. This is
-the Interrupt Descriptor Table (IDT). The table base address is loaded and set
-via the LIDT and SIDT instructions and resides in the IDT register (IDTR).
+interrupt has a number, for example a breakpoint exception has the number 3.
+The processor uses this number to index into a table of 8-byte entries. This
+is the Interrupt Descriptor Table (IDT). The table base address is loaded and
+set via the LIDT and SIDT instructions and resides in the IDT register (IDTR).
 
 Each 8-byte entry in the IDT is called an Interrupt Descriptor. The layout of
 a descriptor is here:
@@ -84,29 +106,87 @@ The TR can be loaded with the LTR instruction.
 
 So to switch to an interrupt handler, the processor finds a selector in the
 TR, looks it up in the GDT, finds a TSS struct in the corresponding segment,
-and there it finds the needed $sp-value.
+and there it finds the needed $sp-value. It finds the $pc-value in the IDT.
 
 
 Returning from theory to practice, our task in this part of the lab is to
 handle exceptions, e.g. page faults (exception #14), debug exceptions
 (exception #3) and so on. Exceptions have numbers from 0 to 31. Other
-interrupts have numbers from 32 to 255. In this second part of the lab we
-focus on exceptions.
+interrupts have numbers from 32 to 255. 
+
+We look up all the relevant exceptions which can occur. For each of these we
+write a small assembly stub which pushes the exception number onto the stack
+and then jumps to a common handler, written in C.
+
+Generally, an exception results in the responsible environment getting
+terminated gracefully.
+
+Note that exceptions can also happen in the kernel. This is much more serious
+and results in a kernel panic, requiring a reboot.
 
 
----------
+At this point we can run a user-mode program which performs a division by
+zero. Now it doesn't cause the machine to reboot. Instead execution flow is
+transferred to the exception handler which terminates the environment.
+
+
+
+
+
+
+--- part 3 ---
 
 Time: 13-16.
 
-- third part: getting syscalls working. TODO write this.
+So far we have handled exceptions, but not other kinds of interrupts. One
+important interrupt that we should handle is the one used for system calls.
+
+On Linux this is "int 0x80"; in our OS it will be "int 0x30". It is an
+arbitrary choice, as long as the number doesn't overlap with other interrupts.
+
+When a program wants to perform a syscall, it will load the arguments into
+registers, then execute the "int 0x30" instruction. The processor looks up the
+handler in the IDT and transfers execution there, performing a context switch.
+The kernel should then call the appropriate handler, put the return value into
+a register, and transfer execution back to the environment.
+
+To make this work we need to write the syscall handler and set entry 0x30 of
+the IDT. Once we've done this, the "hello world" program works. We can now
+perform syscalls.
+
+There is one small complication: some syscalls pass user-land pointers into
+kernel-land. For security reasons we need to be careful with these pointers.
+For example, we don't want to let an environment write into the kernel code by
+passing a kernel-space pointer to a syscall. So we had to write functions
+which can be used to validate these pointers.
 
 
 
-TODO: write about these things:
-- bugs from previous labs caught up with me
-- triple fault, qemu logging, page tables.
-- setting up the IDT
-- breakpoint exceptions -> drop into monitor
-- handling syscalls, both from kernel- and userland
-- checking of userland pointers
+
+--- other notes ---
+
+This lab took much longer than anticipated. The reason is that various bugs
+from lab 2 caught up with me in this lab.
+
+For example I had not set the kernel stack to be writable in the page table.
+But that part of the page table was not used during lab 2. It was only once I
+switched to an environment and triggered a fault, dropping back into the
+kernel, that the page table entry was used. 
+
+Thus when the interrupt handler tried to push values to the stack, it faulted,
+causing a switch to the double fault handler. It similarly faulted, triggering
+a triple fault, at which point the processor rebooted. Initially I did not
+understand why the machine rebooted and did not know how to figure this out.
+
+After some googling I found that you can pass special options to qemu to log
+the register state upon interrupts. This showed me (1) that a page fault
+exception was occurring and (2) that the $cr2 register was getting set to
+KERNEL_STACK_BASE-4; this implied that pushing to the kernel stack was
+failing, and thus the page tables had to be wrong.
+
+
+Overall, the time in this lab was split evenly between 
+- programming,
+- understanding theory, and 
+- debugging.
 
