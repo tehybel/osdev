@@ -46,10 +46,19 @@ enum EnvType {
 struct Env {
 	struct Trapframe env_tf;	// Saved registers
 	struct Env *env_link;		// Next free Env
-	envid_t env_id;			// Unique environment identifier
-	envid_t env_parent_id;		// env_id of this env's parent
-	enum EnvType env_type;		// Indicates special system environments
-	unsigned env_status;		// Status of the environment
+
+	// Unique environment identifier
+	envid_t env_id;			
+
+	// env_id of this env's parent
+	envid_t env_parent_id;		
+
+	// Indicates special system environments; not used yet.
+	enum EnvType env_type;		
+
+	// Status of the environment, e.g. ENV_FREE, ENV_RUNNING etc.
+	unsigned env_status;		
+
 	uint32_t env_runs;		// Number of times environment has run
 	int env_cpunum;			// The CPU that the env is running on
 
