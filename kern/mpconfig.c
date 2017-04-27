@@ -187,8 +187,7 @@ mp_init(void)
 				cpus[ncpu].cpu_id = ncpu;
 				ncpu++;
 			} else {
-				cprintf("SMP: too many CPUs, CPU %d disabled\n",
-					proc->apicid);
+				cprintf("SMP: too many CPUs, CPU %d disabled\n", proc->apicid);
 			}
 			p += sizeof(struct mpproc);
 			continue;

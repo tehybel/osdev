@@ -626,13 +626,41 @@ tlb_invalidate(pde_t *pgdir, void *va)
 // have to be multiple of PGSIZE.
 //
 void *
-mmio_map_region(physaddr_t pa, size_t size)
+mmio_map_region(physaddr_t begin_pa, size_t size)
 {
 	// Where to start the next region.  Initially, this is the
 	// beginning of the MMIO region.  Because this is static, its
 	// value will be preserved between calls to mmio_map_region
 	// (just like nextfree in boot_alloc).
 	static uintptr_t base = MMIOBASE;
+
+	// the 'pa' should be page-aligned
+	assert ((begin_pa & (PGSIZE - 1)) == 0);
+
+	size_t offset;
+
+	size = ROUNDUP(size, PGSIZE);
+
+	if (base + size > MMIOLIM) 
+		panic("MMIO space exhausted");
+	
+	// insert each of the pages into the kernel page table
+	for (offset = 0; offset < size; offset += PGSIZE) {
+		void *va = base + offset;
+		physaddr_t pa = begin_pa + offset;
+		struct PageInfo *pinfo = pa2page(pa);
+
+		// set cache-disable and write-through, so that the MMIO pages won't
+		// get cached by the CPU
+		int perm = PTE_PCD | PTE_PWT | PTE_W;
+	
+		page_insert(kern_pgdir, pinfo, va, perm);
+	}
+
+	// remember to change the base
+	base += size;
+
+
 
 	// Reserve size bytes of virtual memory starting at base and
 	// map physical pages [pa,pa+size) to virtual addresses
@@ -774,6 +802,7 @@ check_page_free_list(bool only_low_memory)
 		assert(page2pa(pp) != EXTPHYSMEM - PGSIZE);
 		assert(page2pa(pp) != EXTPHYSMEM);
 		assert(page2pa(pp) < EXTPHYSMEM || (char *) page2kva(pp) >= first_free_page);
+
 		// (new test for lab 4)
 		assert(page2pa(pp) != MPENTRY_PADDR);
 
