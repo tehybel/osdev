@@ -19,7 +19,8 @@
 struct Env *envs = NULL;		
 
 // the currently executing environment
-struct Env *curenv = NULL;		
+// this is replaced by a macro instead (?)
+// struct Env *curenv = NULL;		
 
 static struct Env *env_free_list;	// Free environment list
 					// (linked by Env->env_link)
