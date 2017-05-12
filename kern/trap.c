@@ -274,6 +274,7 @@ trap_dispatch(struct Trapframe *tf)
 	env_destroy(curenv);
 }
 
+// this function is called when an exception occurs.
 void
 trap(struct Trapframe *tf)
 {
@@ -296,20 +297,20 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
+	// if we trapped from kernel land, panic.
 	if ((tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT) {
-		// trapped from kernel land
 		print_trapframe(tf);
 		panic("trap in kernel mode");
 	}
 
-	// if we get here, we (hopefully) trapped from user mode.
+	// if we get here, we trapped from user mode.
 	assert ((tf->tf_cs & 3) == 3);
-
-	cprintf("Incoming TRAP frame at %p\n", tf);
 
 	// Acquire the big kernel lock before doing any
 	// serious kernel work.
-	// LAB 4: Your code here.
+	lock_kernel();
+
+	cprintf("Incoming TRAP frame at %p\n", tf);
 
 	assert (curenv);
 	assert (curenv->env_status == ENV_RUNNING);

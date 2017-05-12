@@ -569,6 +569,9 @@ env_run(struct Env *new)
 	new->env_status = ENV_RUNNING;
 	new->env_runs++;
 
+	// unlock the big kernel lock before context switching to userland
+	unlock_kernel();
+
 	// switch to the new address space
 	lcr3(PADDR(new->env_pgdir));
 
