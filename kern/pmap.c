@@ -278,9 +278,6 @@ init_memory(void)
 static void
 mem_init_mp(void)
 {
-	// for each CPU we've set aside some physical pages for its stack at
-	// PADDR(&percpu_kstacks[i]). Make sure to insert this page into the page
-	// table so that the CPUs can use these stacks.
 	int i;
 	for (i = 0; i < NCPU; i++) {
 		uintptr_t stack_top = KSTACKTOP - i*PERSTACK_SIZE;

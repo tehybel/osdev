@@ -52,6 +52,9 @@ i386_init(void)
 	// Starting non-boot CPUs
 	boot_aps();
 
+	cprintf("BSP is hanging for now..\n");
+	while (1) ; 
+
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
@@ -88,14 +91,10 @@ boot_aps(void)
 
 	memmove(code, mpentry_start, code_size);
 
-	cprintf("The BSP is CPU %d\n", cpunum());
-
 	// Boot each AP one at a time
 	for (int i = 0; i < ncpu; i++) {
-		struct CpuInfo *cpu = &cpus[i];
 		if (i == cpunum()) {
 			// current CPU is already running.
-			cprintf("skipping %d\n", cpunum());
 			continue;
 		}
 
@@ -103,10 +102,10 @@ boot_aps(void)
 		mpentry_kstack = percpu_kstacks[i] + KSTKSIZE;
 
 		// Start the CPU at mpentry_start
-		lapic_startap(cpu->cpu_id, PADDR(code));
+		lapic_startap(i, PADDR(code));
 
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while (cpu->cpu_status != CPU_STARTED)
+		while (cpus[i].cpu_status != CPU_STARTED)
 			; // spin
 	}
 }
@@ -117,7 +116,7 @@ mp_main(void)
 {
 	// We are in high EIP now, safe to switch to kern_pgdir 
 	lcr3(PADDR(kern_pgdir));
-	cprintf("SMP: CPU %d starting\n", cpunum());
+	cprintf("CMP: CPU %d starting\n", cpunum());
 
 	lapic_init();
 	env_init_percpu();

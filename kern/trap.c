@@ -158,8 +158,7 @@ init_idt_percpu(void)
 
 	struct Taskstate *ts = &thiscpu->cpu_ts;
 	uintptr_t stack_top = KSTACKTOP - cpunum()*PERSTACK_SIZE;
-	cprintf("cpu %d gets stack_top: 0x%x\n", cpunum(), stack_top);
-	int tss_descriptor = (GD_TSS0 >> 3) + cpunum();
+	int GD_TSSi = GD_TSS0 + (cpunum() << 3);
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
@@ -168,13 +167,13 @@ init_idt_percpu(void)
 	ts->ts_iomb = sizeof(struct Taskstate);
 
 	// Initialize the TSS slot of the gdt.
-	gdt[tss_descriptor] = SEG16(STS_T32A, (uint32_t) (ts),
+	gdt[GD_TSSi >> 3] = SEG16(STS_T32A, (uint32_t) (ts),
 								sizeof(struct Taskstate) - 1, 0);
-	gdt[tss_descriptor].sd_s = 0;
+	gdt[GD_TSSi >> 3].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(GD_TSSi);
 
 	// Load the IDT
 	lidt(&idt_pd);
