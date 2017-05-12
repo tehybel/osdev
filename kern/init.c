@@ -75,6 +75,7 @@ boot_aps(void)
 {
 	extern unsigned char mpentry_start[], mpentry_end[];
 	void *code;
+	int i;
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR; we need to do this
@@ -84,21 +85,28 @@ boot_aps(void)
 
 	size_t code_size = mpentry_end - mpentry_start;
 	assert (code_size <= PGSIZE); // we only reserved one physical page
+
 	memmove(code, mpentry_start, code_size);
 
+	cprintf("The BSP is CPU %d\n", cpunum());
+
 	// Boot each AP one at a time
-	for (c = cpus; c < cpus + ncpu; c++) {
-		if (c == cpus + cpunum())  // We've started already.
+	for (int i = 0; i < ncpu; i++) {
+		struct CpuInfo *cpu = &cpus[i];
+		if (i == cpunum()) {
+			// current CPU is already running.
+			cprintf("skipping %d\n", cpunum());
 			continue;
+		}
 
 		// Tell mpentry.S what stack to use 
-		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
+		mpentry_kstack = &percpu_kstacks[i] + KSTKSIZE;
 
 		// Start the CPU at mpentry_start
-		lapic_startap(c->cpu_id, PADDR(code));
+		lapic_startap(cpu->cpu_id, PADDR(code));
 
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while (c->cpu_status != CPU_STARTED)
+		while (cpu->cpu_status != CPU_STARTED)
 			; // spin
 	}
 }

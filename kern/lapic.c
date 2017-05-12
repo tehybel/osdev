@@ -111,6 +111,7 @@ lapic_init(void)
 	lapicw(TPR, 0);
 }
 
+// the current CPU's number; should be the same as thiscpu->cpu_id.
 int
 cpunum(void)
 {
