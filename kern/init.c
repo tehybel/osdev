@@ -81,7 +81,10 @@ boot_aps(void)
 	// because APs will boot in real mode, so they need their init code at a
 	// low address.
 	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+
+	size_t code_size = mpentry_end - mpentry_start;
+	assert (code_size <= PGSIZE); // we only reserved one physical page
+	memmove(code, mpentry_start, code_size);
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {

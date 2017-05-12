@@ -278,23 +278,20 @@ init_memory(void)
 static void
 mem_init_mp(void)
 {
-	// Map per-CPU stacks starting at KSTACKTOP, for up to 'NCPU' CPUs.
-	//
-	// For CPU i, use the physical memory that 'percpu_kstacks[i]' refers
-	// to as its kernel stack. CPU i's kernel stack grows down from virtual
-	// address kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP), and is
-	// divided into two pieces, just like the single stack you set up in
-	// mem_init:
-	//     * [kstacktop_i - KSTKSIZE, kstacktop_i)
-	//          -- backed by physical memory
-	//     * [kstacktop_i - (KSTKSIZE + KSTKGAP), kstacktop_i - KSTKSIZE)
-	//          -- not backed; so if the kernel overflows its stack,
-	//             it will fault rather than overwrite another CPU's stack.
-	//             Known as a "guard page".
-	//     Permissions: kernel RW, user NONE
-	//
-	// LAB 4: Your code here:
+	// for each CPU we've set aside some physical pages for its stack at
+	// PADDR(&percpu_kstacks[i]). Make sure to insert this page into the page
+	// table so that the CPUs can use these stacks.
+	int i;
+	for (i = 0; i < NCPU; i++) {
+		uintptr_t stack_top = KSTACKTOP - i*PERSTACK_SIZE;
+		uintptr_t stack_bot = stack_top - KSTKSIZE;
+		physaddr_t stack_pa = PADDR(&percpu_kstacks[i]);
+		boot_map_region(kern_pgdir, stack_bot, KSTKSIZE, stack_pa, PTE_W);
 
+		// Note that the area [stack_bot - KSTKGAP, stack_bot] is not mapped;
+		// it functions as a guard page. This way if a stack overflows, we'll
+		// fault rather than get silent corruption.
+	}
 }
 
 // --------------------------------------------------------------
