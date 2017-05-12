@@ -158,6 +158,7 @@ init_idt_percpu(void)
 
 	struct Taskstate *ts = &thiscpu->cpu_ts;
 	uintptr_t stack_top = KSTACKTOP - cpunum()*PERSTACK_SIZE;
+	cprintf("cpu %d gets stack_top: 0x%x\n", cpunum(), stack_top);
 	int tss_descriptor = (GD_TSS0 >> 3) + cpunum();
 
 	// Setup a TSS so that we get the right stack

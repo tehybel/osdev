@@ -285,7 +285,7 @@ mem_init_mp(void)
 	for (i = 0; i < NCPU; i++) {
 		uintptr_t stack_top = KSTACKTOP - i*PERSTACK_SIZE;
 		uintptr_t stack_bot = stack_top - KSTKSIZE;
-		physaddr_t stack_pa = PADDR(&percpu_kstacks[i]);
+		physaddr_t stack_pa = PADDR(percpu_kstacks[i]);
 		boot_map_region(kern_pgdir, stack_bot, KSTKSIZE, stack_pa, PTE_W);
 
 		// Note that the area [stack_bot - KSTKGAP, stack_bot] is not mapped;

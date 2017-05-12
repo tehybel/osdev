@@ -69,7 +69,7 @@ i386_init(void)
 // this variable.
 void *mpentry_kstack;
 
-// Start the application processors (APs).
+// Start the application processors (APs), i.e., the "secondary processors".
 static void
 boot_aps(void)
 {
@@ -100,7 +100,7 @@ boot_aps(void)
 		}
 
 		// Tell mpentry.S what stack to use 
-		mpentry_kstack = &percpu_kstacks[i] + KSTKSIZE;
+		mpentry_kstack = percpu_kstacks[i] + KSTKSIZE;
 
 		// Start the CPU at mpentry_start
 		lapic_startap(cpu->cpu_id, PADDR(code));
