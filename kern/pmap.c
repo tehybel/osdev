@@ -626,16 +626,15 @@ tlb_invalidate(pde_t *pgdir, void *va)
 // have to be multiple of PGSIZE.
 //
 void *
-mmio_map_region(physaddr_t begin_pa, size_t size)
+mmio_map_region(physaddr_t pa, size_t size)
 {
 	// Where to start the next region.  Initially, this is the
-	// beginning of the MMIO region.  Because this is static, its
-	// value will be preserved between calls to mmio_map_region
-	// (just like nextfree in boot_alloc).
+	// beginning of the MMIO region.
 	static uintptr_t base = MMIOBASE;
+	void * result = (void *) base;
 
 	// the 'pa' should be page-aligned
-	assert ((begin_pa & (PGSIZE - 1)) == 0);
+	assert ((pa & (PGSIZE - 1)) == 0);
 
 	size_t offset;
 
@@ -644,43 +643,17 @@ mmio_map_region(physaddr_t begin_pa, size_t size)
 	if (base + size > MMIOLIM) 
 		panic("MMIO space exhausted");
 	
+	// set cache-disable and write-through, so that the MMIO pages won't
+	// get cached by the CPU
+	int perm = PTE_PCD | PTE_PWT | PTE_W;
+
 	// insert each of the pages into the kernel page table
-	for (offset = 0; offset < size; offset += PGSIZE) {
-		void *va = base + offset;
-		physaddr_t pa = begin_pa + offset;
-		struct PageInfo *pinfo = pa2page(pa);
+	boot_map_region(kern_pgdir, base, size, pa, perm);
 
-		// set cache-disable and write-through, so that the MMIO pages won't
-		// get cached by the CPU
-		int perm = PTE_PCD | PTE_PWT | PTE_W;
-	
-		page_insert(kern_pgdir, pinfo, va, perm);
-	}
-
-	// remember to change the base
+	// remember to change the base for future calls.
 	base += size;
 
-
-
-	// Reserve size bytes of virtual memory starting at base and
-	// map physical pages [pa,pa+size) to virtual addresses
-	// [base,base+size).  Since this is device memory and not
-	// regular DRAM, you'll have to tell the CPU that it isn't
-	// safe to cache access to this memory.  Luckily, the page
-	// tables provide bits for this purpose; simply create the
-	// mapping with PTE_PCD|PTE_PWT (cache-disable and
-	// write-through) in addition to PTE_W.  (If you're interested
-	// in more details on this, see section 10.5 of IA32 volume
-	// 3A.)
-	//
-	// Be sure to round size up to a multiple of PGSIZE and to
-	// handle if this reservation would overflow MMIOLIM (it's
-	// okay to simply panic if this happens).
-	//
-	// Hint: The staff solution uses boot_map_region.
-	//
-	// Your code here:
-	panic("mmio_map_region not implemented");
+	return result;
 }
 
 static uintptr_t user_mem_check_addr;
