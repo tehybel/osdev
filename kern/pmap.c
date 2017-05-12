@@ -312,10 +312,6 @@ mem_init_mp(void)
 void
 page_init(void)
 {
-	// LAB 4:
-	// Change your code to mark the physical page at MPENTRY_PADDR
-	// as in use
-
 	physaddr_t boot_alloc_mem_end = PADDR(boot_alloc(0));
 	boot_alloc_should_not_be_called = 1;
 
@@ -338,6 +334,12 @@ page_init(void)
 
 		// the range [IOPHYSMEM, EXTPHYSMEM] is reserved for IO
 		if (addr >= IOPHYSMEM && addr < EXTPHYSMEM)
+			continue;
+
+		// the page at MPENTRY_PADDR is used to store the code responsible for
+		// initializing non-boot processors (APs), so we should never hand it
+		// out. 
+		if (addr == MPENTRY_PADDR)
 			continue;
 
 		// the kernel should not be mapped.

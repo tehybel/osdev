@@ -162,6 +162,9 @@ mpconfig(struct mp **pmp)
 	return conf;
 }
 
+// mp_init retrieves information about the system related to multiprocessing,
+// such as the total number of CPUs, by reading 'conf' which is a table filled
+// out by the BIOS.
 void
 mp_init(void)
 {

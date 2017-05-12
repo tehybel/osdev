@@ -69,7 +69,7 @@ i386_init(void)
 // this variable.
 void *mpentry_kstack;
 
-// Start the non-boot (AP) processors.
+// Start the application processors (APs).
 static void
 boot_aps(void)
 {
@@ -77,7 +77,9 @@ boot_aps(void)
 	void *code;
 	struct CpuInfo *c;
 
-	// Write entry code to unused memory at MPENTRY_PADDR
+	// Write entry code to unused memory at MPENTRY_PADDR; we need to do this
+	// because APs will boot in real mode, so they need their init code at a
+	// low address.
 	code = KADDR(MPENTRY_PADDR);
 	memmove(code, mpentry_start, mpentry_end - mpentry_start);
 
@@ -88,11 +90,13 @@ boot_aps(void)
 
 		// Tell mpentry.S what stack to use 
 		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
+
 		// Start the CPU at mpentry_start
 		lapic_startap(c->cpu_id, PADDR(code));
+
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while(c->cpu_status != CPU_STARTED)
-			;
+		while (c->cpu_status != CPU_STARTED)
+			; // spin
 	}
 }
 
