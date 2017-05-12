@@ -7,30 +7,43 @@
 
 void sched_halt(void);
 
-// Choose a user environment to run and run it.
+// look circularly through 'envs' starting after 'curenv' until we find a
+// runnable environment.
+struct Env * get_next_runnable_env() {
+	int i, offset = curenv ? (curenv - envs) : 0;
+	for (i = 0; i < NENV; i++) {
+		struct Env * env = &envs[(i + offset) % NENV];
+		if (env->env_status == ENV_RUNNABLE)
+			return env;
+	}
+	return NULL;
+}
+
+// This function implements simple round-robin scheduling.
+// It chooses a user environment and runs it. It never returns.
 void
 sched_yield(void)
 {
-	struct Env *idle;
-
-	// Implement simple round-robin scheduling.
-	//
 	// Search through 'envs' for an ENV_RUNNABLE environment in
 	// circular fashion starting just after the env this CPU was
 	// last running.  Switch to the first such environment found.
-	//
+	struct Env * env = get_next_runnable_env();
+
 	// If no envs are runnable, but the environment previously
 	// running on this CPU is still ENV_RUNNING, it's okay to
 	// choose that environment.
-	//
+	if (!env && curenv && curenv->env_status == ENV_RUNNING)
+		env = curenv;
+
 	// Never choose an environment that's currently running on
-	// another CPU (env_status == ENV_RUNNING). If there are
-	// no runnable environments, simply drop through to the code
-	// below to halt the cpu.
+	// another CPU (env_status == ENV_RUNNING).
+	assert (!env || env->env_status != ENV_RUNNING || env == curenv);
 
-	// LAB 4: Your code here.
+	// if we found an idle environment, switch to it; this never returns.
+	if (env)
+		env_run(env);
 
-	// sched_halt never returns
+	// otherwise there's nothing to do, so halt the processor.
 	sched_halt();
 }
 

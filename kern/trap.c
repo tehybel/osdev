@@ -310,12 +310,10 @@ trap(struct Trapframe *tf)
 	// serious kernel work.
 	lock_kernel();
 
-	cprintf("Incoming TRAP frame at %p\n", tf);
-
 	assert (curenv);
 	assert (curenv->env_status == ENV_RUNNING);
 
-	// Garbage collect if current enviroment is a zombie
+	// Garbage collect if current environment is a zombie
 	if (curenv->env_status == ENV_DYING) {
 		env_free(curenv);
 		curenv = NULL;

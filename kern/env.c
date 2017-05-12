@@ -437,9 +437,6 @@ env_create(uint8_t *binary, enum EnvType type)
 
 	envid_t parent_id = 0;
 
-	// we assume this will always allocate envs[0], 
-	// that's why we don't return anything; the caller knows where to find the
-	// created env.
 	int res = env_alloc(&env, parent_id);
 	if (res)
 		panic("env_alloc failed: %e", res);
