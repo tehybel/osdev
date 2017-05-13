@@ -1,9 +1,17 @@
 
---- part 1 ---
+--- part A ---
 
-Time: 10:30-13:30, 14-15:15, 9:30-TODO
+Time: 10:30-13:30, 14-15:15, 9:30-10:45
+
+TODO write the writeup
 
 
+
+--- part B ---
+
+Time: 10:45-TODO
+
+TODO write the writeup
 
 
 
