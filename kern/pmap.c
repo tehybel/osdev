@@ -540,7 +540,8 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// page_remove, it will not get freed.
 	page_incref(pp);
 
-	// in case there is already a page mapped at va, remove it
+	// in case there is already a page mapped at va, remove it.
+	// note that this flushes the TLB.
 	page_remove(pgdir, va);
 
 	// set up the mapping to 'pa'

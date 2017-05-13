@@ -202,12 +202,6 @@ static int
 sys_page_map(envid_t src_envid, void *src_va,
 	     envid_t dst_envid, void *dst_va, int dst_perm)
 {
-	// Hint: This function is a wrapper around page_lookup() and
-	//   page_insert() from kern/pmap.c.
-	//   Again, most of the new code you write should be to check the
-	//   parameters for correctness.
-	//   Use the third argument to page_lookup() to
-	//   check the current permissions on the page.
 	struct Env *src_env = NULL, *dst_env = NULL;
 	struct PageInfo *pinfo = NULL;
 	pte_t *pte = NULL;
@@ -238,7 +232,6 @@ sys_page_map(envid_t src_envid, void *src_va,
 	if ((dst_perm & PTE_W) && !(*pte & PTE_W))
 		return -E_INVAL;
 	
-	// TODO fix page_insert bug!
 	return page_insert(dst_env->env_pgdir, pinfo, dst_va, dst_perm);
 }
 
@@ -252,10 +245,17 @@ sys_page_map(envid_t src_envid, void *src_va,
 static int
 sys_page_unmap(envid_t envid, void *va)
 {
-	// Hint: This function is a wrapper around page_remove().
+	struct Env *env = NULL;
+	int result = 0;
+	
+	if (va >= (void *) UTOP || PGOFF(va) != 0)
+		return -E_INVAL;
 
-	// LAB 4: Your code here.
-	panic("sys_page_unmap not implemented");
+	if ((result = envid2env(envid, &env, 1)))
+		return result;
+	
+	page_remove(env->env_pgdir, va);
+	return 0;
 }
 
 // Try to send 'value' to the target env 'envid'.
@@ -360,6 +360,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_page_map:
 		return sys_page_map(a1, (void *) a2, a3, (void *) a4, a5);
+	
+	case SYS_page_unmap:
+		return sys_page_unmap(a1, (void *) a2);
 
 	default:
 		return -E_INVAL;
