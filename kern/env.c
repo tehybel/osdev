@@ -333,9 +333,6 @@ load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
 	uint8_t *src = binary + ph->p_offset;
 	uintptr_t va = ph->p_va;
 
-	cprintf("segment with va=0x%x, src=0x%x, memsize=0x%x, filesize=0x%x\n",
-		va, src, memsize, filesize);
-
 	// allocate the segment
 	region_alloc(pgdir, va, memsize);
 
@@ -378,7 +375,6 @@ load_icode(struct Env *env, uint8_t *binary)
 		panic("not a valid ELF file");
 	
 	// parse the ELF file, loading one segment at a time
-	cprintf("loading ELF segments...\n");
 
 	// switch to the userland page directory first, so that we can copy data
 	// directly with memcpy during load_segment
@@ -395,8 +391,6 @@ load_icode(struct Env *env, uint8_t *binary)
 
 	// switch back to the kernel page directory
 	lcr3(PADDR(kern_pgdir));
-
-	cprintf("done loading ELF.\n");
 
 	// initialize the trap frame according to the ELF entry point
 	// so that the environment starts executing at the right place
