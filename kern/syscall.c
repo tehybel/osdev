@@ -151,15 +151,35 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 static int
 sys_page_alloc(envid_t envid, void *va, int perm)
 {
-	// Hint: This function is a wrapper around page_alloc() and
-	//   page_insert() from kern/pmap.c.
-	//   Most of the new code you write should be to check the
-	//   parameters for correctness.
-	//   If page_insert() fails, remember to free the page you
-	//   allocated!
+	struct Env *env = NULL;
+	struct PageInfo *pinfo = NULL;
+	int result = 0;
 
-	// LAB 4: Your code here.
-	panic("sys_page_alloc not implemented");
+	// PTE_U and PTE_P must be set
+	if ((perm & (PTE_U | PTE_P)) != perm)
+		return -E_INVAL;
+	
+	// PTE_AVAIL and PTE_W may be set, nothing else may be set
+	if ((perm & PTE_SYSCALL) != perm)
+		return -E_INVAL;
+	
+	// is the 'va' OK?
+	if (va >= (void *) UTOP || PGOFF(va) != 0)
+		return -E_INVAL;
+
+	if ((result = envid2env(envid, &env, 1)))
+		return result;
+	
+	if (!(pinfo = page_alloc(ALLOC_ZERO)))
+		return -E_NO_MEM;
+	
+	// page_insert increases the page refcnt on success
+	if ((result = page_insert(env->env_pgdir, pinfo, va, perm))) {
+		page_free(pinfo);
+		return result;
+	}
+	
+	return 0;
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
@@ -305,6 +325,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_env_set_status:
 		return sys_env_set_status(a1, a2);
+	
+	case SYS_page_alloc:
+		return sys_page_alloc(a1, (void *) a2, a3);
 
 	default:
 		return -E_INVAL;
