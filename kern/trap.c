@@ -387,7 +387,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Then the environment will be destroyed and user_mem_assert doesn't
 	// return.
 	size_t needed_size = sizeof(struct UTrapframe) + sizeof(uintptr_t);
-	user_mem_assert(curenv, (void *) new_esp, needed_size, PTE_W);
+	user_mem_assert(curenv, (void *) new_esp - needed_size, 
+		needed_size, PTE_W);
 
 	// map the exception stack into our page table so we can modify it from
 	// kernel land
