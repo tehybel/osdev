@@ -18,3 +18,5 @@
 /.suf
 /cscope.out
 /tags
+*.swp
+*.swo
