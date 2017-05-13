@@ -156,7 +156,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	int result = 0;
 
 	// PTE_U and PTE_P must be set
-	if ((perm & (PTE_U | PTE_P)) != perm)
+	if ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))
 		return -E_INVAL;
 	
 	// PTE_AVAIL and PTE_W may be set, nothing else may be set
@@ -193,14 +193,14 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //		or the caller doesn't have permission to change one of them.
 //	-E_INVAL if srcva >= UTOP or srcva is not page-aligned,
 //		or dstva >= UTOP or dstva is not page-aligned.
-//	-E_INVAL is srcva is not mapped in srcenvid's address space.
+//	-E_INVAL if srcva is not mapped in srcenvid's address space.
 //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
 //	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
 //		address space.
 //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
-sys_page_map(envid_t srcenvid, void *srcva,
-	     envid_t dstenvid, void *dstva, int perm)
+sys_page_map(envid_t src_envid, void *src_va,
+	     envid_t dst_envid, void *dst_va, int dst_perm)
 {
 	// Hint: This function is a wrapper around page_lookup() and
 	//   page_insert() from kern/pmap.c.
@@ -208,9 +208,38 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   parameters for correctness.
 	//   Use the third argument to page_lookup() to
 	//   check the current permissions on the page.
+	struct Env *src_env = NULL, *dst_env = NULL;
+	struct PageInfo *pinfo = NULL;
+	pte_t *pte = NULL;
+	int result = 0;
 
-	// LAB 4: Your code here.
-	panic("sys_page_map not implemented");
+	// check that the environments exist and we have permissions for them
+	if ((result = envid2env(src_envid, &src_env, 1)))
+		return result;
+	if ((result = envid2env(dst_envid, &dst_env, 1)))
+		return result;
+
+	// check that the addresses are OK
+	if (src_va >= (void *) UTOP || PGOFF(src_va) != 0)
+		return -E_INVAL;
+	if (dst_va >= (void *) UTOP || PGOFF(dst_va) != 0)
+		return -E_INVAL;
+
+	// check the permissions
+	if ((dst_perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))
+		return -E_INVAL;
+	if ((dst_perm & PTE_SYSCALL) != dst_perm)
+		return -E_INVAL;
+	
+	if (!(pinfo = page_lookup(src_env->env_pgdir, src_va, &pte)))
+		return -E_INVAL;
+	
+	// we do not allow setting a read-only page to be writable
+	if ((dst_perm & PTE_W) && !(*pte & PTE_W))
+		return -E_INVAL;
+	
+	// TODO fix page_insert bug!
+	return page_insert(dst_env->env_pgdir, pinfo, dst_va, dst_perm);
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -328,6 +357,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_page_alloc:
 		return sys_page_alloc(a1, (void *) a2, a3);
+	
+	case SYS_page_map:
+		return sys_page_map(a1, (void *) a2, a3, (void *) a4, a5);
 
 	default:
 		return -E_INVAL;
