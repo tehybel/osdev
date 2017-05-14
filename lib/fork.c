@@ -7,6 +7,8 @@
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
 
+extern void _pgfault_upcall(void);
+
 //
 // Custom page fault handler - if faulting page is copy-on-write,
 // map in our own private writable copy.
@@ -38,23 +40,43 @@ pgfault(struct UTrapframe *utf)
 }
 
 //
-// Map our virtual page pn (address pn*PGSIZE) into the target envid
-// at the same virtual address.  If the page is writable or copy-on-write,
-// the new mapping must be created copy-on-write, and then our mapping must be
-// marked copy-on-write as well.  (Exercise: Why do we need to mark ours
-// copy-on-write again if it was already copy-on-write at the beginning of
-// this function?)
+// Map our virtual page page_number into the child environment given by 'cid'
+// at the same virtual address. If the page is writable or copy-on-write, the
+// new mapping must be created copy-on-write, and then our mapping must be
+// marked copy-on-write as well. 
 //
-// Returns: 0 on success, < 0 on error.
-// It is also OK to panic on error.
+// Returns: 0 on success, < 0 on error
 //
 static int
-duppage(envid_t envid, unsigned pn)
+duppage(envid_t cid, unsigned int page_number)
 {
-	int r;
+	int result;
+	void * va = (void *) (page_number * PGSIZE);
+	pte_t pte = uvpt[page_number];
+	assert (pte & PTE_P);
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	// special case: the exception stack is not dup'd with COW, but is just
+	// mapped fresh in the child
+	if (va == (void *) UXSTACKBASE) {
+		return sys_page_alloc(cid, (void *) UXSTACKBASE, 
+							  PTE_U | PTE_P | PTE_W);
+	}
+
+	if ((pte & PTE_W) || (pte & PTE_COW)) {
+		// it's writable; map the page COW in the child
+		if ((result = sys_page_map(0, va, cid, va, PTE_U | PTE_P | PTE_COW)))
+			return result;
+
+		// also mark it read-only and COW in the parent (us)
+		if ((result = sys_page_map(0, va, 0, va, PTE_U | PTE_P | PTE_COW)))
+			return result;
+	} 
+	else {
+		// it's read-only; just map the page directly in the child without COW
+		if ((result = sys_page_map(0, va, cid, va, PTE_U | PTE_P)))
+			return result;
+	}
+
 	return 0;
 }
 
@@ -68,18 +90,61 @@ duppage(envid_t envid, unsigned pn)
 // Returns: child's envid to the parent, 0 to the child, < 0 on error.
 // It is also OK to panic on error.
 //
-// Hint:
-//   Use uvpd, uvpt, and duppage.
-//   Remember to fix "thisenv" in the child process.
-//   Neither user exception stack should ever be marked copy-on-write,
-//   so you must allocate a new page for the child's user exception stack.
-//
 envid_t
 fork(void)
 {
-	// LAB 4: Your code here.
-	panic("fork not implemented");
+	envid_t cid;
+	pte_t pte;
+	pde_t pde;
+	unsigned int page_number;
+	int i, j;
+
+	set_pgfault_handler(pgfault);
+	
+	cid = sys_exofork();
+	if (cid < 0)
+		panic("fork failed: %e", cid);
+	
+	if (cid == 0) {
+		// this is the child; update 'thisenv' and return
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// now walk over the page directory, finding entries which are present,
+	// and dup those to the child
+	for (i = 0; i < NPDENTRIES; i++) {
+		pde = uvpd[i];
+		if (!(pde & PTE_P))
+			continue;
+
+		for (j = 0; j < NPTENTRIES; j++) {
+			if (PGADDR(i, j, 0) >= (void *) UTOP) {
+				// we only need to check up to UTOP
+				break;
+			}
+
+			page_number = i*NPTENTRIES + j;
+			pte = uvpt[page_number];
+			if (!(pte & PTE_P))
+				continue;
+
+			if (duppage(cid, page_number))
+				panic("duppage failed");
+		}
+	}
+
+	// set the page fault handler for the child, too
+	if (sys_env_set_pgfault_upcall(cid, _pgfault_upcall))
+		panic("sys_env_set_pgfault_upcall failed");
+
+	// mark the child as runnable
+	if (sys_env_set_status(cid, ENV_RUNNABLE))
+		panic("sys_env_set_status failed");
+
+	return cid;
 }
+
 
 // Challenge!
 int
