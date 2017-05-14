@@ -19,6 +19,8 @@ pgfault(struct UTrapframe *utf)
 	void * va = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	pte_t pte = uvpt[(uint32_t) va / PGSIZE];
 
+	// TODO handle writes that span multiple pages?
+
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
 
@@ -67,7 +69,7 @@ duppage(envid_t cid, unsigned int page_number)
 	// special case: the exception stack is not dup'd with COW, but is just
 	// mapped fresh in the child
 	if (va == (void *) UXSTACKBASE) {
-		cprintf("allocated the UXSTACKBASE page for 0x%x\n", cid);
+		cprintf("--- allocated the UXSTACKBASE page for 0x%x\n", cid);
 		return sys_page_alloc(cid, (void *) UXSTACKBASE,
 							  PTE_U | PTE_P | PTE_W);
 	}

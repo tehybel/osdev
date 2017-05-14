@@ -385,6 +385,8 @@ page_fault_handler(struct Trapframe *tf)
 	cprintf("page fault in 0x%x! It was at 0x%x. Putting the tf at 0x%x\n", 
 			curenv->env_id, fault_va, new_esp);
 
+	// assert (page_lookup(curenv->env_pgdir, new_));
+
 	// make sure there's space for the new trap-time state; if not, it's
 	// because the exception stack overflowed or it was mapped non-writable.
 	// Then the environment will be destroyed and user_mem_assert doesn't
@@ -417,6 +419,7 @@ page_fault_handler(struct Trapframe *tf)
 	utf->utf_esp = tf->tf_esp;
 
 	// finally return to user-mode, but branch to the page fault handler
+	assert (tf == &curenv->env_tf);
 	tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
 	tf->tf_esp = new_esp;
 	env_run(curenv); // never returns

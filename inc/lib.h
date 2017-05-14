@@ -75,6 +75,8 @@ envid_t	ipc_find_env(enum EnvType type);
 envid_t	fork(void);
 envid_t	sfork(void);	// Challenge!
 
+// map.c
+void print_process_mappings(void);
 
 
 /* File open modes */

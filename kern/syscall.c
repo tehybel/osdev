@@ -187,7 +187,9 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	}
 
 	cprintf("sys_page_alloc allocated a page with perm: 0x%x, va: 0x%x, for "
-			"envid: 0x%x\n", perm, va, envid);
+			"envid: 0x%x\n", perm, va, env->env_id);
+
+	assert (page_lookup(env->env_pgdir, va, NULL));
 	
 	return 0;
 }
@@ -242,6 +244,8 @@ sys_page_map(envid_t src_envid, void *src_va,
 	if ((dst_perm & PTE_W) && !(*pte & PTE_W))
 		return -E_INVAL;
 	
+	cprintf("page_insert with dst_va: 0x%x, dst_perm: 0x%x\n", 
+			dst_va, dst_perm);
 	return page_insert(dst_env->env_pgdir, pinfo, dst_va, dst_perm);
 }
 
