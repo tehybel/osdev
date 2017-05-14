@@ -16,27 +16,33 @@ extern void _pgfault_upcall(void);
 static void
 pgfault(struct UTrapframe *utf)
 {
-	void *addr = (void *) utf->utf_fault_va;
-	uint32_t err = utf->utf_err;
-	int r;
+	void * va = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
+	pte_t pte = uvpt[(uint32_t) va / PGSIZE];
 
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
-	// Hint:
-	//   Use the read-only page table mappings at uvpt
-	//   (see <inc/memlayout.h>).
 
-	// LAB 4: Your code here.
+	if (!(utf->utf_err & FEC_WR))
+		panic("page fault (not a write) at 0x%x: %e", va, utf->utf_err);
+	
+	if (!(pte & PTE_COW))
+		panic("page fault (write) at 0x%x", va);
+
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
-	// Hint:
-	//   You should make three system calls.
 
-	// LAB 4: Your code here.
+	if (sys_page_alloc(0, PFTEMP, PTE_U | PTE_P | PTE_W))
+		panic("sys_page_alloc failed");
+	
+	memcpy(PFTEMP, va, PGSIZE);
 
-	panic("pgfault not implemented");
+	if (sys_page_map(0, PFTEMP, 0, va, PTE_U | PTE_P | PTE_W))
+		panic("sys_page_map failed");
+	
+	if (sys_page_unmap(0, PFTEMP))
+		panic("sys_page_unmap failed");
 }
 
 //
