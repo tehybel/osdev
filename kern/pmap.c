@@ -8,6 +8,7 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 #include <kern/cpu.h>
+#include <kern/monitor.h>
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -458,6 +459,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		physaddr_t pa = page2pa(pinfo);
 
 		// mark it present and writable
+		// TODO should we really set PTE_U here??
 		*pte = pa | PTE_P | PTE_W | PTE_U;
 	}
 
@@ -565,6 +567,9 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	pte_t *pte = pgdir_walk(pgdir, va, 0);
 	if (!pte)
+		return NULL;
+	
+	if (!(*pte & PTE_P))
 		return NULL;
 	
 	if (pte_store)
@@ -679,19 +684,27 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 
 	for (cur = (void *) va; cur < end; cur += PGSIZE) {
 		// is it in kernel land?
-		if (cur >= (void *) ULIM)
+		if (cur >= (void *) ULIM) {
+			cprintf("user_mem_check failed (high addr)\n");
 			goto bad;
+		}
 
 		// look it up in the page table
 		struct PageInfo* pageinfo = page_lookup(env->env_pgdir, cur, &pte);
 
 		// is it not present?
-		if (!pageinfo) 
+		if (!pageinfo) {
+			cprintf("user_mem_check failed (not present)\n");
 			goto bad;
+		}
 
 		// are the permissions wrong?
-		if ((*pte & perm) != perm) 
+		if ((*pte & perm) != perm) {
+			cprintf("user_mem_check failed "
+					"(bad perms; perm: 0x%x, pte: 0x%x)\n",
+					perm, *pte);
 			goto bad;
+		}
 	}
 
 	return 0;

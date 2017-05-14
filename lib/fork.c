@@ -22,6 +22,8 @@ pgfault(struct UTrapframe *utf)
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
 
+	cprintf("pgfault called, fault at 0x%x\n", utf->utf_fault_va);
+
 	if (!(utf->utf_err & FEC_WR))
 		panic("page fault (not a write) at 0x%x: %e", va, utf->utf_err);
 	
@@ -64,7 +66,8 @@ duppage(envid_t cid, unsigned int page_number)
 	// special case: the exception stack is not dup'd with COW, but is just
 	// mapped fresh in the child
 	if (va == (void *) UXSTACKBASE) {
-		return sys_page_alloc(cid, (void *) UXSTACKBASE, 
+		cprintf("allocated the UXSTACKBASE page for 0x%x\n", cid);
+		return sys_page_alloc(cid, (void *) UXSTACKBASE,
 							  PTE_U | PTE_P | PTE_W);
 	}
 
@@ -74,16 +77,12 @@ duppage(envid_t cid, unsigned int page_number)
 			return result;
 
 		// also mark it read-only and COW in the parent (us)
-		if ((result = sys_page_map(0, va, 0, va, PTE_U | PTE_P | PTE_COW)))
-			return result;
+		return sys_page_map(0, va, 0, va, PTE_U | PTE_P | PTE_COW);
 	} 
 	else {
 		// it's read-only; just map the page directly in the child without COW
-		if ((result = sys_page_map(0, va, cid, va, PTE_U | PTE_P)))
-			return result;
+		return sys_page_map(0, va, cid, va, PTE_U | PTE_P);
 	}
-
-	return 0;
 }
 
 //

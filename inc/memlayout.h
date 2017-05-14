@@ -136,7 +136,7 @@
 // Top of one-page user exception stack
 #define UXSTACKTOP	UTOP
 
-#define UXSTACKBASE (UTOP - PGSIZE)
+#define UXSTACKBASE (UXSTACKTOP - PGSIZE)
 
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
