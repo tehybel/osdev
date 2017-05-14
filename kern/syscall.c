@@ -185,6 +185,9 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 		page_free(pinfo);
 		return result;
 	}
+
+	cprintf("sys_page_alloc allocated a page with perm: 0x%x, va: 0x%x, for "
+			"envid: 0x%x\n", perm, va, envid);
 	
 	return 0;
 }

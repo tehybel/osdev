@@ -392,6 +392,7 @@ page_fault_handler(struct Trapframe *tf)
 	size_t needed_size = sizeof(struct UTrapframe) + sizeof(uintptr_t);
 	user_mem_assert(curenv, (void *) new_esp - needed_size, 
 		needed_size, PTE_W);
+	cprintf("this was OK\n");
 
 	// map the exception stack into our page table so we can modify it from
 	// kernel land
@@ -409,7 +410,7 @@ page_fault_handler(struct Trapframe *tf)
 	new_esp -= sizeof(struct UTrapframe);
 	struct UTrapframe *utf = (struct UTrapframe *) new_esp;
 	utf->utf_fault_va = fault_va;
-	utf->utf_err = T_PGFLT;
+	utf->utf_err = tf->tf_err;
 	utf->utf_regs = tf->tf_regs;
 	utf->utf_eip = tf->tf_eip;
 	utf->utf_eflags = tf->tf_eflags;
