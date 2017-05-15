@@ -155,6 +155,8 @@ boot_alloc(uint32_t n)
 	return result;
 }
 
+int checks_done = 0;
+
 // Set up a two-level page table:
 //    kern_pgdir is its linear (virtual) address of the root
 //
@@ -211,9 +213,8 @@ init_memory(void)
 
 	// perform various tests of code sanity
 	check_page_free_list(1);
-	// check_page_alloc();
-	// check_page();
-	// TODO re-enable these
+	check_page_alloc();
+	check_page();
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -289,6 +290,8 @@ init_memory(void)
 
 	// Some more checks, only possible after kern_pgdir is installed.
 	check_page_installed_pgdir();
+
+	checks_done = 1;
 }
 
 // Modify mappings in kern_pgdir to support SMP
@@ -387,6 +390,8 @@ page_alloc(int alloc_flags)
 {
 	struct PageInfo * pginfo = take_pageinfo();
 	if (!pginfo) {
+		if (!checks_done)
+			return NULL;
 		// for now panic, I'd rather know if this happens..
 		panic("low-memory conditions!"); 
 		// return NULL;
