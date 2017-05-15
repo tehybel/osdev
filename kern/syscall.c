@@ -188,8 +188,20 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	cprintf("sys_page_alloc allocated a page with perm: 0x%x, va: 0x%x, for "
 			"envid: 0x%x\n", perm, va, env->env_id);
+	
+	pte_t *pte = NULL;
+	struct PageInfo * pp = NULL;
+	if ((pp = page_lookup(env->env_pgdir, (void *) UXSTACKBASE, &pte))) {
+		cprintf("process 0x%x has UXSTACKBASE pte: 0x%x\n", 
+				env->env_id, *pte);
+		if (va == (void *) UXSTACKBASE)
+			assert(pp == pinfo);
+	} else {
+		cprintf("process 0x%x has no UXSTACKBASE pte", env->env_id);
+	}
 
 	assert (page_lookup(env->env_pgdir, va, NULL));
+	assert (pinfo->pp_ref == 1);
 	
 	return 0;
 }
@@ -239,6 +251,8 @@ sys_page_map(envid_t src_envid, void *src_va,
 	
 	if (!(pinfo = page_lookup(src_env->env_pgdir, src_va, &pte)))
 		return -E_INVAL;
+	
+	assert (pinfo->pp_ref > 0);
 	
 	// we do not allow setting a read-only page to be writable
 	if ((dst_perm & PTE_W) && !(*pte & PTE_W))

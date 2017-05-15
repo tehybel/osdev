@@ -10,6 +10,8 @@
 #include <kern/cpu.h>
 #include <kern/monitor.h>
 
+#define ENABLE_EXPENSIVE_ASSERTIONS 1
+
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
 static size_t npages_basemem;	// Amount of base memory (in pages)
@@ -26,6 +28,16 @@ static struct PageInfo *page_free_list;	// Free list of physical pages
 // similar idea, but for pp_ref
 #define MAGIC2 0xfff0
 
+void check_not_in_page_free_list(struct PageInfo * p) {
+	if (ENABLE_EXPENSIVE_ASSERTIONS) {
+		// check that the result pginfo isn't in the list more than once
+		struct PageInfo * cur;
+		for (cur = page_free_list; cur; cur = cur->pp_link) {
+			assert (cur != p);
+		}
+	}
+}
+
 // takes a single PageInfo struct off of the page_free_list
 static struct PageInfo * take_pageinfo() {
 	if (!page_free_list)
@@ -33,6 +45,7 @@ static struct PageInfo * take_pageinfo() {
 	
 	struct PageInfo * result = page_free_list;
 	page_free_list = page_free_list->pp_link;
+	check_not_in_page_free_list(result);
 	return result;
 }
 
@@ -366,7 +379,7 @@ page_alloc(int alloc_flags)
 	struct PageInfo * pginfo = take_pageinfo();
 	if (!pginfo)
 		return NULL;
-
+	
 	if (pginfo->pp_ref != MAGIC2)
 		panic("bad take_pageinfo: 0x%x", pginfo);
 
@@ -398,6 +411,7 @@ page_free(struct PageInfo *pageinfo)
 		panic("invalid free: 0x%x (bad pp_ref: %d)", 
 			pageinfo, pageinfo->pp_ref);
 	
+	check_not_in_page_free_list(pageinfo);
 	pageinfo->pp_link = page_free_list;
 	pageinfo->pp_ref = MAGIC2;
 
@@ -550,6 +564,8 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	physaddr_t pa = page2pa(pp);
 	*pte = pa | perm | PTE_P;
 
+	tlb_invalidate(pgdir, va); // TODO think about whether this is needed
+
 	return 0;
 }
 
@@ -576,7 +592,9 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 		*pte_store = pte;
 
 	physaddr_t pa = PTE_ADDR(*pte);
-	return pa2page(pa);
+	struct PageInfo * result = pa2page(pa);
+	assert (result->pp_ref > 0);
+	return result;
 }
 
 //

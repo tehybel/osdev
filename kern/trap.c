@@ -385,27 +385,27 @@ page_fault_handler(struct Trapframe *tf)
 	cprintf("page fault in 0x%x! It was at 0x%x. Putting the tf at 0x%x\n", 
 			curenv->env_id, fault_va, new_esp);
 
-	// assert (page_lookup(curenv->env_pgdir, new_));
-
 	// make sure there's space for the new trap-time state; if not, it's
 	// because the exception stack overflowed or it was mapped non-writable.
 	// Then the environment will be destroyed and user_mem_assert doesn't
 	// return.
-	size_t needed_size = sizeof(struct UTrapframe) + sizeof(uintptr_t);
+	size_t needed_size = sizeof(struct UTrapframe) + sizeof(uint32_t);
 	user_mem_assert(curenv, (void *) new_esp - needed_size, 
 		needed_size, PTE_W);
-	cprintf("this was OK\n");
 
 	// map the exception stack into our page table so we can modify it from
 	// kernel land
 	struct PageInfo *pinfo;
 	pinfo = page_lookup(curenv->env_pgdir, (void *) UXSTACKBASE, NULL);
 	assert (pinfo); // should exist since we just did user_mem_assert
+	// the UXSTACKBASE page should never be shared
+	assert (pinfo->pp_ref == 1); 
 	if (page_insert(kern_pgdir, pinfo, (void *) UXSTACKBASE, PTE_W))
 		goto destroy_env;
+	assert (pinfo->pp_ref == 2);
 
 	// push empty word
-	new_esp -= sizeof(uintptr_t);
+	new_esp -= sizeof(uint32_t);
 	*(uint32_t *) new_esp = 0;
 
 	// push UTrapFrame
@@ -417,6 +417,10 @@ page_fault_handler(struct Trapframe *tf)
 	utf->utf_eip = tf->tf_eip;
 	utf->utf_eflags = tf->tf_eflags;
 	utf->utf_esp = tf->tf_esp;
+
+	// no need to keep the page around in the kernel page table
+	page_remove(kern_pgdir, (void *) UXSTACKBASE);
+	assert (pinfo->pp_ref == 1); 
 
 	// finally return to user-mode, but branch to the page fault handler
 	assert (tf == &curenv->env_tf);

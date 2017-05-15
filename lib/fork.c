@@ -65,6 +65,7 @@ duppage(envid_t cid, unsigned int page_number)
 	void * va = (void *) (page_number * PGSIZE);
 	pte_t pte = uvpt[page_number];
 	assert (pte & PTE_P);
+	assert (pte & PTE_U);
 
 	// special case: the exception stack is not dup'd with COW, but is just
 	// mapped fresh in the child
@@ -74,7 +75,12 @@ duppage(envid_t cid, unsigned int page_number)
 							  PTE_U | PTE_P | PTE_W);
 	}
 
-	if ((pte & PTE_W) || (pte & PTE_COW)) {
+	if (pte & PTE_COW) {
+		assert (!(pte & PTE_W));
+		// it's already COW; map it likewise in the child
+		return sys_page_map(0, va, cid, va, PTE_U | PTE_P | PTE_COW);
+	}
+	else if (pte & PTE_W) {
 		// it's writable; map the page COW in the child
 		if ((result = sys_page_map(0, va, cid, va, PTE_U | PTE_P | PTE_COW)))
 			return result;
