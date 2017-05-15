@@ -9,7 +9,7 @@ TODO write the writeup
 
 --- part B ---
 
-Time: 10:45-13:00, 9:45-14:45, 10:30-TODO
+Time: 10:45-13:00, 9:45-14:45, 10:30-13, TODO
 
 - stuck because of bugs...
 

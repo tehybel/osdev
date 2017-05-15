@@ -432,7 +432,11 @@ page_free(struct PageInfo *pageinfo)
 	pageinfo->pp_link = page_free_list;
 	pageinfo->pp_ref = MAGIC2;
 
-	page_free_list = pageinfo;
+	if (checks_done)
+		/* for now, never put pages back on the free list; this is expensive,
+		 * but it simplifies debugging of user-after-frees. */ ;
+	else
+		page_free_list = pageinfo;
 }
 
 //
