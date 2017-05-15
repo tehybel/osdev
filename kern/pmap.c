@@ -211,8 +211,9 @@ init_memory(void)
 
 	// perform various tests of code sanity
 	check_page_free_list(1);
-	check_page_alloc();
-	check_page();
+	// check_page_alloc();
+	// check_page();
+	// TODO re-enable these
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -257,6 +258,10 @@ init_memory(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	boot_map_region(kern_pgdir, KERNBASE, KERNSIZE, 0, PTE_W);
+
+	// make sure the MMIO region is directly accessible
+	boot_map_region(kern_pgdir, MMIOBASE, MMIOLIM - MMIOBASE, 
+					MMIOBASE, PTE_W);
 
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -357,6 +362,10 @@ page_init(void)
 		if (addr >= KERNPHYSBASE && addr < boot_alloc_mem_end)
 			continue;
 
+		// the MMIO region is allocated by dedicated functions
+		if (addr >= MMIOBASE && addr < MMIOLIM)
+			continue;
+
 		pageinfo->pp_ref = MAGIC2;
 		pageinfo->pp_link = page_free_list;
 		page_free_list = pageinfo;
@@ -377,8 +386,11 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	struct PageInfo * pginfo = take_pageinfo();
-	if (!pginfo)
-		return NULL;
+	if (!pginfo) {
+		// for now panic, I'd rather know if this happens..
+		panic("low-memory conditions!"); 
+		// return NULL;
+	}
 	
 	if (pginfo->pp_ref != MAGIC2)
 		panic("bad take_pageinfo: 0x%x", pginfo);
