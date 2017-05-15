@@ -683,7 +683,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	perm |= PTE_P;
 
 	for (cur = (void *) va; cur < end; cur += PGSIZE) {
-		cprintf("cur: 0x%x\n", cur);
+
 		// is it in kernel land?
 		if (cur >= (void *) ULIM) {
 			cprintf("user_mem_check failed (high addr)\n");
