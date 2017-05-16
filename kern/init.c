@@ -39,11 +39,11 @@ i386_init(void)
 	// set up the IDT to handle exceptions and other interrupts
 	init_idt();
 
-	// Lab 4 multiprocessor initialization functions
+	// multiprocessor initialization functions
 	mp_init();
 	lapic_init();
 
-	// Lab 4 multitasking initialization functions
+	// multitasking initialization functions
 	pic_init();
 
 	// Acquire the big kernel lock before waking up APs
