@@ -382,9 +382,6 @@ page_fault_handler(struct Trapframe *tf)
 		new_esp = UXSTACKTOP;
 	}
 
-	cprintf("page fault in 0x%x! It was at 0x%x. Putting the tf at 0x%x\n", 
-			curenv->env_id, fault_va, new_esp);
-
 	// make sure there's space for the new trap-time state; if not, it's
 	// because the exception stack overflowed or it was mapped non-writable.
 	// Then the environment will be destroyed and user_mem_assert doesn't

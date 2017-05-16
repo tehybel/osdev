@@ -70,7 +70,6 @@ duppage(envid_t cid, unsigned int page_number)
 	// special case: the exception stack is not dup'd with COW, but is just
 	// mapped fresh in the child
 	if (va == (void *) UXSTACKBASE) {
-		cprintf("--- allocated the UXSTACKBASE page for 0x%x\n", cid);
 		return sys_page_alloc(cid, (void *) UXSTACKBASE,
 							  PTE_U | PTE_P | PTE_W);
 	}

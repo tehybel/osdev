@@ -837,8 +837,6 @@ check_page_free_list(bool only_low_memory)
 
 	assert(nfree_basemem > 0);
 	assert(nfree_extmem > 0);
-
-	cprintf("check_page_free_list() succeeded!\n");
 }
 
 
@@ -916,8 +914,6 @@ check_page_alloc(void)
 	for (pp = page_free_list; pp; pp = pp->pp_link)
 		--nfree;
 	assert(nfree == 0);
-
-	cprintf("check_page_alloc() succeeded!\n");
 }
 
 //
@@ -983,7 +979,6 @@ check_kern_pgdir(void)
 			break;
 		}
 	}
-	cprintf("check_kern_pgdir() succeeded!\n");
 }
 
 // This function returns the physical address of the page containing 'va',
@@ -1180,7 +1175,6 @@ check_page(void)
 	*pgdir_walk(kern_pgdir, (void*) mm1 + PGSIZE, 0) = 0;
 	*pgdir_walk(kern_pgdir, (void*) mm2, 0) = 0;
 
-	cprintf("check_page() succeeded!\n");
 }
 
 // check page_insert, page_remove, &c, with an installed kern_pgdir
@@ -1222,5 +1216,4 @@ check_page_installed_pgdir(void)
 	// free the pages we took
 	page_free(pp0);
 
-	cprintf("check_page_installed_pgdir() succeeded!\n");
 }
