@@ -72,6 +72,14 @@ TRAPHANDLER     (trap_align,  T_ALIGN  ) 	// aligment check
 TRAPHANDLER_NOEC(trap_mchk,   T_MCHK   ) 	// machine check
 TRAPHANDLER_NOEC(trap_simerr, T_SIMDERR)	// SIMD floating point error
 
+// IRQs
+TRAPHANDLER_NOEC(trap_irq_timer, IRQ_OFFSET + IRQ_TIMER)
+TRAPHANDLER_NOEC(trap_irq_kbd, IRQ_OFFSET + IRQ_KBD)
+TRAPHANDLER_NOEC(trap_irq_serial, IRQ_OFFSET + IRQ_SERIAL)
+TRAPHANDLER_NOEC(trap_irq_spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+TRAPHANDLER_NOEC(trap_irq_ide, IRQ_OFFSET + IRQ_IDE)
+TRAPHANDLER_NOEC(trap_irq_error, IRQ_OFFSET + IRQ_ERROR)
+
 TRAPHANDLER_NOEC(trap_syscall, T_SYSCALL)	// syscalls
 
 // all traps enter the trap() C function via this code

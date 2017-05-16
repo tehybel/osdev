@@ -25,7 +25,6 @@ void
 forktree(const char *cur)
 {
 	cprintf("%04x: I am '%s'\n", sys_getenvid(), cur);
-	print_process_mappings();
 
 	forkchild(cur, '0');
 	forkchild(cur, '1');
