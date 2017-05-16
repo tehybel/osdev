@@ -17,3 +17,92 @@ TODO write the writeup
 
 
 
+
+
+Debugging:
+
+Something here doesn't make sense. We see that process 1002 allocates its
+exception stack:
+
+	page_insert 0xeebff000 -> 0x0039f000 (pgdir: 0xf03a3000)
+	[00001002] allocated 0xeebff000 -> 0x0039f000
+
+This happens in sys_page_alloc, which makes sense. At that point, process 1000
+is acting on behalf of process 1002.
+
+Here, page_alloc allocates 39f000. But then soon afterwards that page gets
+freed:
+
+	freed 0x39f000
+
+And this should not happen!
+
+When does it get freed? I broke in gdb and backtraced:
+
+	Breakpoint 1, page_free (pageinfo=0xf0287cf8) at kern/pmap.c:446
+	446		cprintf("freed 0x%x\n", pa);
+	1: pa = 0x39f000
+	(gdb) bt
+	#0  page_free (pageinfo=0xf0287cf8) at kern/pmap.c:446
+	#1  0xf0101951 in page_decref (pinfo=0xf0287cf8) at kern/pmap.c:463
+	#2  0xf0101d24 in page_remove (pgdir=0xf0285000, va=0xeebff000) at
+	kern/pmap.c:654
+	#3  0xf0101c14 in page_insert (pgdir=0xf0285000, pp=0xf0287d28, 
+	va=0xeebff000, perm=0x2) at kern/pmap.c:592
+	#4  0xf0105f67 in page_fault_handler (tf=0xf02c607c) at kern/trap.c:400
+
+It's getting freed during a page_insert inside the page fault handler. In
+which process? 
+
+	(gdb) p (cpus[cpunum()].cpu_env)->env_id
+	$6 = 0x1001
+
+This matches with process 1001 doing an insert into the kernel page table.
+That is, the following lines result in the memory at 39f000 getting freed:
+
+    cprintf("[%08x] insert 0x%08x\n", curenv->env_id, page2pa(pinfo));
+	if (page_insert(kern_pgdir, pinfo, (void *) UXSTACKBASE, PTE_W))
+		goto destroy_env;
+
+
+So we're inserting an entry into the kernel page directory. This removes the
+old entry. And that's how 39f000 gets freed. But *HOW* did 39f000 ever end up
+in the kernel page directory!?
+
+It could have happened during page fault handling. But if that's the case, we
+should see a line with "[%08x] insert 0x%08x\n" in the output. But we don't!
+
+	dynabox@dynabox:~/lab$ make qemu | grep '\] insert 0x'
+	[00001000] insert 0x003ad000
+	[00001000] insert 0x003ad000
+	[00001000] insert 0x003ad000
+	[00001001] insert 0x003a5000
+	[00001001] insert 0x003a5000
+
+So now the big question is: HOW does 39f000 end up in the kernel page table??
+
+Well, it could get inserted directly with page_insert. But we only see one
+call to page_insert with 39f000. And that's when process 1002 inserts the page
+into its own page table.
+
+Are there other functions which insert into the page table? Well, you'd have
+to call pgdir_walk. The only other caller of that is page_lookup. So who calls
+page_lookup? I checked with cscope and no caller modifies the looked-up PTE.
+
+Then another option is that the kern_pgdir and that of process 1002 somehow
+share some physical pages. But that should never happen. Can we confirm this?
+
+We could print the page tables. When should we do this? When 1002 allocates
+its exception stack. Okay.
+
+
+
+OH. I just realized that in env_setup_vm we *ARE* setting up a new
+environment's page directory to look exactly like that of the kernel. But we
+are copying each PDE. This means that the second level of page tables will be
+shared! And this is NOT okay. When we modify the kernel's page table we'll
+also affect that of every process, and that's really not what we want.
+
+
+
+

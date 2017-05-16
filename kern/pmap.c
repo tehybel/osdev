@@ -38,6 +38,21 @@ void check_not_in_page_free_list(struct PageInfo * p) {
 	}
 }
 
+void print_pgdir(pde_t *pgdir) {
+	int i;
+
+	cprintf("--- page directory 0x%08x ---\n", pgdir);
+	for (i = 0; i < NPDENTRIES; i++) {
+		pde_t pde = pgdir[i];
+		if (!(pde & PTE_P))
+			continue;
+
+		cprintf("entry %d: 0x%08x\n", i, pde);
+	}
+	cprintf("---------------------------------\n");
+
+}
+
 
 // takes a single PageInfo struct off of the page_free_list
 static struct PageInfo * take_pageinfo() {
@@ -413,7 +428,8 @@ page_alloc(int alloc_flags)
 		// fill it with nonsense to catch uninitialized variable usage early
 		memset(mem, '\x42', PGSIZE);
 	
-	// cprintf("ALLOC 0x%x\n", page2pa(pginfo));
+	physaddr_t pa = page2pa(pginfo);
+	cprintf("ALLOC 0x%x\n", pa);
 	return pginfo;
 }
 
@@ -442,7 +458,8 @@ page_free(struct PageInfo *pageinfo)
 		page_free_list = pageinfo;
 	
 	
-	cprintf("freed 0x%x\n", page2pa(pageinfo));
+	physaddr_t pa = page2pa(pageinfo);
+	cprintf("freed 0x%x\n", pa);
 }
 
 //
@@ -593,6 +610,9 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// set up the mapping to 'pa'
 	physaddr_t pa = page2pa(pp);
 	*pte = pa | perm | PTE_P;
+
+	cprintf("page_insert 0x%08x -> 0x%08x (pgdir: 0x%08x)\n",
+			va, pa, pgdir);
 
 	tlb_invalidate(pgdir, va); // TODO think about whether this is needed
 
