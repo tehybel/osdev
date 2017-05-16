@@ -189,15 +189,6 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	assert (page_lookup(env->env_pgdir, va, NULL));
 	assert (pinfo->pp_ref == 1);
 
-	cprintf("[%08x] allocated 0x%08x -> 0x%08x (process %08x did this for "
-			"process %08x\n", env->env_id, va, page2pa(pinfo),
-			curenv->env_id, env->env_id);
-
-	if (env->env_id == 0x1002 && va == (void *) 0xeebff000) {
-		print_pgdir(env->env_pgdir);
-		print_pgdir(kern_pgdir);
-	}
-	
 	return 0;
 }
 

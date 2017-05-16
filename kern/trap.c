@@ -398,7 +398,6 @@ page_fault_handler(struct Trapframe *tf)
 	// the UXSTACKBASE page should never be shared
 	assert (pinfo->pp_ref == 1); 
 
-	cprintf("[%08x] insert 0x%08x\n", curenv->env_id, page2pa(pinfo));
 	if (page_insert(kern_pgdir, pinfo, (void *) UXSTACKBASE, PTE_W))
 		goto destroy_env;
 	assert (pinfo->pp_ref == 2);
@@ -418,8 +417,6 @@ page_fault_handler(struct Trapframe *tf)
 	utf->utf_esp = tf->tf_esp;
 
 	// no need to keep the page around in the kernel page table
-	cprintf("[%08x] remove 0x%08x\n", curenv->env_id, 
-			page2pa(page_lookup(kern_pgdir, (void *) UXSTACKBASE, NULL)));
 	page_remove(kern_pgdir, (void *) UXSTACKBASE);
 	assert (pinfo->pp_ref == 1); 
 

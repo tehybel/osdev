@@ -428,8 +428,6 @@ page_alloc(int alloc_flags)
 		// fill it with nonsense to catch uninitialized variable usage early
 		memset(mem, '\x42', PGSIZE);
 	
-	physaddr_t pa = page2pa(pginfo);
-	cprintf("ALLOC 0x%x\n", pa);
 	return pginfo;
 }
 
@@ -450,16 +448,7 @@ page_free(struct PageInfo *pageinfo)
 	check_not_in_page_free_list(pageinfo);
 	pageinfo->pp_link = page_free_list;
 	pageinfo->pp_ref = MAGIC2;
-
-	if (checks_done)
-		/* for now, never put pages back on the free list; this is expensive,
-		 * but it simplifies debugging of use-after-frees. */ ;
-	else
-		page_free_list = pageinfo;
-	
-	
-	physaddr_t pa = page2pa(pageinfo);
-	cprintf("freed 0x%x\n", pa);
+	page_free_list = pageinfo;
 }
 
 //
@@ -611,11 +600,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	physaddr_t pa = page2pa(pp);
 	*pte = pa | perm | PTE_P;
 
-	cprintf("page_insert 0x%08x -> 0x%08x (pgdir: 0x%08x)\n",
-			va, pa, pgdir);
-
 	tlb_invalidate(pgdir, va); // TODO think about whether this is needed
-
 	return 0;
 }
 
