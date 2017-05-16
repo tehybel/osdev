@@ -553,6 +553,11 @@ env_run(struct Env *new)
 {
 	struct Env *old = curenv;
 
+	// make sure interrupts are enabled in user mode
+	assert (!old || old->env_tf.tf_eflags & FL_IF);
+	assert (new);
+	assert (new->env_tf.tf_eflags & FL_IF);
+
 	// update the old environment's status
 	if (old && old->env_status == ENV_RUNNING)
 		old->env_status = ENV_RUNNABLE;

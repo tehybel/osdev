@@ -131,7 +131,7 @@ init_idt(void)
 	SETGATE (idt[T_MCHK],    0, GD_KT, trap_mchk,    0) // machine check
 	SETGATE (idt[T_SIMDERR], 0, GD_KT, trap_simerr,  0)	// SIMD floating point err
 
-	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 0)
+	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 3)
 	SETGATE (idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_irq_kbd, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_irq_serial, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, trap_irq_spurious, 0)
@@ -147,29 +147,6 @@ init_idt(void)
 void
 init_idt_percpu(void)
 {
-	// The example code here sets up the Task State Segment (TSS) and
-	// the TSS descriptor for CPU 0. But it is incorrect if we are
-	// running on other CPUs because each CPU has its own kernel stack.
-	// Fix the code so that it works for all CPUs.
-	//
-	// Hints:
-	//   - The macro "thiscpu" always refers to the current CPU's
-	//     struct CpuInfo;
-	//   - The ID of the current CPU is given by cpunum() or
-	//     thiscpu->cpu_id;
-	//   - Use "thiscpu->cpu_ts" as the TSS for the current CPU,
-	//     rather than the global "ts" variable;
-	//   - Use gdt[(GD_TSS0 >> 3) + i] for CPU i's TSS descriptor;
-	//   - You mapped the per-CPU kernel stacks in mem_init_mp()
-	//
-	// ltr sets a 'busy' flag in the TSS selector, so if you
-	// accidentally load the same TSS on more than one CPU, you'll
-	// get a triple fault.  If you set up an individual CPU's TSS
-	// wrong, you may not get a fault until you try to return from
-	// user space on that CPU.
-	//
-	// LAB 4: Your code here:
-
 	struct Taskstate *ts = &thiscpu->cpu_ts;
 	uintptr_t stack_top = KSTACKTOP - cpunum()*PERSTACK_SIZE;
 	int GD_TSSi = GD_TSS0 + (cpunum() << 3);
@@ -243,6 +220,8 @@ print_regs(struct PushRegs *regs)
 static void
 trap_dispatch(struct Trapframe *tf)
 {
+	assert (tf->tf_cs != GD_KT); // should have been caught earlier.
+
 	// page faults are handled specially
 	if (tf->tf_trapno == T_PGFLT) {
 		page_fault_handler(tf);
@@ -284,8 +263,6 @@ trap_dispatch(struct Trapframe *tf)
 		sched_yield();
 	}
 
-	assert (tf->tf_cs != GD_KT); // should have been caught earlier.
-
 	// unhandled trap; display it, then terminate the environment.
 	print_trapframe(tf);
 	env_destroy(curenv);
@@ -313,6 +290,12 @@ trap(struct Trapframe *tf)
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
+
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		// timer interrupts must come from user land, because interrupts are
+		// disabled while we're in the kernel
+		assert ((tf->tf_cs & 3) == 3); 
+	}
 
 	// if we trapped from kernel land, panic.
 	if ((tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT) {

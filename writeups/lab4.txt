@@ -9,9 +9,21 @@ TODO write the writeup
 
 --- part B ---
 
-Time: 10:45-13:00, 9:45-14:45, 10:30-13, 8:30-TODO
+Time: 10:45-13:00, 9:45-14:45, 10:30-13, 8:30-11
 
-- stuck because of bugs...
+- spent a long time being stuck because of bugs; see description below. The
+  issue was that the second level of page tables were shared between all
+  processes and the kernel.
+
+TODO write the writeup
+
+
+--- part C ---
+
+Time: 11-12:15, TODO
+
+- again stuck due to bugs (right now I'm getting clock interrupts in kernel
+  land, although I've disabled interrupts there??)
 
 TODO write the writeup
 
