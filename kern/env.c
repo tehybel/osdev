@@ -166,9 +166,7 @@ env_init_percpu(void)
 static int
 env_setup_vm(struct Env *env)
 {
-	struct PageInfo *user_pgdir;
-	pde_t pde;
-	pte_t pte;
+	struct PageInfo *user_pgdir, *p;
 	int i;
 
 	// Allocate a page for the page directory
@@ -193,17 +191,23 @@ env_setup_vm(struct Env *env)
 	// This means that userland programs can access kernel space. We need a
 	// way to prevent this, perhaps with segmentation (GD_UD etc.)? TODO.
 	for (i = 0; i < NPDENTRIES; i++) {
-		pde = kern_pgdir[i];
-		if (!(pde & PTE_P)) {
-			// not present
+		pde_t pde  = kern_pgdir[i];
+		if (!(pde & PTE_P))
 			continue;
-		}
 
-		page_incref(pa2page(PTE_ADDR(pde)));
-		env->env_pgdir[i] = pde;
+		// allocate a separate second-level page in the page table; a process
+		// can *NOT* share the second level of its page table with the kernel,
+		// because then all processes would share the second level, and that's
+		// nonsense.
+		if (!(p = page_alloc(ALLOC_ZERO)))
+			return -E_NO_MEM;
+
+		// copy the second-level page
+		memcpy(page2kva(p), KADDR(PTE_ADDR(pde)), PGSIZE);
+
+		page_incref(p);
+		env->env_pgdir[i] = PTE_FLAGS(pde) | page2pa(p);
 	}
-	// TODO: pp_ref is only maintained for physical pages below UTOP, so
-	// should we only incref if this is the case?
 
 	// these should be initialized via the kernel page table
 	assert (env->env_pgdir[PDX(UPAGES)] & PTE_P);
