@@ -188,6 +188,9 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	assert (page_lookup(env->env_pgdir, va, NULL));
 	assert (pinfo->pp_ref == 1);
+
+	cprintf("[%08x] allocated 0x%08x -> 0x%08x\n", env->env_id,
+			va, page2pa(pinfo));
 	
 	return 0;
 }

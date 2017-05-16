@@ -24,9 +24,6 @@ pgfault(struct UTrapframe *utf)
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
 
-	cprintf("pgfault called, fault at 0x%x, err: 0x%x\n", 
-			utf->utf_fault_va, utf->utf_err);
-
 	if (!(utf->utf_err & FEC_WR))
 		panic("page fault (not a write) at 0x%x: %e", va, utf->utf_err);
 	

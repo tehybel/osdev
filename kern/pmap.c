@@ -38,6 +38,7 @@ void check_not_in_page_free_list(struct PageInfo * p) {
 	}
 }
 
+
 // takes a single PageInfo struct off of the page_free_list
 static struct PageInfo * take_pageinfo() {
 	if (!page_free_list)
@@ -46,6 +47,7 @@ static struct PageInfo * take_pageinfo() {
 	struct PageInfo * result = page_free_list;
 	page_free_list = page_free_list->pp_link;
 	check_not_in_page_free_list(result);
+
 	return result;
 }
 
@@ -411,6 +413,7 @@ page_alloc(int alloc_flags)
 		// fill it with nonsense to catch uninitialized variable usage early
 		memset(mem, '\x42', PGSIZE);
 	
+	// cprintf("ALLOC 0x%x\n", page2pa(pginfo));
 	return pginfo;
 }
 
@@ -434,9 +437,12 @@ page_free(struct PageInfo *pageinfo)
 
 	if (checks_done)
 		/* for now, never put pages back on the free list; this is expensive,
-		 * but it simplifies debugging of user-after-frees. */ ;
+		 * but it simplifies debugging of use-after-frees. */ ;
 	else
 		page_free_list = pageinfo;
+	
+	
+	cprintf("freed 0x%x\n", page2pa(pageinfo));
 }
 
 //
@@ -454,6 +460,9 @@ page_decref(struct PageInfo* pinfo)
 
 	if (--pinfo->pp_ref == 0)
 		page_free(pinfo);
+	
+	// TODO: add scrambling (with memset of junk values) to freed pages to
+	// catch use-after-frees.
 }
 
 void page_incref(struct PageInfo* pinfo) {
