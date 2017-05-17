@@ -131,7 +131,7 @@ init_idt(void)
 	SETGATE (idt[T_MCHK],    0, GD_KT, trap_mchk,    0) // machine check
 	SETGATE (idt[T_SIMDERR], 0, GD_KT, trap_simerr,  0)	// SIMD floating point err
 
-	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 3)
+	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_irq_kbd, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_irq_serial, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, trap_irq_spurious, 0)
@@ -259,6 +259,7 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts by switching to the next process to be
 	// scheduled.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		cprintf("timer interrupt!\n");
 		lapic_eoi();
 		sched_yield();
 	}
@@ -281,7 +282,7 @@ trap(struct Trapframe *tf)
 	if (panicstr)
 		asm volatile("hlt");
 
-	// Re-acqurie the big kernel lock if we were halted in
+	// Re-acquire the big kernel lock if we were halted in
 	// sched_yield()
 	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED)
 		lock_kernel();

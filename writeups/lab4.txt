@@ -20,7 +20,7 @@ TODO write the writeup
 
 --- part C ---
 
-Time: 11-12:15, TODO
+Time: 11-12:15, 10:30-TODO
 
 - again stuck due to bugs (right now I'm getting clock interrupts in kernel
   land, although I've disabled interrupts there??)
@@ -31,7 +31,9 @@ TODO write the writeup
 
 
 
-Debugging:
+-----------------------------
+
+Debugging the page tables issue:
 
 Something here doesn't make sense. We see that process 1002 allocates its
 exception stack:
@@ -115,6 +117,111 @@ are copying each PDE. This means that the second level of page tables will be
 shared! And this is NOT okay. When we modify the kernel's page table we'll
 also affect that of every process, and that's really not what we want.
 
+
+
+
+-------------------
+
+
+Debugging the clock interrupts issue:
+
+The problem is that when I run "make CPUS=2 run-hello" then an assertion
+fails. But if I set CPUS=1 there is no problem.
+
+The assertion failure is:
+
+	kernel panic on CPU 1 at kern/trap.c:297: assertion failed: (tf->tf_cs & 3) == 3
+
+It happens on the secondary CPU. It happens no matter which program I try to
+run.
+
+The faulting line looks like this:
+
+    if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+        assert ((tf->tf_cs & 3) == 3);
+    }
+
+It's inside the trap() function which handles all exceptions.
+
+When did this start happening? Since I enabled exceptions. I did so by setting
+the IF flag on the eflags register in user-land only. That's in env_alloc:
+
+    e->env_tf.tf_eflags |= FL_IF;
+
+If I comment out that line... it still fails. I thought that was not the case.
+
+How can I revert to a non-failing state, then? Maybe it has to do with my new
+setting up of the IDT?
+
+Yes, commenting out this line removes the fault:
+
+	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 3)
+
+But if I attach gdb I see that CPU1 is just hitting badint instead, meaning
+that the clock interrupt isn't handled properly.
+
+So.. we can now conclude that the problem is *not* about whether clock
+interrupts happen in user mode. The problem was not caused by me setting the
+interrupt flag in eflags in userland. So let's forget that part again.
+
+The problem is that timer interrupts now happen in kernel mode, but only on
+CPU 1.
+
+I expect this to not happen, because I've explicitly disabled interrupts on
+secondary processors.
+
+Secondary processors start in mpentry_start. The first instruction there is
+"cli" which clears the interrupt flag.
+
+I'm reading up to confirm this. Wikipedia
+(https://en.wikipedia.org/wiki/Interrupt_flag) says:
+
+	If the flag is set to 1, maskable hardware interrupts will be handled. If
+	cleared (set to 0), such interrupts will be ignored. IF does not affect
+	the handling of non-maskable interrupts or software interrupts generated
+	by the INT instruction.
+
+So it seems that there are interrupts which can't be masked (NMIs). Is the
+timer interrupt one? ... I can't actually find the information about this
+online. 
+
+But here's a quote from the exercise material:
+
+	External interrupts are referred to as IRQs ... For example, the clock
+	interrupt is IRQ 0 ... we make a key simplification ... External device
+	interrupts are always disabled when in the kernel ... External interrupts
+	are controlled by the FL_IF flag bit of the %eflags register
+
+So that's confirmed.
+
+Also the first thing we do in trap() is to assert that the FL_IF bit isn't set
+in eflags. So external interrupts really are disabled in the kernel. But we
+get them anyway?
+
+Do secondary processors even get past that first "cli" instruction? Yes,
+because we see that a cprintf() in mp_main is getting hit.
+
+What if we mark the timer interrupt as a trap? It would make some sense,
+because the instruction where the interrupt happened should indeed be
+restarted. Then we get another assertion failure:
+
+	kernel panic on CPU 1 at kern/trap.c:293: assertion failed:
+	!(read_eflags() & FL_IF)
+
+This confuses me. Why does marking an interrupt as a trap cause the eflags
+register to change in kernel mode?
+
+Can qemu or gdb help debug interrupts?
+
+
+Hmm.. Maybe my assertions are just wrong. Maybe clock interrupts can sometimes
+happen in kernel land, without this being a problem.
+
+Yeah, I tried changing the code to allow kernel-land timer interrupts. Then we
+just call sched_yield. I guess that's a way to let the CPU be idle, then. Then
+it can wake up periodically and look for new scheduled tasks.
+
+Then in the end the exercise description was just really misleading.
 
 
 
