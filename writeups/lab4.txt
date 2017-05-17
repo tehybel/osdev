@@ -1,15 +1,159 @@
 
+
+
+All in all, lab 4 is about concurrency: getting multiple processes running
+concurrently and letting them communicate via IPC.
+
+
 --- part A ---
 
 Time: 10:30-13:30, 14-15:15, 9:30-10:45
+Total: 5h 30min
 
-TODO write the writeup
+In part A, we:
+- start more processors than just one
+- implement a simple scheduler
+- implement various syscalls and an exokernel-style fork() function
+
+In other words, we're trying to get multiple processes/environments running
+concurrently.
+
+Up to now, only a single processor has been running. That's CPU 0, the boot
+processor (BP). The first thing we do in this lab is to have the BP start up
+other processors if there are any. These are sometimes called Application
+Processors (APs).
+
+We can emulate as many processors as we want by passing the CPUS=n flag to
+qemu.
+
+How does the kernel know how many CPUs there are? The BIOS fills out a table
+which the kernel reads. Exactly how this table is laid out and where it's
+found are just convention and can be found in the so-called MultiProcessor
+Specification. The code to interact with this table was given to us, so I
+don't know the details.
+
+How are processors brought up? To answer this we first need to define what a
+LAPIC is.
+
+A processor's interrupts are managed by a Programmable Interrupt Controller
+(PIC); it prioritizes and queues interrupts and delivers them one at a time to
+the CPU. Modern processors use what, for historical reasons, is called an
+Advanced PIC (APIC). Each processor has its own Local APIC (LAPIC). 
+
+From the kernel we can communicate with the LAPIC using memory-mapped IO.
+Concretely we write to a certain physical address, and the LAPIC reacts. To
+make the boot processor bring up more application processors, we will tell the
+LAPIC of the BP to send an inter-processor interrupt (IPI) to the LAPIC of
+each AP.
+
+As part of this IPI we get to send an address at which each AP should start
+executing code once it's brought up.
+
+The code to send the IPI was also written for us, but we needed to write code
+which maps a certain physical address range to make MMIO communication with
+the APIC possible.
+
+To sum up: the BP can make each AP start up by telling its LAPIC to transmit
+an IPI to the AP's LAPIC. This brings the AP up at an address we control.
+
+Just like the BP, the APs will start in 16-bit real mode, so we use a small
+assembly stub to switch to 32 bits and protected mode, turn on paging, and
+jump to proper C code.
+
+
+In the code, the kernel's main function, i386_init, will now call mp_init,
+which reads the table from the BIOS. It will then call lapic_init which maps
+the LAPIC to enable MMIO with it. 
+
+i386_init then calls boot_aps to bring up the APs one at a time.
+
+
+What about concurrency issues? What if the processors modify kernel structures
+concurrently? To avoid this situation we have a "big kernel lock" which a CPU
+must take before doing anything in the kernel. 
+
+In practice this means that the kernel isn't really fully multithreaded; only
+one processor can be in kernel-mode at a time. If another tries to transition
+from user- to kernel land, it will spin waiting for the lock.
+
+However multiple environments *can* run concurrently, as long as they are all
+in user mode. So we do have true multithreading, just not inside the kernel.
+
+
+Most of the effort here was spent on technical details. For example we must
+lock and unlock the big kernel lock in the right places. We must allocate
+separate kernel stacks for each processor. We must set up the IDT, GDT, and
+TSS for each processor. And so on. These details don't take up much space in
+the writeup, but they took time to get right.
+
+
+
+
+The next thing we need is a scheduler. For now we simply use round-robin
+scheduling, which means that when e.g. process 4 is scheduled out we look
+circularly through processes 5, 6, ..., MAX, 0, ..., 3 until we find one
+that's runnable, then we pick and run that.
+
+I implemented the scheduler as the function sched_yield(). It calls
+get_next_runnable_env() which performs the circular lookup. Then sched_yield
+calls env_run to context switch to the given process, ending up in user land
+and never returning.
+
+In part A, the scheduling is voluntary; a process calls sys_yield to yield.
+Later we'll make it preemptive.
+
+
+
+
+Once we have a scheduler, we need a way to get more processes running.
+Initially the kernel just starts one process, but then there's no way to
+create more. So we implemented a fork system call which lets a process spawn a
+child process.
+
+However since this is an exokernel we won't do all of the work directly in the
+kernel. Instead we implement a bunch of small syscalls, and then the user-mode
+C library will call all of those to get a fully functional fork().
+
+Concretely, we implemented these syscalls:
+
+	sys_exofork
+	sys_env_set_status
+	sys_page_alloc
+	sys_page_map
+	sys_page_unmap
+
+All in all, we want the fork function to create a new process which is
+identical to the original except that fork() returns 0 in the new process and
+nonzero in the old.
+
+To fork, a process (the parent) calls sys_exofork which creates a new process
+(the child). However sys_exofork makes a process whose address space is empty.
+It is the job of the parent to set up the child so that their address spaces
+are identical.
+
+Since this is an exokernel, we have a special memory address at which a
+process can read (but of course not write) its own page table. So a process
+can figure out the layout of its own address space.
+
+Thus the parent walks over its page table, finds present entries, and maps
+those pages into the child. It calls sys_page_alloc to alloc a new page, uses
+sys_page_map to temporarily map its own page into the child, copies over the
+data, then unmaps the temporary page again. After the parent is done, the
+child looks just like it.
+
+
+
+This finishes part A of the lab. The kernel can now talk to the LAPIC to start
+multiple processors, perform simple round-robin scheduling, and we've
+implemented an exokernel-style fork() to let multiple processes run.
+
 
 
 
 --- part B ---
 
 Time: 10:45-13:00, 9:45-14:45, 10:30-13, 8:30-11
+Total: 12h 15min
 
 - spent a long time being stuck because of bugs; see description below. The
   issue was that the second level of page tables were shared between all
@@ -20,7 +164,8 @@ TODO write the writeup
 
 --- part C ---
 
-Time: 11-12:15, 10:30-12:30, 13-TODO
+Time: 11-12:15, 10:30-12:30, 13-15
+Total: 5h 15min
 
 - again stuck due to bugs (right now I'm getting clock interrupts in kernel
   land, although I've disabled interrupts there??)
@@ -28,6 +173,27 @@ Time: 11-12:15, 10:30-12:30, 13-TODO
 TODO write the writeup
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Below are some notes from my debugging sessions. It's just me thinking out
+loud about bugs, trying to figure out their cause. It's probably not
+interesting reading.
 
 
 
