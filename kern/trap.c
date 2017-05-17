@@ -220,10 +220,10 @@ print_regs(struct PushRegs *regs)
 static void
 trap_dispatch(struct Trapframe *tf)
 {
-	assert (tf->tf_cs != GD_KT); // should have been caught earlier.
+	int trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
 
 	// page faults are handled specially
-	if (tf->tf_trapno == T_PGFLT) {
+	if (tf->tf_trapno == T_PGFLT && !trapped_from_kernel) {
 		page_fault_handler(tf);
 		return;
 	}
@@ -243,7 +243,7 @@ trap_dispatch(struct Trapframe *tf)
 	}
 
 	// handle syscalls
-	if (tf->tf_trapno == T_SYSCALL) {
+	if (tf->tf_trapno == T_SYSCALL && !trapped_from_kernel) {
 		int32_t retval = syscall(
 			tf->tf_regs.reg_eax, 
 			tf->tf_regs.reg_edx, 
@@ -264,8 +264,13 @@ trap_dispatch(struct Trapframe *tf)
 		sched_yield();
 	}
 
-	// unhandled trap; display it, then terminate the environment.
 	print_trapframe(tf);
+
+	// if we get an unhandled trap in kernel land, panic
+	if (trapped_from_kernel)
+		panic("trap in kernel mode");
+
+	// if we get an unhandled trap in user land, terminate the environment
 	env_destroy(curenv);
 }
 
@@ -282,52 +287,39 @@ trap(struct Trapframe *tf)
 	if (panicstr)
 		asm volatile("hlt");
 
+	int trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
+
 	// Re-acquire the big kernel lock if we were halted in
 	// sched_yield()
-	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED)
+	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED) {
+		assert (trapped_from_kernel); // otherwise we lock the kernel twice
 		lock_kernel();
+	}
 
-	// Check that interrupts are disabled.  If this assertion
-	// fails, DO NOT be tempted to fix it by inserting a "cli" in
-	// the interrupt path.
+	// Check that interrupts are disabled. This should always be the case once
+	// we're in kernel land. If this assertion fails, Don't "fix" it by
+	// inserting a "cli" in the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
-	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
-		// timer interrupts must come from user land, because interrupts are
-		// disabled while we're in the kernel
-		assert ((tf->tf_cs & 3) == 3); 
+	if (!trapped_from_kernel) {
+		lock_kernel();
+
+		// Garbage collect if current environment is a zombie
+		if (curenv->env_status == ENV_DYING) {
+			env_free(curenv);
+			curenv = NULL;
+			sched_yield();
+		}
+
+		// Copy trap frame (which is currently on the stack)
+		// into 'curenv->env_tf', so that running the environment
+		// will restart at the trap point.
+		curenv->env_tf = *tf;
+
+		// The trapframe on the stack should be ignored from here on.
+		tf = &curenv->env_tf;
+
 	}
-
-	// if we trapped from kernel land, panic.
-	if ((tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT) {
-		print_trapframe(tf);
-		panic("trap in kernel mode");
-	}
-
-	// if we get here, we trapped from user mode.
-	assert ((tf->tf_cs & 3) == 3);
-
-	// Acquire the big kernel lock before doing any
-	// serious kernel work.
-	lock_kernel();
-
-	assert (curenv);
-	assert (curenv->env_status == ENV_RUNNING);
-
-	// Garbage collect if current environment is a zombie
-	if (curenv->env_status == ENV_DYING) {
-		env_free(curenv);
-		curenv = NULL;
-		sched_yield();
-	}
-
-	// Copy trap frame (which is currently on the stack)
-	// into 'curenv->env_tf', so that running the environment
-	// will restart at the trap point.
-	curenv->env_tf = *tf;
-
-	// The trapframe on the stack should be ignored from here on.
-	tf = &curenv->env_tf;
 
 	// Record that tf is the last real trapframe so
 	// print_trapframe can print some additional information.
@@ -336,9 +328,8 @@ trap(struct Trapframe *tf)
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
-	// If we made it to this point, then no other environment was
-	// scheduled, so we should return to the current environment
-	// if doing so makes sense.
+	// We can make it here on e.g. syscalls, spurious interrupts, etc.
+	// Return to the current environment if doing so makes sense.
 	if (curenv && curenv->env_status == ENV_RUNNING)
 		env_run(curenv);
 	else
