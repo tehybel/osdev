@@ -280,8 +280,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// You will set e->env_tf.tf_eip later.
 
 	// Enable interrupts while in user mode.
-	// TODO re-enable this
-	// e->env_tf.tf_eflags |= FL_IF;
+	e->env_tf.tf_eflags |= FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -555,10 +554,9 @@ env_run(struct Env *new)
 	struct Env *old = curenv;
 
 	// make sure interrupts are enabled in user mode
-	// TODO re-enable these.
-	// assert (!old || old->env_tf.tf_eflags & FL_IF);
-	// assert (new);
-	// assert (new->env_tf.tf_eflags & FL_IF);
+	assert (!old || old->env_tf.tf_eflags & FL_IF);
+	assert (new);
+	assert (new->env_tf.tf_eflags & FL_IF);
 
 	// update the old environment's status
 	if (old && old->env_status == ENV_RUNNING)
