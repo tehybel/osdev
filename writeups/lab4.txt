@@ -20,7 +20,7 @@ TODO write the writeup
 
 --- part C ---
 
-Time: 11-12:15, 10:30-TODO
+Time: 11-12:15, 10:30-12:30, 13-TODO
 
 - again stuck due to bugs (right now I'm getting clock interrupts in kernel
   land, although I've disabled interrupts there??)

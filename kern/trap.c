@@ -303,7 +303,10 @@ trap(struct Trapframe *tf)
 	if (!trapped_from_kernel) {
 		lock_kernel();
 
-		// Garbage collect if current environment is a zombie
+		// Garbage collect if current environment is a zombie.
+		// This happens when process A kills process B, and they are running
+		// on different CPUs; then process A just marks B as dying, and we
+		// only notice now that B has trapped.
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);
 			curenv = NULL;

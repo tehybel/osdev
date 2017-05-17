@@ -310,30 +310,104 @@ sys_page_unmap(envid_t envid, void *va)
 //		current environment's address space.
 //	-E_NO_MEM if there's not enough memory to map srcva in envid's
 //		address space.
+
+#define TRANSMITTING(va) (va < (void *) UTOP)
 static int
-sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
+sys_ipc_try_send(envid_t envid, uint32_t value, void *src_va, unsigned perm)
 {
-	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	struct Env *dst_env = NULL;
+	struct PageInfo* pinfo = NULL;
+	pte_t *pte = NULL;
+	int result = 0;
+
+	if ((result = envid2env(envid, &dst_env, 0)))
+		return result;
+	
+	if (!dst_env->env_ipc_recving)
+		return -E_IPC_NOT_RECV;
+	
+	// if curenv wants to send a page of data, do additional checks
+	if (TRANSMITTING(src_va)) {
+		if (PGOFF(src_va) != 0)
+			return -E_INVAL;
+
+		if (!(pinfo = page_lookup(curenv->env_pgdir, src_va, &pte)))
+			// page must exist in curenv
+			return -E_INVAL;
+
+		if ((perm & PTE_SYSCALL) != perm)
+			// don't allow nonstandard permissions
+			return -E_INVAL;
+
+		if ((perm & PTE_W) && !(*pte & PTE_W))
+			// don't allow change from read-only to writable
+			return -E_INVAL;
+
+		if (!(perm & PTE_U) || !(perm & PTE_P))
+			// require setting user and present bits
+			return -E_INVAL;
+	} 
+	// if we're not sending a page, perm should be 0
+	else if (perm) {
+		return -E_INVAL;
+	}
+
+	// if the recipient wants a page of data, and one is being sent, then
+	// update the mapping
+	if (TRANSMITTING(dst_env->env_ipc_dst_va) && TRANSMITTING(src_va)) {
+		assert (pinfo);
+		assert (PGOFF(dst_env->env_ipc_dst_va) == 0);
+		if ((result = page_insert(dst_env->env_pgdir, pinfo, 
+							 dst_env->env_ipc_dst_va, perm)))
+			return result;
+	}
+
+
+	// if we get here, the send succeeds and we can update the values of
+	// dst_env
+	assert (dst_env->env_ipc_recving);
+	dst_env->env_ipc_recving = 0;
+	dst_env->env_ipc_from = curenv->env_id;
+	dst_env->env_ipc_value = value;
+
+	if (TRANSMITTING(dst_env->env_ipc_dst_va) && TRANSMITTING(src_va))
+		// a page was transferred, so set the perm field to nonzero
+		dst_env->env_ipc_perm = perm;
+	else
+		// no page was transferred. Maybe the sender didn't transmit one,
+		// maybe the receiver didn't want one. Both cases are OK and marked by
+		// setting env_ipc_perm to 0.
+		dst_env->env_ipc_perm = 0;
+	
+	// make sure that the ipc_recv syscall in the dst_env returns 0, then mark
+	// it as runnable
+	assert (dst_env->env_status == ENV_NOT_RUNNABLE);
+	dst_env->env_tf.tf_regs.reg_eax = 0;
+	dst_env->env_status = ENV_RUNNABLE;
+
+	return 0;
 }
 
-// Block until a value is ready.  Record that you want to receive
-// using the env_ipc_recving and env_ipc_dstva fields of struct Env,
-// mark yourself not runnable, and then give up the CPU.
+// This syscall blocks waiting until another env sends the current one a
+// value. If (dst_va < UTOP) then curenv wants to receive a page of data at
+// that address. Otherwise only a value is transmitted.
 //
-// If 'dstva' is < UTOP, then you are willing to receive a page of data.
-// 'dstva' is the virtual address at which the sent page should be mapped.
-//
-// This function only returns on error, but the system call will eventually
-// return 0 on success.
 // Return < 0 on error.  Errors are:
 //	-E_INVAL if dstva < UTOP but dstva is not page-aligned.
 static int
-sys_ipc_recv(void *dstva)
+sys_ipc_recv(void *dst_va)
 {
-	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
-	return 0;
+	if (TRANSMITTING(dst_va) && PGOFF(dst_va) != 0)
+		return -E_INVAL;
+	
+	curenv->env_ipc_recving = 1;
+	curenv->env_ipc_dst_va = dst_va;
+	curenv->env_status = ENV_NOT_RUNNABLE;
+
+	// this function never returns; instead eax of curenv is set when another
+	// process does a sys_ipc_try_send. That's also when curenv will be
+	// scheduled back in.
+	sched_yield();
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
