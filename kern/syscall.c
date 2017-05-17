@@ -134,7 +134,9 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 	if ((result = envid2env(envid, &env, 1)))
 		return result;
 	
-	assert (func < (void *) UTOP);
+	// make sure this is a valid user-space address
+	user_mem_assert(env, func, 1, PTE_U | PTE_P);
+
 	env->env_pgfault_upcall = func;
 	return 0;
 }
