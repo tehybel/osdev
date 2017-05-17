@@ -16,10 +16,11 @@ extern void _pgfault_upcall(void);
 static void
 pgfault(struct UTrapframe *utf)
 {
+	// we do not currently handle writes that span multiple pages
+	assert (PGOFF(utf->utf_fault_va) <= PGSIZE-4);
+
 	void * va = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	pte_t pte = uvpt[(uint32_t) va / PGSIZE];
-
-	// TODO handle writes that span multiple pages?
 
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.

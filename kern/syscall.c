@@ -134,7 +134,7 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 	if ((result = envid2env(envid, &env, 1)))
 		return result;
 	
-	// TODO should we check 'func' here or elsewhere?
+	assert (func < (void *) UTOP);
 	env->env_pgfault_upcall = func;
 	return 0;
 }
