@@ -331,6 +331,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *src_va, unsigned perm)
 		if (PGOFF(src_va) != 0)
 			return -E_INVAL;
 
+
 		if (!(pinfo = page_lookup(curenv->env_pgdir, src_va, &pte)))
 			// page must exist in curenv
 			return -E_INVAL;
@@ -453,9 +454,15 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_env_set_pgfault_upcall:
 		return sys_env_set_pgfault_upcall(a1, (void *) a2);
+	
+	case SYS_ipc_try_send:
+		return sys_ipc_try_send(a1, a2, (void *) a3, a4);
+	
+	case SYS_ipc_recv:
+		return sys_ipc_recv((void *) a1);
 
 	default:
-		return -E_INVAL;
+		return -E_NOSYS;
 
 	}
 }

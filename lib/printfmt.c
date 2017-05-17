@@ -28,6 +28,7 @@ static const char * const error_string[MAXERROR] =
 	[E_FAULT]	= "segmentation fault",
 	[E_IPC_NOT_RECV]= "env is not recving",
 	[E_EOF]		= "unexpected end of file",
+	[E_NOSYS]		= "no such syscall",
 };
 
 /*
