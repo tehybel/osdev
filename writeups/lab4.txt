@@ -1,8 +1,6 @@
 
-
-
-All in all, lab 4 is about concurrency: getting multiple processes running
-concurrently and letting them communicate via IPC.
+The goal of lab 4 is to implement preemptive multitasking, process forking
+with copy-on-write semantics, and inter-process communication.
 
 
 --- part A ---
@@ -15,9 +13,6 @@ In part A, we:
 - implement a simple scheduler
 - implement various syscalls and an exokernel-style fork() function
 
-In other words, we're trying to get multiple processes/environments running
-concurrently.
-
 Up to now, only a single processor has been running. That's CPU 0, the boot
 processor (BP). The first thing we do in this lab is to have the BP start up
 other processors if there are any. These are sometimes called Application
@@ -26,95 +21,72 @@ Processors (APs).
 We can emulate as many processors as we want by passing the CPUS=n flag to
 qemu.
 
-How does the kernel know how many CPUs there are? The BIOS fills out a table
-which the kernel reads. Exactly how this table is laid out and where it's
-found are just convention and can be found in the so-called MultiProcessor
-Specification. The code to interact with this table was given to us, so I
-don't know the details.
+The kernel determines the number of APs by querying a table filled out by the
+BIOS.
 
-How are processors brought up? To answer this we first need to define what a
-LAPIC is.
+To explain how APs are brought up we first need to define what a LAPIC is.
 
 A processor's interrupts are managed by a Programmable Interrupt Controller
 (PIC); it prioritizes and queues interrupts and delivers them one at a time to
 the CPU. Modern processors use what, for historical reasons, is called an
 Advanced PIC (APIC). Each processor has its own Local APIC (LAPIC). 
 
-From the kernel we can communicate with the LAPIC using memory-mapped IO.
-Concretely we write to a certain physical address, and the LAPIC reacts. To
-make the boot processor bring up more application processors, we will tell the
-LAPIC of the BP to send an inter-processor interrupt (IPI) to the LAPIC of
-each AP.
+If the kernel wants to do anything related to interrupts, it must delegate to
+the LAPIC.
+
+The kernel communicates with the LAPIC via MMIO. To make the boot processor
+bring up more application processors, we will tell the LAPIC of the BP to send
+an inter-processor interrupt (IPI) to the LAPIC of each AP.
 
 As part of this IPI we get to send an address at which each AP should start
-executing code once it's brought up.
+executing code.
 
-The code to send the IPI was also written for us, but we needed to write code
-which maps a certain physical address range to make MMIO communication with
-the APIC possible.
-
-To sum up: the BP can make each AP start up by telling its LAPIC to transmit
-an IPI to the AP's LAPIC. This brings the AP up at an address we control.
+The code which tells the LAPIC what to do was written for us, but we
+implemented the code which maps the LAPIC into memory to facilitate the MMIO.
 
 Just like the BP, the APs will start in 16-bit real mode, so we use a small
 assembly stub to switch to 32 bits and protected mode, turn on paging, and
 jump to proper C code.
 
-
-In the code, the kernel's main function, i386_init, will now call mp_init,
-which reads the table from the BIOS. It will then call lapic_init which maps
-the LAPIC to enable MMIO with it. 
-
-i386_init then calls boot_aps to bring up the APs one at a time.
+So now we can bring up multiple processors via their LAPICs.
 
 
-What about concurrency issues? What if the processors modify kernel structures
-concurrently? To avoid this situation we have a "big kernel lock" which a CPU
-must take before doing anything in the kernel. 
 
-In practice this means that the kernel isn't really fully multithreaded; only
-one processor can be in kernel-mode at a time. If another tries to transition
-from user- to kernel land, it will spin waiting for the lock.
+What if the processors modify kernel structures concurrently? To avoid this
+situation we have a "big kernel lock" which a CPU must take before doing
+anything in the kernel. 
 
-However multiple environments *can* run concurrently, as long as they are all
-in user mode. So we do have true multithreading, just not inside the kernel.
+In practice this means that the kernel isn't fully multithreaded; only one
+processor can be doing work in kernel-mode at a time. If another tries to
+transition from user- to kernel land, it will spin waiting for the lock.
 
-
-Most of the effort here was spent on technical details. For example we must
-lock and unlock the big kernel lock in the right places. We must allocate
-separate kernel stacks for each processor. We must set up the IDT, GDT, and
-TSS for each processor. And so on. These details don't take up much space in
-the writeup, but they took time to get right.
-
+However multiple environments (processes) *can* run concurrently. So we do
+have true multithreading, just only when in user mode.
 
 
 
 The next thing we need is a scheduler. For now we simply use round-robin
 scheduling, which means that when e.g. process 4 is scheduled out we look
 circularly through processes 5, 6, ..., MAX, 0, ..., 3 until we find one
-that's runnable, then we pick and run that.
+that's runnable, then we run that.
 
 I implemented the scheduler as the function sched_yield(). It calls
 get_next_runnable_env() which performs the circular lookup. Then sched_yield
 calls env_run to context switch to the given process, ending up in user land
 and never returning.
 
-In part A, the scheduling is voluntary; a process calls sys_yield to yield.
+For now, the scheduling is voluntary; a process calls sys_yield to yield.
 Later we'll make it preemptive.
 
 
 
 
-Once we have a scheduler, we need a way to get more processes running.
-Initially the kernel just starts one process, but then there's no way to
-create more. So we implemented a fork system call which lets a process spawn a
-child process.
+Once we have a scheduler, we need a way to get more processes running than
+just the initial one. We want a fork() function.
 
-However since this is an exokernel we won't do all of the work directly in the
-kernel. Instead we implement a bunch of small syscalls, and then the user-mode
-C library will call all of those to get a fully functional fork().
-
-Concretely, we implemented these syscalls:
+Since this is an exokernel we will do as much work as possible in user land.
+Rather than calling one complex syscall, the user-mode fork function calls a
+series of smaller syscalls:
 
 	sys_exofork
 	sys_env_set_status
@@ -122,30 +94,23 @@ Concretely, we implemented these syscalls:
 	sys_page_map
 	sys_page_unmap
 
-All in all, we want the fork function to create a new process which is
-identical to the original except that fork() returns 0 in the new process and
-nonzero in the old.
+We implemented all of these.
 
 To fork, a process (the parent) calls sys_exofork which creates a new process
-(the child). However sys_exofork makes a process whose address space is empty.
-It is the job of the parent to set up the child so that their address spaces
-are identical.
+(the child) with an empty address space. The parent then uses the other
+syscalls to fill in the address space of the child such that the address
+spaces are identical.
 
-Since this is an exokernel, we have a special memory address at which a
-process can read (but of course not write) its own page table. So a process
-can figure out the layout of its own address space.
+The parent knows its address space layout because its page table is mapped
+read-only at a special address.
 
-Thus the parent walks over its page table, finds present entries, and maps
-those pages into the child. It calls sys_page_alloc to alloc a new page, uses
-sys_page_map to temporarily map its own page into the child, copies over the
-data, then unmaps the temporary page again. After the parent is done, the
-child looks just like it.
-
+For now the user-mode fork function is simple but inefficient: it immediately
+copies every page from the parent to the child.
 
 
 This finishes part A of the lab. The kernel can now talk to the LAPIC to start
 multiple processors, perform simple round-robin scheduling, and we've
-implemented an exokernel-style fork() to let multiple processes run.
+implemented an inefficient exokernel-style fork function.
 
 
 
@@ -158,14 +123,13 @@ Total: 12h 15min
 
 The goal in part B is to implement a copy-on-write (COW) fork() function.
 
-Our fork() from part A ensures that the address space of the child looks like
-that of the parent by allocating new physical pages and copying over the
-contents. 
+Our fork() from part A copies every page from the parent to the child. However
+this is inefficient.
 
-However this is inefficient. We want COW semantics instead. This means that
-rather than copying the content of a page immediately on forking, we instead
-initially share the physical page between the parent and child. Only when one
-of them writes to the page does each process get its own physical page.
+We want COW semantics instead. This means that when a child process is
+created, it will initially share all its memory with its parent. Only when the
+parent or child writes to a page of memory does each process get its own
+physical page.
 
 Since this is an exokernel, we want to do as much of this work in user land as
 possible. To make this possible we will let a process handle its own page
@@ -173,42 +137,43 @@ faults.
 
 Concretely we will let a process register a function as a page fault handler.
 When a page fault occurs, the CPU traps into the kernel. The kernel pushes the
-application state (registers) onto a dedicated exception stack and redirects
-the program's execution to its fault handler. Then it context switches back to
-the application.
+application state (registers) onto a dedicated user-mode exception stack and
+redirects the program's execution to its fault handler. This is done by simply
+modifying the saved $eip and $esp registers. Then the kernel context switches
+back to the application.
 
-When the application is running its fault handler, it can allocate a new
-dedicated page, copy over the data from the shared page, then unmap the shared
-page and put the dedicated page where the shared one was. Thus we get COW
-semantics implemented in user space.
+This lets us implement COW fork as follows. When an application writes to a
+COW page, it will fault, transferring execution to its fault handler, it can
+then allocate a new dedicated page, copy over the data from the shared page,
+then unmap the shared page and put the dedicated page where the shared one
+was. Thus we get COW semantics implemented in user space.
 
 So all in all, here's what we did in part B:
 - we implemented a syscall for setting the page fault handler function
 - we wrote the code in the kernel which changes the control flow of an
-  application to its fault handler upon page faults, if one is set
+  application to its fault handler upon page faults
 - we wrote user-mode library functions to set the page fault handler
-- we wrote a proper COW fork function
+- we wrote a COW fork function for the user-mode library
 
 
 
-This part took much longer than anticipated. The reason is that my code had
-bugs, and kernel debugging is a tortuous affair.
+This part took a long time to code. The reason is that my code had bugs, and
+kernel debugging is a tortuous affair.
 
-Essentially what I observed was that I mapped page A in application X, then I
-mapped page B in application Y, and then the kernel killed application X,
-because it accessed page A which the kernel says isn't mapped. But we just
-mapped it.
+What I observed was: I mapped page A in application X, then I mapped page B in
+application Y, and then the kernel killed application X, because it accessed
+page A which the kernel says isn't mapped. But we just mapped it?
 
 I initially thought the problem was with reference counting, since this
 behaved like a use-after-free bug. So I added debugging and sanity checks to
 my page allocator, but that was a blind alley.
 
-Eventually I realized that I was setting up the page table of a new process in
-such a way that it shared the second level of the page table with the kernel.
-Since all processes did this, they all shared the second level of their page
-tables, which is nonsense.
+Eventually I realized that I set up the page table of a new process such that
+it shared the second level of the page table with the kernel. Since all
+processes did this, they all shared the second level of their page tables,
+which is nonsense.
 
-I've documented my debugging further down in this document.
+I've documented how I figured this out further down in this document.
 
 
 
@@ -216,12 +181,12 @@ The faulty code was written during a previous lab. But the bug didn't surface
 until we had multiple processes, which is only the case now.
 
 This is a phenomenon which seems to happen often in kernel development: you
-write some code, but you can't test if it works before much later. And once
-you do get to a point where you start to use it, the code isn't in the
-forefront of your mind anymore.
+write some code, but you can't test if it works until much later. And once you
+do get to a point where you use the code, it's not longer in the forefront of
+your mind.
 
 Another issue that makes kernel debugging hard is that the subsystems of the
-kernel are highly interdependent. In the bug above, the problem could ahve
+kernel are highly interdependent. In the bug above, the problem could have
 been in page table setup, environment initialization, reference counting,
 physical page allocation, or something else. Any of several large subsystems
 could be responsible. So you don't know where to look for the issue.
@@ -229,12 +194,6 @@ could be responsible. So you don't know where to look for the issue.
 The moral of the story is: for osdev, it's especially important to write
 correct code, because debugging is really hard. So it's worth taking the time
 to write correct code the first time. Rushing is inefficient.
-
-
-
-
-
-
 
 
 
@@ -248,37 +207,28 @@ Total: 5h 15min
 In this part we implement preemptive multitasking and IPC.
 
 
+So far, each application had to voluntarily give up control. But we want the
+kernel to take back control forcefully if an application hogs the CPU.
 
-So far we've implemented a scheduler, but each application has to voluntarily
-give up control.
-
-In this part we implemented preemptive multitasking, such that the kernel can
-instead take back control forcefully if an application hogs the CPU.
-
-The way this works is that we tell the LAPIC to generate periodic interrupts.
-The responsible lines are:
+The way this is done is that we tell the LAPIC to generate periodic
+interrupts. The responsible lines are:
 
     lapicw(TIMER, PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
     lapicw(TICR, 10000000);
 
-We write to the LAPIC that it should repeatedly count down from 10000000 and
-when the counter reaches 0, it should send the CPU an timer interrupt request.
+We write to the LAPIC that it should repeatedly count down from 10000000. Each
+time the counter reaches 0, it should send the CPU a timer interrupt.
 
 This means that execution will be transferred to the kernel's trap handling
-function. There we will schedule out the current application and pick a new
-one to context switch to, by calling into the scheduler with the sched_yield
-function we wrote earlier.
+function. There we will call into the scheduler to pick a new application.
 
-To make all this work we also had to change the IDT so that the IRQ_TIMER
-interrupt is handled properly. 
 
 
 
 The final task in this lab is to implement IPC. We implemented two syscalls,
-sys_ipc_recv and sys_ipc_try_send. The former blocks until receiving a
-message. The latter attempts to send a message to a waiting process. The
-message is a 32-bit integer, but the syscall also makes it possible to
-transfer a full page from one process to another.
+sys_ipc_recv and sys_ipc_try_send. The recv syscall blocks until it receives a
+message. The message is a 32-bit integer, but the syscalls also allow
+transferring a full page from one process to another.
 
 sys_ipc_recv works by setting a flag in the environment struct to show that
 we're waiting for IPC, and then marking the environment as not runnable. That
@@ -306,8 +256,6 @@ This completes the lab.
 Below are some notes from my debugging sessions. It's just me thinking out
 loud about bugs, trying to figure out their cause. It's probably not
 interesting reading.
-
-
 
 -----------------------------
 
