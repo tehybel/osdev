@@ -155,11 +155,88 @@ implemented an exokernel-style fork() to let multiple processes run.
 Time: 10:45-13:00, 9:45-14:45, 10:30-13, 8:30-11
 Total: 12h 15min
 
-- spent a long time being stuck because of bugs; see description below. The
-  issue was that the second level of page tables were shared between all
-  processes and the kernel.
 
-TODO write the writeup
+The goal in part B is to implement a copy-on-write (COW) fork() function.
+
+Our fork() from part A ensures that the address space of the child looks like
+that of the parent by allocating new physical pages and copying over the
+contents. 
+
+However this is inefficient. We want COW semantics instead. This means that
+rather than copying the content of a page immediately on forking, we instead
+initially share the physical page between the parent and child. Only when one
+of them writes to the page does each process get its own physical page.
+
+Since this is an exokernel, we want to do as much of this work in user land as
+possible. To make this possible we will let a process handle its own page
+faults.
+
+Concretely we will let a process register a function as a page fault handler.
+When a page fault occurs, the CPU traps into the kernel. The kernel pushes the
+application state (registers) onto a dedicated exception stack and redirects
+the program's execution to its fault handler. Then it context switches back to
+the application.
+
+When the application is running its fault handler, it can allocate a new
+dedicated page, copy over the data from the shared page, then unmap the shared
+page and put the dedicated page where the shared one was. Thus we get COW
+semantics implemented in user space.
+
+So all in all, here's what we did in part B:
+- we implemented a syscall for setting the page fault handler function
+- we wrote the code in the kernel which changes the control flow of an
+  application to its fault handler upon page faults, if one is set
+- we wrote user-mode library functions to set the page fault handler
+- we wrote a proper COW fork function
+
+
+
+This part took much longer than anticipated. The reason is that my code had
+bugs, and kernel debugging is a tortuous affair.
+
+Essentially what I observed was that I mapped page A in application X, then I
+mapped page B in application Y, and then the kernel killed application X,
+because it accessed page A which the kernel says isn't mapped. But we just
+mapped it.
+
+I initially thought the problem was with reference counting, since this
+behaved like a use-after-free bug. So I added debugging and sanity checks to
+my page allocator, but that was a blind alley.
+
+Eventually I realized that I was setting up the page table of a new process in
+such a way that it shared the second level of the page table with the kernel.
+Since all processes did this, they all shared the second level of their page
+tables, which is nonsense.
+
+I've documented my debugging further down in this document.
+
+
+
+The faulty code was written during a previous lab. But the bug didn't surface
+until we had multiple processes, which is only the case now.
+
+This is a phenomenon which seems to happen often in kernel development: you
+write some code, but you can't test if it works before much later. And once
+you do get to a point where you start to use it, the code isn't in the
+forefront of your mind anymore.
+
+Another issue that makes kernel debugging hard is that the subsystems of the
+kernel are highly interdependent. In the bug above, the problem could ahve
+been in page table setup, environment initialization, reference counting,
+physical page allocation, or something else. Any of several large subsystems
+could be responsible. So you don't know where to look for the issue.
+
+The moral of the story is: for osdev, it's especially important to write
+correct code, because debugging is really hard. So it's worth taking the time
+to write correct code the first time. Rushing is inefficient.
+
+
+
+
+
+
+
+
 
 
 --- part C ---
