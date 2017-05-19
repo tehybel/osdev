@@ -244,19 +244,54 @@ to write correct code the first time. Rushing is inefficient.
 Time: 11-12:15, 10:30-12:30, 13-15
 Total: 5h 15min
 
-- again stuck due to bugs (right now I'm getting clock interrupts in kernel
-  land, although I've disabled interrupts there??)
 
-TODO write the writeup
+In this part we implement preemptive multitasking and IPC.
 
 
 
+So far we've implemented a scheduler, but each application has to voluntarily
+give up control.
+
+In this part we implemented preemptive multitasking, such that the kernel can
+instead take back control forcefully if an application hogs the CPU.
+
+The way this works is that we tell the LAPIC to generate periodic interrupts.
+The responsible lines are:
+
+    lapicw(TIMER, PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
+    lapicw(TICR, 10000000);
+
+We write to the LAPIC that it should repeatedly count down from 10000000 and
+when the counter reaches 0, it should send the CPU an timer interrupt request.
+
+This means that execution will be transferred to the kernel's trap handling
+function. There we will schedule out the current application and pick a new
+one to context switch to, by calling into the scheduler with the sched_yield
+function we wrote earlier.
+
+To make all this work we also had to change the IDT so that the IRQ_TIMER
+interrupt is handled properly. 
 
 
 
+The final task in this lab is to implement IPC. We implemented two syscalls,
+sys_ipc_recv and sys_ipc_try_send. The former blocks until receiving a
+message. The latter attempts to send a message to a waiting process. The
+message is a 32-bit integer, but the syscall also makes it possible to
+transfer a full page from one process to another.
 
+sys_ipc_recv works by setting a flag in the environment struct to show that
+we're waiting for IPC, and then marking the environment as not runnable. That
+way it blocks forever.
 
+sys_ipc_try_send will look up the target environment and see if it's waiting
+for IPC. If so the target is marked as runnable again and scheduled back in.
 
+Once the syscalls were implemented, we also had to write ipc_recv() and
+ipc_send() functions for the user-mode library such that applications can make
+use of the syscalls.
+
+This completes the lab.
 
 
 
