@@ -36,6 +36,12 @@ block_is_free(uint32_t blockno)
 	return 0;
 }
 
+void mark_inuse(uint32_t blockno) {
+	assert (block_is_free(blockno));
+	bitmap[blockno / 32] &= ~(1 << (blockno % 32));
+	assert (!block_is_free(blockno));
+}
+
 // Mark a block free in the bitmap
 void
 free_block(uint32_t blockno)
@@ -52,17 +58,20 @@ free_block(uint32_t blockno)
 //
 // Return block number allocated on success,
 // -E_NO_DISK if we are out of blocks.
-//
-// Hint: use free_block as an example for manipulating the bitmap.
 int
 alloc_block(void)
 {
-	// The bitmap consists of one or more blocks.  A single bitmap block
-	// contains the in-use bits for BLKBITSIZE blocks.  There are
-	// super->s_nblocks blocks in the disk altogether.
+	assert (super);
 
-	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	int blockno;
+	for (blockno = 0; blockno < super->s_nblocks; blockno++) {
+		if (block_is_free(blockno)) {
+			mark_inuse(blockno);
+			flush_block(diskaddr(blockno));
+			return blockno;
+		}
+	}
+
 	return -E_NO_DISK;
 }
 
