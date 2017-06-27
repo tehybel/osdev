@@ -431,9 +431,6 @@ bad:
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
-	// LAB 5: Your code here. TODO
-
 	struct Env *env;
 
 	envid_t parent_id = 0;
@@ -443,6 +440,11 @@ env_create(uint8_t *binary, enum EnvType type)
 		panic("env_alloc failed: %e", res);
 	
 	load_icode(env, binary);
+
+	// If this is the file server, give it I/O privileges.
+	if (type == ENV_TYPE_FS) {
+		env->env_tf.tf_eflags |= FL_IOPL_3;
+	}
 }
 
 //
