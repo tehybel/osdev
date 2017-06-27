@@ -4,7 +4,7 @@
 #include <inc/types.h>
 
 // Comment this to disable spinlock debugging
-#define DEBUG_SPINLOCK
+#define DEBUG_SPINLOCK 1
 
 // Mutual exclusion lock.
 struct spinlock {

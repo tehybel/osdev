@@ -16,3 +16,7 @@
 /sol?/
 /myapi.key
 /.suf
+/cscope.out
+/tags
+*.swp
+*.swo

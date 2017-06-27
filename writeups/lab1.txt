@@ -1,0 +1,174 @@
+
+
+Time spent: 14-20, with a couple of short breaks.
+
+This lab mainly involved reading and understanding text and code. There was
+not much programming necessary. However I am already familiar with C, gdb,
+assembly etc. so the time I took is likely not representative.
+
+I think this lab is intended as a gentle warmup.
+
+
+------------
+
+
+Explanation of what is happening:
+
+
+
+The BIOS is the first code that runs. It does some initialization (which?) and
+finds a bootable medium (e.g. the HDD), loads the boot loader from it and
+jumps to it.
+
+The boot loader is in boot/{main.c,boot.S}.
+
+(Initially we are in real mode, with real mode addressing. The processor
+executes instructions not at $pc but at $cs*0x10+$pc.)
+
+The boot loader is assumed to be placed on the first sector of the HDD (i.e.,
+the first 0x200 bytes). The BIOS always loads the first 0x200 bytes of the
+bootable medium at 0x7c00; this is standardized.
+
+The boot loader (boot.S) will switch from real to protected mode by setting
+the PE (Protected Enable) bit in $cr0. It will then switch to 32-bit mode with
+an ljmp instruction. Then it sets up $esp and jumps to C code (bootmain in
+main.c).
+
+(Incidentally, the boot loader also a temporary GDT; the GDT is a table which
+defines the segments: their address, length and permissions.)
+
+So control is transferred to bootmain(). It reads and parses an ELF file from
+the disk. The ELF file specifies where the different segments should be
+loaded. It also specifies an entry point. When the boot loader has loaded the
+ELF file, it jumps to the entry point. The kernel has been loaded.
+
+
+To answer some questions from the lab page:
+
+	At what point does the processor start executing 32-bit code? What exactly
+	causes the switch from 16- to 32-bit mode?
+
+That happens with this instruction:
+
+  ljmp    $PROT_MODE_CSEG, $protcseg
+
+This sets the $cs register to 8. We are not in real mode anymore, so this is
+used as an index into the GDT, which finds the r|x entry. Note that GDT
+entries have a complex format (described at the osdev link below). In
+particular, a bit in these entries determines whether this segment is a 16-bit
+or 32-bit one. The ljmp also results in the PIQ (Prefetch Input Queue) getting
+cleared.
+
+Thus when the new $cs-value is set, a new entry from the GDT is used, which is
+marked as 32-bit code instead of the old 16-bit code.
+
+Useful links:
+  https://en.wikipedia.org/wiki/Protected_mode
+  https://en.wikipedia.org/wiki/Real_mode
+  https://en.wikipedia.org/wiki/Global_Descriptor_Table
+  http://wiki.osdev.org/Global_Descriptor_Table
+
+
+	What is the last instruction of the boot loader executed, and what is the
+	first instruction of the kernel it just loaded?
+
+The last instruction of the boot loader can be found in obj/boot/boot.asm:
+
+  // call the entry point from the ELF header
+  // note: does not return!
+  ((void (*)(void)) (ELFHDR->e_entry))();
+  7d6b:   ff 15 18 00 01 00       call   *0x10018
+
+The first instruction can be found by breaking at *0x7d6b and single-stepping:
+
+  => 0x10000c:	mov    WORD PTR ds:0x472,0x1234
+
+
+	How does the boot loader decide how many sectors it must read in order to
+	fetch the entire kernel from disk? Where does it find this information?
+
+This information resides in the ELF file, which the boot loader parses. The
+ELF file has a number of program header structs. Each of these has a physical
+load address, a size, and an offset into the ELF file. With this information,
+each segment can be read from the ELF file and be placed appropriately. This
+line results in the reading of a segment:
+
+  readseg(ph->p_pa, ph->p_memsz, ph->p_offset);
+
+
+All in all, the kernel thus gets loaded at 0x00100000 and the boot loader
+jumps to its entry point.
+
+We can see the segments of the kernel with objdump:
+
+	$ objdump -h ../obj/kern/kernel
+
+	Sections:
+	Idx Name          Size      VMA       LMA       File off  Algn
+	  0 .text         00001871  f0100000  00100000  00001000  2**4
+	...
+
+As we can see, the kernel gets placed at address 0x100000, but it expects to
+run at 0xf0100000. We need to fix this disparity by using virtual memory.
+
+The entry point to the kernel is in the file kern/entry.S. It will set up an
+appropriate temporary page table. The table will map virtual addresses
+0xf0000000-0xf0400000 to physical addresses 0x0-0x400000. It will also map
+virtual addresses 0x0-0x400000 to the same physical addresses, so that
+when we enable paging, the next instruction will still be valid.
+
+The page table is set by putting its address into $cr3. Then paging is enabled
+by setting the PG bit in $cr0. After this the kernel jumps to 0xf010XXXX which
+is now a valid virtual address.
+
+After setting up the page tables, the kernel jumps to i386_init which is C
+code.
+
+
+--------------
+
+{{{ Exercise 9. 
+
+"Determine where the kernel initializes its stack, and exactly where in memory
+its stack is located. How does the kernel reserve space for its stack? And at
+which "end" of this reserved area is the stack pointer initialized to point
+to?"
+
+From entry.S:
+	
+	# Set the stack pointer
+	movl    $(bootstacktop),%esp
+
+In that file we make a space for the stack like this:
+
+		.globl      bootstack
+	bootstack:
+		.space      KSTKSIZE
+		.globl      bootstacktop
+	bootstacktop:
+
+So we reserve KSTKSIZE bytes (8 pages) for the stack.
+
+This is indeed the stack used by the kernel. We can confirm this via gdb,
+breaking after the monitor appears:
+
+	(gdb) p &bootstack
+	$2 = (<data variable, no debug info> *) 0xf0108000
+	(gdb) p &bootstacktop 
+	$3 = (<data variable, no debug info> *) 0xf0110000
+	(gdb) p $sp
+	$4 = (void *) 0xf010ff30
+
+The stack grows down, so of course the stack pointer initially points at
+"bootstacktop".
+
+
+
+}}}
+
+
+
+
+
+
+

@@ -23,33 +23,31 @@ i386_init(void)
 {
 	extern char edata[], end[];
 
-	// Before doing anything else, complete the ELF loading process.
-	// Clear the uninitialized global data (BSS) section of our program.
-	// This ensures that all static/global variables start out zero.
+	// clear out the .bss
 	memset(edata, 0, end - edata);
 
-	// Initialize the console.
-	// Can't call cprintf until after we do this!
-	cons_init();
+	// initialize the console subsystem; cprintf will not work otherwise
+	init_console();
 
-	cprintf("6828 decimal is %o octal!\n", 6828);
+	// initialize the physical page management system 
+	// also initialize the page table to support proper virtual memory
+	init_memory();
 
-	// Lab 2 memory management initialization functions
-	mem_init();
+	// user environment initialization
+	init_environments();
 
-	// Lab 3 user environment initialization functions
-	env_init();
-	trap_init();
+	// set up the IDT to handle exceptions and other interrupts
+	init_idt();
 
-	// Lab 4 multiprocessor initialization functions
+	// multiprocessor initialization functions
 	mp_init();
 	lapic_init();
 
-	// Lab 4 multitasking initialization functions
+	// multitasking initialization functions
 	pic_init();
 
 	// Acquire the big kernel lock before waking up APs
-	// Your code here:
+	lock_kernel();
 
 	// Starting non-boot CPUs
 	boot_aps();
@@ -77,30 +75,41 @@ i386_init(void)
 // this variable.
 void *mpentry_kstack;
 
-// Start the non-boot (AP) processors.
+// Start the application processors (APs), i.e., the "secondary processors".
 static void
 boot_aps(void)
 {
 	extern unsigned char mpentry_start[], mpentry_end[];
 	void *code;
+	int i;
 	struct CpuInfo *c;
 
-	// Write entry code to unused memory at MPENTRY_PADDR
+	// Write entry code to unused memory at MPENTRY_PADDR; we need to do this
+	// because APs will boot in real mode, so they need their init code at a
+	// low address.
 	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+
+	size_t code_size = mpentry_end - mpentry_start;
+	assert (code_size <= PGSIZE); // we only reserved one physical page
+
+	memmove(code, mpentry_start, code_size);
 
 	// Boot each AP one at a time
-	for (c = cpus; c < cpus + ncpu; c++) {
-		if (c == cpus + cpunum())  // We've started already.
+	for (int i = 0; i < ncpu; i++) {
+		if (i == cpunum()) {
+			// current CPU is already running.
 			continue;
+		}
 
 		// Tell mpentry.S what stack to use 
-		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
+		mpentry_kstack = percpu_kstacks[i] + KSTKSIZE;
+
 		// Start the CPU at mpentry_start
-		lapic_startap(c->cpu_id, PADDR(code));
+		lapic_startap(i, PADDR(code));
+
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while(c->cpu_status != CPU_STARTED)
-			;
+		while (cpus[i].cpu_status != CPU_STARTED)
+			; // spin
 	}
 }
 
@@ -114,17 +123,14 @@ mp_main(void)
 
 	lapic_init();
 	env_init_percpu();
-	trap_init_percpu();
+	init_idt_percpu();
 	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
 
 	// Now that we have finished some basic setup, call sched_yield()
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
-	//
-	// Your code here:
-
-	// Remove this after you finish Exercise 4
-	for (;;);
+	lock_kernel();
+	sched_yield();
 }
 
 /*
@@ -149,11 +155,15 @@ _panic(const char *file, int line, const char *fmt,...)
 	// Be extra sure that the machine is in as reasonable state
 	asm volatile("cli; cld");
 
+	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("!!!!!\n");
 	va_start(ap, fmt);
-	cprintf("kernel panic on CPU %d at %s:%d: ", cpunum(), file, line);
+	cprintf("!!!!! kernel panic on CPU %d at %s:%d: ", cpunum(), file, line);
 	vcprintf(fmt, ap);
-	cprintf("\n");
 	va_end(ap);
+	cprintf("\n!!!!!\n");
+	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+	cprintf("\nDropping into the monitor.\n");
 
 dead:
 	/* break into the kernel monitor */

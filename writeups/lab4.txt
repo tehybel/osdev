@@ -1,0 +1,453 @@
+
+The goal of lab 4 is to implement preemptive multitasking, process forking
+with copy-on-write semantics, and inter-process communication.
+
+
+--- part A ---
+
+Time: 10:30-13:30, 14-15:15, 9:30-10:45
+Total: 5h 30min
+
+In part A, we:
+- start more processors than just one
+- implement a simple scheduler
+- implement various syscalls and an exokernel-style fork() function
+
+Up to now, only a single processor has been running. That's CPU 0, the boot
+processor (BP). The first thing we do in this lab is to have the BP start up
+other processors if there are any. These are sometimes called Application
+Processors (APs).
+
+We can emulate as many processors as we want by passing the CPUS=n flag to
+qemu.
+
+The kernel determines the number of APs by querying a table filled out by the
+BIOS.
+
+To explain how APs are brought up we first need to define what a LAPIC is.
+
+A processor's interrupts are managed by a Programmable Interrupt Controller
+(PIC); it prioritizes and queues interrupts and delivers them one at a time to
+the CPU. Modern processors use what, for historical reasons, is called an
+Advanced PIC (APIC). Each processor has its own Local APIC (LAPIC). 
+
+If the kernel wants to do anything related to interrupts, it must delegate to
+the LAPIC.
+
+The kernel communicates with the LAPIC via MMIO. To make the boot processor
+bring up more application processors, we will tell the LAPIC of the BP to send
+an inter-processor interrupt (IPI) to the LAPIC of each AP.
+
+As part of this IPI we get to send an address at which each AP should start
+executing code.
+
+The code which tells the LAPIC what to do was written for us, but we
+implemented the code which maps the LAPIC into memory to facilitate the MMIO.
+
+Just like the BP, the APs will start in 16-bit real mode, so we use a small
+assembly stub to switch to 32 bits and protected mode, turn on paging, and
+jump to proper C code.
+
+So now we can bring up multiple processors via their LAPICs.
+
+
+
+What if the processors modify kernel structures concurrently? To avoid this
+situation we have a "big kernel lock" which a CPU must take before doing
+anything in the kernel. 
+
+In practice this means that the kernel isn't fully multithreaded; only one
+processor can be doing work in kernel-mode at a time. If another tries to
+transition from user- to kernel land, it will spin waiting for the lock.
+
+However multiple environments (processes) *can* run concurrently. So we do
+have true multithreading, just only when in user mode.
+
+
+
+The next thing we need is a scheduler. For now we simply use round-robin
+scheduling, which means that when e.g. process 4 is scheduled out we look
+circularly through processes 5, 6, ..., MAX, 0, ..., 3 until we find one
+that's runnable, then we run that.
+
+I implemented the scheduler as the function sched_yield(). It calls
+get_next_runnable_env() which performs the circular lookup. Then sched_yield
+calls env_run to context switch to the given process, ending up in user land
+and never returning.
+
+For now, the scheduling is voluntary; a process calls sys_yield to yield.
+Later we'll make it preemptive.
+
+
+
+
+Once we have a scheduler, we need a way to get more processes running than
+just the initial one. We want a fork() function.
+
+Since this is an exokernel we will do as much work as possible in user land.
+Rather than calling one complex syscall, the user-mode fork function calls a
+series of smaller syscalls:
+
+	sys_exofork
+	sys_env_set_status
+	sys_page_alloc
+	sys_page_map
+	sys_page_unmap
+
+We implemented all of these.
+
+To fork, a process (the parent) calls sys_exofork which creates a new process
+(the child) with an empty address space. The parent then uses the other
+syscalls to fill in the address space of the child such that the address
+spaces are identical.
+
+The parent knows its address space layout because its page table is mapped
+read-only at a special address.
+
+For now the user-mode fork function is simple but inefficient: it immediately
+copies every page from the parent to the child.
+
+
+This finishes part A of the lab. The kernel can now talk to the LAPIC to start
+multiple processors, perform simple round-robin scheduling, and we've
+implemented an inefficient exokernel-style fork function.
+
+
+
+
+--- part B ---
+
+Time: 10:45-13:00, 9:45-14:45, 10:30-13, 8:30-11
+Total: 12h 15min
+
+
+The goal in part B is to implement a copy-on-write (COW) fork() function.
+
+Our fork() from part A copies every page from the parent to the child. However
+this is inefficient.
+
+We want COW semantics instead. This means that when a child process is
+created, it will initially share all its memory with its parent. Only when the
+parent or child writes to a page of memory does each process get its own
+physical page.
+
+Since this is an exokernel, we want to do as much of this work in user land as
+possible. To make this possible we will let a process handle its own page
+faults.
+
+Concretely we will let a process register a function as a page fault handler.
+When a page fault occurs, the CPU traps into the kernel. The kernel pushes the
+application state (registers) onto a dedicated user-mode exception stack and
+redirects the program's execution to its fault handler. This is done by simply
+modifying the saved $eip and $esp registers. Then the kernel context switches
+back to the application.
+
+This lets us implement COW fork as follows. When an application writes to a
+COW page, it will fault, transferring execution to its fault handler, it can
+then allocate a new dedicated page, copy over the data from the shared page,
+then unmap the shared page and put the dedicated page where the shared one
+was. Thus we get COW semantics implemented in user space.
+
+So all in all, here's what we did in part B:
+- we implemented a syscall for setting the page fault handler function
+- we wrote the code in the kernel which changes the control flow of an
+  application to its fault handler upon page faults
+- we wrote user-mode library functions to set the page fault handler
+- we wrote a COW fork function for the user-mode library
+
+
+
+This part took a long time to code. The reason is that my code had bugs, and
+kernel debugging is a tortuous affair.
+
+What I observed was: I mapped page A in application X, then I mapped page B in
+application Y, and then the kernel killed application X, because it accessed
+page A which the kernel says isn't mapped. But we just mapped it?
+
+I initially thought the problem was with reference counting, since this
+behaved like a use-after-free bug. So I added debugging and sanity checks to
+my page allocator, but that was a blind alley.
+
+Eventually I realized that I set up the page table of a new process such that
+it shared the second level of the page table with the kernel. Since all
+processes did this, they all shared the second level of their page tables,
+which is nonsense.
+
+I've documented how I figured this out further down in this document.
+
+
+
+The faulty code was written during a previous lab. But the bug didn't surface
+until we had multiple processes, which is only the case now.
+
+This is a phenomenon which seems to happen often in kernel development: you
+write some code, but you can't test if it works until much later. And once you
+do get to a point where you use the code, it's not longer in the forefront of
+your mind.
+
+Another issue that makes kernel debugging hard is that the subsystems of the
+kernel are highly interdependent. In the bug above, the problem could have
+been in page table setup, environment initialization, reference counting,
+physical page allocation, or something else. Any of several large subsystems
+could be responsible. So you don't know where to look for the issue.
+
+The moral of the story is: for osdev, it's especially important to write
+correct code, because debugging is really hard. So it's worth taking the time
+to write correct code the first time. Rushing is inefficient.
+
+
+
+
+--- part C ---
+
+Time: 11-12:15, 10:30-12:30, 13-15
+Total: 5h 15min
+
+
+In this part we implement preemptive multitasking and IPC.
+
+
+So far, each application had to voluntarily give up control. But we want the
+kernel to take back control forcefully if an application hogs the CPU.
+
+The way this is done is that we tell the LAPIC to generate periodic
+interrupts. The responsible lines are:
+
+    lapicw(TIMER, PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
+    lapicw(TICR, 10000000);
+
+We write to the LAPIC that it should repeatedly count down from 10000000. Each
+time the counter reaches 0, it should send the CPU a timer interrupt.
+
+This means that execution will be transferred to the kernel's trap handling
+function. There we will call into the scheduler to pick a new application.
+
+
+
+
+The final task in this lab is to implement IPC. We implemented two syscalls,
+sys_ipc_recv and sys_ipc_try_send. The recv syscall blocks until it receives a
+message. The message is a 32-bit integer, but the syscalls also allow
+transferring a full page from one process to another.
+
+sys_ipc_recv works by setting a flag in the environment struct to show that
+we're waiting for IPC, and then marking the environment as not runnable. That
+way it blocks forever.
+
+sys_ipc_try_send will look up the target environment and see if it's waiting
+for IPC. If so the target is marked as runnable again and scheduled back in.
+
+Once the syscalls were implemented, we also had to write ipc_recv() and
+ipc_send() functions for the user-mode library such that applications can make
+use of the syscalls.
+
+This completes the lab.
+
+
+
+
+
+
+
+
+
+
+
+Below are some notes from my debugging sessions. It's just me thinking out
+loud about bugs, trying to figure out their cause. It's probably not
+interesting reading.
+
+-----------------------------
+
+Debugging the page tables issue:
+
+Something here doesn't make sense. We see that process 1002 allocates its
+exception stack:
+
+	page_insert 0xeebff000 -> 0x0039f000 (pgdir: 0xf03a3000)
+	[00001002] allocated 0xeebff000 -> 0x0039f000
+
+This happens in sys_page_alloc, which makes sense. At that point, process 1000
+is acting on behalf of process 1002.
+
+Here, page_alloc allocates 39f000. But then soon afterwards that page gets
+freed:
+
+	freed 0x39f000
+
+And this should not happen!
+
+When does it get freed? I broke in gdb and backtraced:
+
+	Breakpoint 1, page_free (pageinfo=0xf0287cf8) at kern/pmap.c:446
+	446		cprintf("freed 0x%x\n", pa);
+	1: pa = 0x39f000
+	(gdb) bt
+	#0  page_free (pageinfo=0xf0287cf8) at kern/pmap.c:446
+	#1  0xf0101951 in page_decref (pinfo=0xf0287cf8) at kern/pmap.c:463
+	#2  0xf0101d24 in page_remove (pgdir=0xf0285000, va=0xeebff000) at
+	kern/pmap.c:654
+	#3  0xf0101c14 in page_insert (pgdir=0xf0285000, pp=0xf0287d28, 
+	va=0xeebff000, perm=0x2) at kern/pmap.c:592
+	#4  0xf0105f67 in page_fault_handler (tf=0xf02c607c) at kern/trap.c:400
+
+It's getting freed during a page_insert inside the page fault handler. In
+which process? 
+
+	(gdb) p (cpus[cpunum()].cpu_env)->env_id
+	$6 = 0x1001
+
+This matches with process 1001 doing an insert into the kernel page table.
+That is, the following lines result in the memory at 39f000 getting freed:
+
+    cprintf("[%08x] insert 0x%08x\n", curenv->env_id, page2pa(pinfo));
+	if (page_insert(kern_pgdir, pinfo, (void *) UXSTACKBASE, PTE_W))
+		goto destroy_env;
+
+
+So we're inserting an entry into the kernel page directory. This removes the
+old entry. And that's how 39f000 gets freed. But *HOW* did 39f000 ever end up
+in the kernel page directory!?
+
+It could have happened during page fault handling. But if that's the case, we
+should see a line with "[%08x] insert 0x%08x\n" in the output. But we don't!
+
+	dynabox@dynabox:~/lab$ make qemu | grep '\] insert 0x'
+	[00001000] insert 0x003ad000
+	[00001000] insert 0x003ad000
+	[00001000] insert 0x003ad000
+	[00001001] insert 0x003a5000
+	[00001001] insert 0x003a5000
+
+So now the big question is: HOW does 39f000 end up in the kernel page table??
+
+Well, it could get inserted directly with page_insert. But we only see one
+call to page_insert with 39f000. And that's when process 1002 inserts the page
+into its own page table.
+
+Are there other functions which insert into the page table? Well, you'd have
+to call pgdir_walk. The only other caller of that is page_lookup. So who calls
+page_lookup? I checked with cscope and no caller modifies the looked-up PTE.
+
+Then another option is that the kern_pgdir and that of process 1002 somehow
+share some physical pages. But that should never happen. Can we confirm this?
+
+We could print the page tables. When should we do this? When 1002 allocates
+its exception stack. Okay.
+
+
+
+OH. I just realized that in env_setup_vm we *ARE* setting up a new
+environment's page directory to look exactly like that of the kernel. But we
+are copying each PDE. This means that the second level of page tables will be
+shared! And this is NOT okay. When we modify the kernel's page table we'll
+also affect that of every process, and that's really not what we want.
+
+
+
+
+-------------------
+
+
+Debugging the clock interrupts issue:
+
+The problem is that when I run "make CPUS=2 run-hello" then an assertion
+fails. But if I set CPUS=1 there is no problem.
+
+The assertion failure is:
+
+	kernel panic on CPU 1 at kern/trap.c:297: assertion failed: (tf->tf_cs & 3) == 3
+
+It happens on the secondary CPU. It happens no matter which program I try to
+run.
+
+The faulting line looks like this:
+
+    if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+        assert ((tf->tf_cs & 3) == 3);
+    }
+
+It's inside the trap() function which handles all exceptions.
+
+When did this start happening? Since I enabled exceptions. I did so by setting
+the IF flag on the eflags register in user-land only. That's in env_alloc:
+
+    e->env_tf.tf_eflags |= FL_IF;
+
+If I comment out that line... it still fails. I thought that was not the case.
+
+How can I revert to a non-failing state, then? Maybe it has to do with my new
+setting up of the IDT?
+
+Yes, commenting out this line removes the fault:
+
+	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 3)
+
+But if I attach gdb I see that CPU1 is just hitting badint instead, meaning
+that the clock interrupt isn't handled properly.
+
+So.. we can now conclude that the problem is *not* about whether clock
+interrupts happen in user mode. The problem was not caused by me setting the
+interrupt flag in eflags in userland. So let's forget that part again.
+
+The problem is that timer interrupts now happen in kernel mode, but only on
+CPU 1.
+
+I expect this to not happen, because I've explicitly disabled interrupts on
+secondary processors.
+
+Secondary processors start in mpentry_start. The first instruction there is
+"cli" which clears the interrupt flag.
+
+I'm reading up to confirm this. Wikipedia
+(https://en.wikipedia.org/wiki/Interrupt_flag) says:
+
+	If the flag is set to 1, maskable hardware interrupts will be handled. If
+	cleared (set to 0), such interrupts will be ignored. IF does not affect
+	the handling of non-maskable interrupts or software interrupts generated
+	by the INT instruction.
+
+So it seems that there are interrupts which can't be masked (NMIs). Is the
+timer interrupt one? ... I can't actually find the information about this
+online. 
+
+But here's a quote from the exercise material:
+
+	External interrupts are referred to as IRQs ... For example, the clock
+	interrupt is IRQ 0 ... we make a key simplification ... External device
+	interrupts are always disabled when in the kernel ... External interrupts
+	are controlled by the FL_IF flag bit of the %eflags register
+
+So that's confirmed.
+
+Also the first thing we do in trap() is to assert that the FL_IF bit isn't set
+in eflags. So external interrupts really are disabled in the kernel. But we
+get them anyway?
+
+Do secondary processors even get past that first "cli" instruction? Yes,
+because we see that a cprintf() in mp_main is getting hit.
+
+What if we mark the timer interrupt as a trap? It would make some sense,
+because the instruction where the interrupt happened should indeed be
+restarted. Then we get another assertion failure:
+
+	kernel panic on CPU 1 at kern/trap.c:293: assertion failed:
+	!(read_eflags() & FL_IF)
+
+This confuses me. Why does marking an interrupt as a trap cause the eflags
+register to change in kernel mode?
+
+Can qemu or gdb help debug interrupts?
+
+
+Hmm.. Maybe my assertions are just wrong. Maybe clock interrupts can sometimes
+happen in kernel land, without this being a problem.
+
+Yeah, I tried changing the code to allow kernel-land timer interrupts. Then we
+just call sched_yield. I guess that's a way to let the CPU be idle, then. Then
+it can wake up periodically and look for new scheduled tasks.
+
+Then in the end the exercise description was just really misleading.
+
+
+

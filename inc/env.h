@@ -47,10 +47,19 @@ enum EnvType {
 struct Env {
 	struct Trapframe env_tf;	// Saved registers
 	struct Env *env_link;		// Next free Env
-	envid_t env_id;			// Unique environment identifier
-	envid_t env_parent_id;		// env_id of this env's parent
-	enum EnvType env_type;		// Indicates special system environments
-	unsigned env_status;		// Status of the environment
+
+	// Unique environment identifier
+	envid_t env_id;			
+
+	// env_id of this env's parent
+	envid_t env_parent_id;		
+
+	// Indicates special system environments; not used yet.
+	enum EnvType env_type;		
+
+	// Status of the environment, e.g. ENV_FREE, ENV_RUNNING etc.
+	unsigned env_status;		
+
 	uint32_t env_runs;		// Number of times environment has run
 	int env_cpunum;			// The CPU that the env is running on
 
@@ -60,9 +69,8 @@ struct Env {
 	// Exception handling
 	void *env_pgfault_upcall;	// Page fault upcall entry point
 
-	// Lab 4 IPC
 	bool env_ipc_recving;		// Env is blocked receiving
-	void *env_ipc_dstva;		// VA at which to map received page
+	void *env_ipc_dst_va;		// VA at which to map received page
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
