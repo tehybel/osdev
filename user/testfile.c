@@ -14,6 +14,8 @@ xopen(const char *path, int mode)
 	fsipcbuf.open.req_omode = mode;
 
 	fsenv = ipc_find_env(ENV_TYPE_FS);
+	if (!fsenv)
+		panic("FS env not found!\n");
 	ipc_send(fsenv, FSREQ_OPEN, &fsipcbuf, PTE_P | PTE_W | PTE_U);
 	return ipc_recv(NULL, FVA, NULL);
 }

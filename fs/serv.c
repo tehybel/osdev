@@ -300,6 +300,7 @@ serve(void)
 
 	while (1) {
 		perm = 0;
+		cprintf("serve is doing an IPC recv\n");
 		req = ipc_recv((int32_t *) &whom, fsreq, &perm);
 		if (debug)
 			cprintf("fs req %d from %08x [page %08x: %s]\n",

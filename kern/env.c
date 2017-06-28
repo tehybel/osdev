@@ -446,6 +446,8 @@ env_create(uint8_t *binary, enum EnvType type)
 	
 	load_icode(env, binary);
 
+	env->env_type = type;
+
 	// If this is the file server, give it I/O privileges.
 	if (type == ENV_TYPE_FS) {
 		env->env_tf.tf_eflags |= FL_IOPL_3;
