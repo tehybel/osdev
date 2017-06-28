@@ -306,17 +306,20 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 static void
 region_alloc(pde_t *pgdir, uintptr_t va, size_t len)
 {
-	uintptr_t cur;
+	uintptr_t cur, end = ROUNDUP(va + len, PGSIZE);
 
-	va = ROUNDDOWN(va, PGSIZE);
-	len = ROUNDUP(len, PGSIZE);
+	// check whether the required pages are already mapped, and if not, add
+	// them to the pgdir.
+	for (cur = va; cur < end; cur += PGSIZE) {
+		struct PageInfo *pp = page_lookup(pgdir, (void *) cur, NULL);
 
-	// allocate a page at a time,
-	// then insert it into both the given pgdir and the kernel pgdir
-	for (cur = va; cur < va + len; cur += PGSIZE) {
-		struct PageInfo *pp = page_alloc(0);
-		if (!pp)
+		// is the page already allocated?
+		if (pp)
+			continue;
+
+		if (!(pp = page_alloc(0)))
 			goto bad;
+
 		if (page_insert(pgdir, pp, (void *) cur, PTE_U | PTE_W | PTE_P))
 			goto bad;
 	}
@@ -337,11 +340,13 @@ load_segment(pde_t *pgdir, uint8_t *binary, struct Proghdr *ph) {
 	uint8_t *src = binary + ph->p_offset;
 	uintptr_t va = ph->p_va;
 
+	assert (filesize <= memsize);
+
 	// allocate the segment
 	region_alloc(pgdir, va, memsize);
 
 	// zero out the memory
-	memset((uint8_t *) ROUNDDOWN(va, PGSIZE), '\0', memsize);
+	memset((void *) va, '\0', memsize);
 
 	// initialize (some of) the memory
 	memcpy((uint8_t *) va, src, filesize);
