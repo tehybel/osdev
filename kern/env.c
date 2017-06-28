@@ -224,6 +224,24 @@ env_setup_vm(struct Env *env)
 	return 0;
 }
 
+void init_trapframe(struct Trapframe *tf) {
+	// Set up appropriate initial values for the segment registers.
+	// GD_UD is the user data segment selector in the GDT, and
+	// GD_UT is the user text segment selector (see inc/memlayout.h).
+	// The low 2 bits of each segment register contains the
+	// Requestor Privilege Level (RPL); 3 means user mode.  When
+	// we switch privilege levels, the hardware does various
+	// checks involving the RPL and the Descriptor Privilege Level
+	// (DPL) stored in the descriptors themselves.
+	tf->tf_ds = GD_UD | 3;
+	tf->tf_es = GD_UD | 3;
+	tf->tf_ss = GD_UD | 3;
+	tf->tf_cs = GD_UT | 3;
+
+	// Enable interrupts while in user mode.
+	tf->tf_eflags |= FL_IF;
+}
+
 //
 // Allocates and initializes a new environment.
 // On success, the new environment is stored in *newenv_store.
@@ -264,23 +282,10 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// from "leaking" into our new environment.
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 
-	// Set up appropriate initial values for the segment registers.
-	// GD_UD is the user data segment selector in the GDT, and
-	// GD_UT is the user text segment selector (see inc/memlayout.h).
-	// The low 2 bits of each segment register contains the
-	// Requestor Privilege Level (RPL); 3 means user mode.  When
-	// we switch privilege levels, the hardware does various
-	// checks involving the RPL and the Descriptor Privilege Level
-	// (DPL) stored in the descriptors themselves.
-	e->env_tf.tf_ds = GD_UD | 3;
-	e->env_tf.tf_es = GD_UD | 3;
-	e->env_tf.tf_ss = GD_UD | 3;
-	e->env_tf.tf_esp = USTACKTOP;
-	e->env_tf.tf_cs = GD_UT | 3;
-	// You will set e->env_tf.tf_eip later.
+	init_trapframe(&e->env_tf);
 
-	// Enable interrupts while in user mode.
-	e->env_tf.tf_eflags |= FL_IF;
+	e->env_tf.tf_esp = USTACKTOP;
+	// we will set e->env_tf.tf_eip later.
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
