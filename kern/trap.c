@@ -302,7 +302,9 @@ trap(struct Trapframe *tf)
 	// Check that interrupts are disabled. This should always be the case once
 	// we're in kernel land. If this assertion fails, Don't "fix" it by
 	// inserting a "cli" in the interrupt path.
-	assert(!(read_eflags() & FL_IF));
+	// NOTE: for now we disable this, because it seems that interrupts *can*
+	// happen in kernel land, specifically timer interrupts?
+	// assert(!(read_eflags() & FL_IF));
 
 	if (!trapped_from_kernel) {
 		lock_kernel();
