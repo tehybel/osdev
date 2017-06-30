@@ -72,7 +72,12 @@ duppage(envid_t cid, unsigned int page_number)
 							  PTE_U | PTE_P | PTE_W);
 	}
 
-	if (pte & PTE_COW) {
+	if (pte & PTE_SHARE) {
+		// if a page table entry has this bit set, the PTE should be copied
+		// directly from parent to child. I.e., share the page.
+		return sys_page_map(0, va, cid, va, pte & PTE_SYSCALL);
+	}
+	else if (pte & PTE_COW) {
 		assert (!(pte & PTE_W));
 		// it's already COW; map it likewise in the child
 		return sys_page_map(0, va, cid, va, PTE_U | PTE_P | PTE_COW);
