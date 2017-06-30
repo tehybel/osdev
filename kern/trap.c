@@ -242,9 +242,17 @@ trap_dispatch(struct Trapframe *tf)
 		monitor(tf); // never returns
 	}
 
-	// Handle keyboard and serial interrupts.
-	// LAB 5: Your code here.
-	// NOTE: maybe this is the wrong place.. TODO think about this.
+	// input to qemu's graphical interface (if any) appear as input from the
+	// keyboard and must be handled here
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
+		kbd_intr();
+		return;
+	}
+	// console input appear on the serial port and must be handled here
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
+		serial_intr();
+		return;
+	}
 
 	// handle syscalls
 	if (tf->tf_trapno == T_SYSCALL && !trapped_from_kernel) {
