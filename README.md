@@ -9,7 +9,7 @@ The writeups/ directory contains writeups for each lab. The current status is:
 | lab2 | done        | physical memory allocator, page tables                     |
 | lab3 | done        | running user-mode ELF files in an "environment" (process)  |
 | lab4 | done        | preemptive multitasking, COW fork(), IPC                   |
-| lab5 | in progress | file system and shell                                      |
+| lab5 | done        | file system and shell                                      |
 | lab6 | not started | ???                                                        |
 
 Note that I am skipping the "challenge" problems for now.
