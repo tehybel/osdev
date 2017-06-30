@@ -186,7 +186,6 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 //	-E_NO_DISK if a block needed to be allocated but the disk is full.
 //	-E_INVAL if filebno is out of range.
 //
-// Hint: Use file_block_walk and alloc_block.
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {

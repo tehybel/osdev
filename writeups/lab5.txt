@@ -1,14 +1,174 @@
 
-In lab5 we implement a simplistic file system and make it possible to execute
-programs from disk.
+Time: 11-14, 12-14:45, 13:45-14:45
+(Total: 6:45)
+
+
+In lab 5 the goal is to get a shell running. To do this, we first need a file
+system, so that we can execute programs from disk.
 
 
 
 
-Time: 11-14, 12-14:45, 13:45-TODO
+--- file system ---
+
+Our file system (FS) is simpler than most "real" file systems; it does not
+support timestamps, user ids, permissions, symbolic and hard links, etc. It
+can just store simple files and folders.
+
+A file system exists on a disk. A disk has empty space. We can partition the
+disk's space into blocks, where each block has a specific size. For our FS,
+the block size will be 4096 bytes.
+
+One of these blocks is special; it's called the "superblock". The superblock
+holds certain metadata for the FS, such as the disk size, where to find the
+root folder, etc.
+
+Our file system is laid out as follows. The disk is partitioned into blocks as
+mentioned. Block 0, the first one, is not used by our FS (this way it can hold
+the bootloader). Block 1 is, by convention, the superblock. 
+
+The next blocks, starting at block 2, hold a bitmap; bits correspond to blocks
+on disk, and each bit is 1 iff. the corresponding block is free. This way we
+can allocate and free blocks.
+
+The remaining blocks are used to store the concrete files and folders.
+
+The layout of our FS is illustrated here:
+
+	https://pdos.csail.mit.edu/6.828/2016/labs/lab5/disk.png
+
+
+A file is represented in C as a File structure, which is stored in a block.
+Such a File struct contains metadata, like the file name and file size. The
+File struct also has 10 pointers to the blocks that hold the file data. If the
+data cannot fit in 10 blocks (~40 kB), the File struct has a pointer to a
+block which holds another 1024 pointers to data blocks. 
+
+This is illustrated in the following diagram:
+
+	https://pdos.csail.mit.edu/6.828/2016/labs/lab5/file.png
+
+Folders are represented exactly as files, except that the 10+1024 block
+pointers no longer point to data blocks, but to blocks holding File structs.
+There is a "type" flag allowing us to distinguish between file and folder
+structs.
+
+
+We were given code which implements the described file system, but certain
+functions were left unimplemented. We had to write the missing parts. 
+
+For example we wrote a function, alloc_block, which allocates a block by
+looking through the bitmap to find a free block. Another example is the
+function file_block_walk which translates from an offset into a file to
+the corresponding data block.
+
+As a result we were made to understand the file system, without having to
+implement everything ourselves.
+
+
+
+We were given a small C program which takes as input some file names, and
+which creates a file system in memory according to the explained format,
+putting the files into the root folder. The file system, with all the data, is
+then written out to a file. This way we can pack important programs, such as
+"cat", into a tiny disk image which we attach to our virtual machine with this
+qemu option:
+
+	-drive file=obj/fs/fs.img,index=1,media=disk,format=raw
 
 
 
 
+--- FS server ---
+
+Since this is an exokernel, we want to implement interaction with the file
+system in user land. The overall idea is to have a single privileged process
+which is the "FS server"; all uses of the FS will go through it.
+
+To interact with the file system, we need to be able to read from and write to
+the disk. How can we do this?
+
+We will use so-called "Programmed IO" (PIO) to interact with the disk. This is
+a fancy way of saying that we'll use the "in" and "out" x86 instructions to
+read from and write to the disk.
+
+Normally, user-mode programs are not allowed to use these instructions and
+will segfault if they try. Whether these instructions can be used depends on a
+bit in the eflags register. Thus we can grant the "I/O privilege" to specific
+user-mode processes by setting this bit in their register state. We changed
+the kernel to grant this privilege to the FS server process.
+
+The FS server can be contacted by other processes to read, write or stat
+files. This communication is performed via the IPC syscalls which we wrote in
+the last lab. So the FS server is hanging on ipc_recv, waiting for requests to
+serve. If it e.g. receives a read request, it will walk over the file system,
+extract the requested data, and send it back to the served process via IPC.
+
+The FS server is made faster with a block caching system; when a block is
+first read from disk, the result is cached in the memory of the FS server.
+
+Once again we were given most of the code, but had to write some missing
+functions to ensure that we understood the ideas. For example we were given
+the function serve_stat for the FS server, but had to write serve_read and
+serve_write to handle those types of requests.
 
 
+
+--- miscellaneous things ---
+
+We had to write certain things which don't fall under a specific category:
+- We were given a spawn() function, which is like unix exec except it's
+  written in user land, exokernel-style. But spawn() needs a
+  sys_env_set_trapframe syscall, to set the initial register state of the
+  process, so we had to write this syscall.
+- We had to change the implementation of fork() and spawn() so that certain
+  pages can be shared between processes upon fork/spawn. This is necessary so
+  that file descriptors can be inherited, since these are stored in the
+  address space of a process.
+- We had to handle KBD and serial interrupts to make input to user-mode
+  programs possible
+
+
+
+--- the shell ---
+
+We were given a simplistic shell, "sh.c", which implements a few features. It
+can execute programs, and it supports output redirection (">") and pipes
+("|"). We had to implement input redirection ("<").
+
+
+Now we have a working shell which can run programs from our file system! If we
+run this command:
+
+	make run-icode
+
+then our makefile system will take the files from the fs/ folder, compile them
+if needed, and pack the files into a file system and store that in
+obj/fs/fs.img. It will then run our OS. Once our OS is started, it will spawn
+the "icode" program, residing in "user/icode.c". This program spawns the
+"init" program with appropriate arguments. The init program hooks up the
+stdin/stdout file descriptors to the console, then it spawns "/sh" from disk.
+The result is a shell:
+
+	$ make run-icode
+	qemu-system-i386 -drive
+	file=obj/kern/kernel.img,index=0,media=disk,format=raw -serial mon:stdio
+	-nographic -gdb tcp::26000 -D qemu.log -smp 1 -drive
+	file=obj/fs/fs.img,index=1,media=disk,format=raw  -d int,cpu_reset ...
+	init: starting sh
+	$ 
+	$ ls
+	newmotd
+	motd
+	lorem
+	...
+	$ cat lorem
+	Lorem ipsum dolor sit amet, ...
+
+
+And that's the end of this lab.
+
+
+All in all, this lab was much smaller and shorter than the others, because we
+were given much of the code. The main difficulty was understanding how file
+systems work.
