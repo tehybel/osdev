@@ -15,7 +15,6 @@ static uint32_t pci_conf1_data_ioport = 0x0cfc;
 
 // Forward declarations
 static int pci_bridge_attach(struct pci_func *pcif);
-static int attach_82540em(struct pci_func *pcif);
 
 // PCI driver table
 struct pci_driver {
@@ -36,7 +35,7 @@ struct pci_driver pci_attach_vendor[] = {
 	// QEMU emulates the 82540EM, so we look in the Intel manual, Table 5-1,
 	// to find these values. We can also look at the PCI devices printed on
 	// boot.
-	{ 0x8086, 0x100e, attach_82540em },
+	{ 0x8086, 0x100e, attach_e1000 },
 
 	{ 0, 0, 0 } // end
 };
@@ -263,7 +262,3 @@ pci_init(void)
 	return pci_scan_bus(&root_bus);
 }
 
-static int attach_82540em(struct pci_func *pcif) {
-	pci_func_enable(pcif);
-	return 0;
-}

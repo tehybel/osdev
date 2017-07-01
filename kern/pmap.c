@@ -679,6 +679,7 @@ tlb_invalidate(pde_t *pgdir, void *va)
 // Reserve size bytes in the MMIO region and map [pa,pa+size) at this
 // location.  Return the base of the reserved region.  size does *not*
 // have to be multiple of PGSIZE.
+// Returns the mapped va. Never fails.
 //
 void *
 mmio_map_region(physaddr_t pa, size_t size)
