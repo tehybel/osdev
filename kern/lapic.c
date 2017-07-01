@@ -59,7 +59,7 @@ lapic_init(void)
 		return;
 
 	// lapicaddr is the physical address of the LAPIC's 4K MMIO
-	// region.  Map it in to virtual memory so we can access it.
+	// region.  Map it into virtual memory so we can access it.
 	lapic = mmio_map_region(lapicaddr, 4096);
 
 	// Enable local APIC; set spurious interrupt vector.
@@ -111,6 +111,7 @@ lapic_init(void)
 	lapicw(TPR, 0);
 }
 
+// the current CPU's number; should be the same as thiscpu->cpu_id.
 int
 cpunum(void)
 {

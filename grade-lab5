@@ -78,7 +78,7 @@ def test_fd_share():
 
 @test(10, "start the shell [icode]")
 def test_icode():
-    r.user_test("icode")
+    r.user_test("icode", timeout=10)
     r.match('icode: read /motd',
             'This is /motd, the message of the day.',
             'icode: spawn /init',

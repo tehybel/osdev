@@ -24,6 +24,18 @@ va_is_dirty(void *va)
 	return (uvpt[PGNUM(va)] & PTE_D) != 0;
 }
 
+int block_read(uint32_t blockno, void *addr, size_t nbytes) {
+	uint32_t secno = blockno * BLKSECTS;
+	size_t nsecs = ROUNDUP(nbytes, SECTSIZE) / SECTSIZE;
+	return ide_read(secno, addr, nsecs);
+}
+
+int block_write(uint32_t blockno, void *addr, size_t nbytes) {
+	uint32_t secno = blockno * BLKSECTS;
+	size_t nsecs = ROUNDUP(nbytes, SECTSIZE) / SECTSIZE;
+	return ide_write(secno, addr, nsecs);
+}
+
 // Fault any disk block that is read in to memory by
 // loading it from disk.
 static void
@@ -42,12 +54,14 @@ bc_pgfault(struct UTrapframe *utf)
 	if (super && blockno >= super->s_nblocks)
 		panic("reading non-existent block %08x\n", blockno);
 
-	// Allocate a page in the disk map region, read the contents
-	// of the block from the disk into that page.
-	// Hint: first round addr to page boundary. fs/ide.c has code to read
-	// the disk.
-	//
-	// LAB 5: you code here:
+	// Allocate a page in the disk map region, 
+	addr = ROUNDDOWN(addr, PGSIZE);
+	if ((r = sys_page_alloc(0, addr, PTE_U | PTE_P | PTE_W)))
+		panic("allocation failed (%e)", r);
+
+	// Then read the contents of the block from the disk into that page.
+	if (block_read(blockno, addr, PGSIZE))
+		panic("block_read failed");
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
@@ -63,21 +77,28 @@ bc_pgfault(struct UTrapframe *utf)
 
 // Flush the contents of the block containing VA out to disk if
 // necessary, then clear the PTE_D bit using sys_page_map.
-// If the block is not in the block cache or is not dirty, does
-// nothing.
-// Hint: Use va_is_mapped, va_is_dirty, and ide_write.
-// Hint: Use the PTE_SYSCALL constant when calling sys_page_map.
-// Hint: Don't forget to round addr down.
 void
 flush_block(void *addr)
 {
 	uint32_t blockno = ((uint32_t)addr - DISKMAP) / BLKSIZE;
+	addr = ROUNDDOWN(addr, PGSIZE);
+	int r;
 
 	if (addr < (void*)DISKMAP || addr >= (void*)(DISKMAP + DISKSIZE))
 		panic("flush_block of bad va %08x", addr);
-
-	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+	
+	// If the block is not in the block cache, or if it's not dirty, do nothing
+	if (!va_is_mapped(addr) || !va_is_dirty(addr))
+		return;
+	
+	// If the block is in the cache and is dirty, flush the block out to the
+	// disk
+	if (block_write(blockno, addr, BLKSIZE))
+		panic("block_write failed");
+	
+	// clear the PTE_D bit
+	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
+		panic("couldn't clear dirty bit: %e", r);
 }
 
 // Test that the block cache works, by smashing the superblock and

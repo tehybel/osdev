@@ -51,7 +51,7 @@
  *                     |          RO PAGES            | R-/R-  PTSIZE
  *    UPAGES    ---->  +------------------------------+ 0xef000000
  *                     |           RO ENVS            | R-/R-  PTSIZE
- * UTOP,UENVS ------>  +------------------------------+ 0xeec00000
+ * UTOP, UENVS ----->  +------------------------------+ 0xeec00000
  * UXSTACKTOP -/       |     User Exception Stack     | RW/RW  PGSIZE
  *                     +------------------------------+ 0xeebff000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
@@ -85,6 +85,7 @@
 
 // All physical memory mapped at this address
 #define	KERNBASE	0xF0000000
+#define KERNSIZE	0x10000000
 
 // At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
 // IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
@@ -92,10 +93,16 @@
 #define IOPHYSMEM	0x0A0000
 #define EXTPHYSMEM	0x100000
 
+#define KERNPHYSBASE 	0x100000
+
 // Kernel stack.
 #define KSTACKTOP	KERNBASE
 #define KSTKSIZE	(8*PGSIZE)   		// size of a kernel stack
 #define KSTKGAP		(8*PGSIZE)   		// size of a kernel stack guard
+
+// the number of bytes each stack really takes up, including its guard
+// page
+#define PERSTACK_SIZE (KSTKSIZE + KSTKGAP)
 
 // Memory-mapped IO.
 #define MMIOLIM		(KSTACKTOP - PTSIZE)
@@ -109,10 +116,15 @@
  */
 
 // User read-only virtual page table (see 'uvpt' below)
+// this is basically a read-only copy of the user env's page table
 #define UVPT		(ULIM - PTSIZE)
+
 // Read-only copies of the Page structures
+// this is a read-only copy of the kernel's page table
 #define UPAGES		(UVPT - PTSIZE)
+
 // Read-only copies of the global env structures
+// this is a read-only copy of the array of Env structs
 #define UENVS		(UPAGES - PTSIZE)
 
 /*
@@ -123,6 +135,9 @@
 #define UTOP		UENVS
 // Top of one-page user exception stack
 #define UXSTACKTOP	UTOP
+
+#define UXSTACKBASE (UXSTACKTOP - PGSIZE)
+
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
 #define USTACKTOP	(UTOP - 2*PGSIZE)

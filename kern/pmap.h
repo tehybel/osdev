@@ -42,6 +42,8 @@ _kaddr(const char *file, int line, physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
 		_panic(file, line, "KADDR called with invalid pa %08lx", pa);
+	if (pa + KERNBASE < pa)
+		_panic(file, line, "KADDR overflow: 0x%x", pa);
 	return (void *)(pa + KERNBASE);
 }
 
@@ -51,7 +53,7 @@ enum {
 	ALLOC_ZERO = 1<<0,
 };
 
-void	mem_init(void);
+void	init_memory(void);
 
 void	page_init(void);
 struct PageInfo *page_alloc(int alloc_flags);
@@ -60,6 +62,7 @@ int	page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm);
 void	page_remove(pde_t *pgdir, void *va);
 struct PageInfo *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct PageInfo *pp);
+void page_incref(struct PageInfo* pinfo);
 
 void	tlb_invalidate(pde_t *pgdir, void *va);
 
@@ -67,6 +70,7 @@ void *	mmio_map_region(physaddr_t pa, size_t size);
 
 int	user_mem_check(struct Env *env, const void *va, size_t len, int perm);
 void	user_mem_assert(struct Env *env, const void *va, size_t len, int perm);
+void print_pgdir(pde_t *pgdir);
 
 static inline physaddr_t
 page2pa(struct PageInfo *pp)

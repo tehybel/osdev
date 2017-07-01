@@ -37,46 +37,37 @@ _pgfault_upcall:
 	movl _pgfault_handler, %eax
 	call *%eax
 	addl $4, %esp			// pop function argument
+
+	// use intel syntax since I prefer it
+	.intel_syntax noprefix
 	
-	// Now the C page fault handler has returned and you must return
-	// to the trap time state.
-	// Push trap-time %eip onto the trap-time stack.
-	//
-	// Explanation:
-	//   We must prepare the trap-time stack for our eventual return to
-	//   re-execute the instruction that faulted.
-	//   Unfortunately, we can't return directly from the exception stack:
-	//   We can't call 'jmp', since that requires that we load the address
-	//   into a register, and all registers must have their trap-time
-	//   values after the return.
-	//   We can't call 'ret' from the exception stack either, since if we
-	//   did, %esp would have the wrong value.
-	//   So instead, we push the trap-time %eip onto the *trap-time* stack!
-	//   Below we'll switch to that stack and call 'ret', which will
-	//   restore %eip to its pre-fault value.
-	//
-	//   In the case of a recursive fault on the exception stack,
-	//   note that the word we're pushing now will fit in the
-	//   blank word that the kernel reserved for us.
-	//
-	// Throughout the remaining code, think carefully about what
-	// registers are available for intermediate calculations.  You
-	// may find that you have to rearrange your code in non-obvious
-	// ways as registers become unavailable as scratch space.
-	//
-	// LAB 4: Your code here.
+	// Now the C page fault handler has returned and we must revert
+	// to the trap time state. This is slightly complicated because *all*
+	// registers must look exactly as they did before the page fault, so we
+	// need to use a 'ret' instruction to return to the old $pc.
 
-	// Restore the trap-time registers.  After you do this, you
-	// can no longer modify any general-purpose registers.
-	// LAB 4: Your code here.
+	// Push trap-time %eip onto the trap-time stack
+	mov eax, [esp+40] // get eip from UTrapFrame
+	mov ebx, [esp+48] // get esp from UTrapFrame
+	sub ebx, 4
+	mov [ebx], eax
+	mov [esp+48], ebx
 
-	// Restore eflags from the stack.  After you do this, you can
-	// no longer use arithmetic operations or anything else that
-	// modifies eflags.
-	// LAB 4: Your code here.
+	// Restore the trap-time registers, except for $esp and eflags
+	add esp, 8
+	popad
+
+	// Restore eflags from the stack. We cannot use arithmetic instructions
+	// after this point!
+	add esp, 4
+	popfd
 
 	// Switch back to the adjusted trap-time stack.
-	// LAB 4: Your code here.
+	pop esp
 
-	// Return to re-execute the instruction that faulted.
-	// LAB 4: Your code here.
+	// jump back to the instruction that faulted.
+	ret
+
+	// switch back to AT&T syntax to avoid breaking anything
+	.att_syntax prefix
+

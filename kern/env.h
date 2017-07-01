@@ -10,7 +10,8 @@ extern struct Env *envs;		// All environments
 #define curenv (thiscpu->cpu_env)		// Current environment
 extern struct Segdesc gdt[];
 
-void	env_init(void);
+void	init_environments(void);
+void	init_trapframe(struct Trapframe *tf);
 void	env_init_percpu(void);
 int	env_alloc(struct Env **e, envid_t parent_id);
 void	env_free(struct Env *e);
