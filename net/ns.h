@@ -1,6 +1,8 @@
 #include <inc/ns.h>
 #include <inc/lib.h>
 
+// these are hardcoded for now, based on QEMU's defaults; QEMU will provide a
+// virtual router at 10.0.2.2 and give the guest an IP of 10.0.2.15.
 #define IP "10.0.2.15"
 #define MASK "255.255.255.0"
 #define DEFAULT "10.0.2.2"

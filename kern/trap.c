@@ -276,9 +276,10 @@ trap_dispatch(struct Trapframe *tf)
 	}
 
 	// Handle clock interrupts by switching to the next process to be
-	// scheduled.
+	// scheduled. Also record a time tick.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
 		lapic_eoi();
+		time_tick();
 		sched_yield();
 	}
 
