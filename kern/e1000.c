@@ -1,4 +1,5 @@
 #include <kern/e1000.h>
+#include <inc/string.h>
 
 /*
 	Driver for the e1000 network adapter which QEMU emulates.
@@ -14,7 +15,12 @@ volatile uint32_t *e1000_va;
 
 #define TXDESC_ARRAY_SIZE 64
 
-struct txdesc 
+#define TXDESC_STATUS_DD_BITOFF 0
+// "RS tells the hardware to report the status information for this
+// descriptor."
+#define TXDESC_CMD_RS_BITOFF 3
+
+struct txdesc
 txdesc_array [TXDESC_ARRAY_SIZE]
 __attribute__ ((aligned (16)));
 
@@ -55,6 +61,12 @@ __attribute__ ((aligned (16)));
 #define TIPG_IPGR1_BITOFF 10
 #define TIPG_IPGR2_BITOFF 20
 
+// Since we set the RS bit on the descriptors, the network card will set
+// the DD bit once a descriptor has been consumed. 
+static int descriptor_inuse(struct txdesc *desc) {
+	return (desc->status & (1 << TXDESC_STATUS_DD_BITOFF)) == 0;
+}
+
 // prepares the e1000 for transmission. The process is described in Section
 // 14.5 and is copied into the comments here.
 void transmit_init() {
@@ -75,13 +87,23 @@ void transmit_init() {
 	// take its physical address.
 	physaddr_t txdesc_array_pa = PADDR(txdesc_array);
 
+	memset(txdesc_array, '\0', sizeof(struct txdesc) * TXDESC_ARRAY_SIZE);
+
 	// however we have not initialized the txdesc structs, so we should do
 	// that now.
 	for (i = 0; i < TXDESC_ARRAY_SIZE; i++) {
-		txdesc_array[i].addr = PADDR(&txbuffers[i]);
-		txdesc_array[i].length = sizeof(struct txbuf);
-	}
+		struct txdesc *desc = &txdesc_array[i];
+		desc->addr = PADDR(&txbuffers[i]);
+		desc->length = sizeof(struct txbuf);
 
+		// set the RS bit so that the e1000 will let us know once it's
+		// consumed a descriptor
+		desc->cmd |= (1 << TXDESC_CMD_RS_BITOFF);
+
+		// set the DD bit to indicate that this descriptor is safe to use
+		desc->status |= (1 << TXDESC_STATUS_DD_BITOFF);
+		assert (!descriptor_inuse(desc));
+	}
 	
 	// Program the Transmit Descriptor Base Address (TDBAL/TDBAH) register(s)
 	// with the address of the region. TDBAL is used for 32-bit addresses and
@@ -149,3 +171,46 @@ int attach_e1000(struct pci_func *pcif) {
 	return 0;
 }
 
+// adds the given data to the txdesc_array and signals the e1000 on the TDT
+// register to let the hardware know there's a new packet to be transmitted.
+// 
+// if the transmit queue is full, the packet is simply dropped for now.
+// This is not a big problem because protocols should be resistant to
+// packet loss.
+// 
+// Later we might want to return an error code, so that the transmitting
+// process can retry if it wants to.
+int transmit(unsigned char *data, size_t length) {
+
+	// "Note that TDT is an index into the transmit descriptor array, not a
+	// byte offset; the documentation isn't very clear about this."
+	int index = TDT;
+
+	assert (index >= 0);
+	assert (index < TXDESC_ARRAY_SIZE);
+	struct txdesc *desc = &txdesc_array[index];
+
+	// this should remain set
+	assert (desc->cmd & (1 << TXDESC_CMD_RS_BITOFF));
+
+	if (length > sizeof(struct txbuf)) {
+		cprintf("warning: dropping packet of length %d (too big)\n", length);
+		return 0;
+	}
+
+	// We must check if a descriptor is in use before copying data into it; if
+	// so, this means the queue is full and we must drop the packet.
+	if (descriptor_inuse(desc)) {
+		cprintf("warning: dropping packet (queue full)\n");
+		return 0;
+	}
+
+	// there is space, so copy the data there
+	memcpy(&txbuffers[index].data, data, length);
+	desc->length = length;
+
+	// update the tail so the card knows there's a new packet to transmit
+	TDT = (index + 1) % TXDESC_ARRAY_SIZE;
+
+	return 0;
+}
