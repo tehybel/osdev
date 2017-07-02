@@ -8,4 +8,8 @@ found an old diff here:
 http://www.cs.technion.ac.il/~cs236376/software/qemu/e1000_debug.diff
 then fixed it; include new diff. Custom compiled qemu.  
 
+remember to export QEMU=/path/to/customqemu
+and configure qemu with --target-list=i386-softmmu when compiling it
+
+
 
