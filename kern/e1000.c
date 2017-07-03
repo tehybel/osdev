@@ -61,11 +61,20 @@ __attribute__ ((aligned (16)));
 #define TIPG_IPGR1_BITOFF 10
 #define TIPG_IPGR2_BITOFF 20
 
+#define CLEAR_BIT(var, bitoff) ((var) &= ~(1 << (bitoff)))
+#define SET_BIT(var, bitoff) ((var) |= (1 << (bitoff)))
+#define BIT_IS_SET(var, bitoff) ((var) & (1 << (bitoff)))
+
 // Since we set the RS bit on the descriptors, the network card will set
 // the DD bit once a descriptor has been consumed. 
-static int descriptor_inuse(struct txdesc *desc) {
-	return (desc->status & (1 << TXDESC_STATUS_DD_BITOFF)) == 0;
+static int descriptor_is_in_use(struct txdesc *desc) {
+	return !BIT_IS_SET(desc->status, TXDESC_STATUS_DD_BITOFF);
 }
+
+static void mark_descriptor_in_use(struct txdesc *desc) {
+	CLEAR_BIT(desc->status, TXDESC_STATUS_DD_BITOFF);
+}
+
 
 // prepares the e1000 for transmission. The process is described in Section
 // 14.5 and is copied into the comments here.
@@ -98,11 +107,11 @@ void transmit_init() {
 
 		// set the RS bit so that the e1000 will let us know once it's
 		// consumed a descriptor
-		desc->cmd |= (1 << TXDESC_CMD_RS_BITOFF);
+		SET_BIT(desc->cmd, TXDESC_CMD_RS_BITOFF);
 
 		// set the DD bit to indicate that this descriptor is safe to use
-		desc->status |= (1 << TXDESC_STATUS_DD_BITOFF);
-		assert (!descriptor_inuse(desc));
+		SET_BIT(desc->status, TXDESC_STATUS_DD_BITOFF);
+		assert (!descriptor_is_in_use(desc));
 	}
 	
 	// Program the Transmit Descriptor Base Address (TDBAL/TDBAH) register(s)
@@ -190,8 +199,7 @@ int transmit(unsigned char *data, size_t length) {
 	assert (index < TXDESC_ARRAY_SIZE);
 	struct txdesc *desc = &txdesc_array[index];
 
-	// this should remain set
-	assert (desc->cmd & (1 << TXDESC_CMD_RS_BITOFF));
+	assert (BIT_IS_SET(desc->cmd, TXDESC_CMD_RS_BITOFF));
 
 	if (length > sizeof(struct txbuf)) {
 		cprintf("warning: dropping packet of length %d (too big)\n", length);
@@ -200,7 +208,7 @@ int transmit(unsigned char *data, size_t length) {
 
 	// We must check if a descriptor is in use before copying data into it; if
 	// so, this means the queue is full and we must drop the packet.
-	if (descriptor_inuse(desc)) {
+	if (descriptor_is_in_use(desc)) {
 		cprintf("warning: dropping packet (queue full)\n");
 		return 0;
 	}
@@ -208,6 +216,7 @@ int transmit(unsigned char *data, size_t length) {
 	// there is space, so copy the data there
 	memcpy(&txbuffers[index].data, data, length);
 	desc->length = length;
+	mark_descriptor_in_use(desc);
 
 	// update the tail so the card knows there's a new packet to transmit
 	TDT = (index + 1) % TXDESC_ARRAY_SIZE;
