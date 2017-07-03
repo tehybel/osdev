@@ -13,13 +13,11 @@
 physaddr_t e1000_pa;        // Initialized in mpconfig.c
 volatile uint32_t *e1000_va;
 
+// number of transmit descriptors
 #define TXDESC_ARRAY_SIZE 64
 
-#define TXDESC_STATUS_DD_BITOFF 0
-// "RS tells the hardware to report the status information for this
-// descriptor."
-#define TXDESC_CMD_EOP_BITOFF 0
-#define TXDESC_CMD_RS_BITOFF 3
+// number of receive descriptors
+#define RXDESC_ARRAY_SIZE 128
 
 struct txdesc
 txdesc_array [TXDESC_ARRAY_SIZE]
@@ -29,6 +27,21 @@ struct txbuf
 txbuffers [TXDESC_ARRAY_SIZE]
 __attribute__ ((aligned (16)));
 
+struct rxdesc
+rxdesc_array [RXDESC_ARRAY_SIZE]
+__attribute__ ((aligned (16)));
+
+struct rxbuf 
+rxbuffers [RXDESC_ARRAY_SIZE]
+__attribute__ ((aligned (16)));
+
+// ----- various offsets into structures are defined below -----
+
+#define TXDESC_STATUS_DD_BITOFF 0
+// "RS tells the hardware to report the status information for this
+// descriptor."
+#define TXDESC_CMD_EOP_BITOFF 0
+#define TXDESC_CMD_RS_BITOFF 3
 
 #define TDBAL_OFFSET (0x3800/sizeof(uint32_t))
 #define TDBAL e1000_va[TDBAL_OFFSET]
@@ -62,9 +75,26 @@ __attribute__ ((aligned (16)));
 #define TIPG_IPGR1_BITOFF 10
 #define TIPG_IPGR2_BITOFF 20
 
-#define CLEAR_BIT(var, bitoff) ((var) &= ~(1 << (bitoff)))
-#define SET_BIT(var, bitoff) ((var) |= (1 << (bitoff)))
-#define BIT_IS_SET(var, bitoff) ((var) & (1 << (bitoff)))
+
+#define RAL e1000_va[0x5400/sizeof(uint32_t)]
+#define RAH e1000_va[0x5404/sizeof(uint32_t)]
+#define IMS e1000_va[0xd0/sizeof(uint32_t)]
+#define RDBAL e1000_va[0x2800/sizeof(uint32_t)]
+#define RDBAH e1000_va[0x2804/sizeof(uint32_t)]
+#define RDLEN e1000_va[0x2808/sizeof(uint32_t)]
+#define RDH e1000_va[0x2810/sizeof(uint32_t)]
+#define RDT e1000_va[0x2818/sizeof(uint32_t)]
+#define RCTL e1000_va[0x100/sizeof(uint32_t)]
+#define RCTL_EN_BITOFF 1
+#define RCTL_LPE_BITOFF 5
+#define RCTL_SECRC_BITOFF 26
+
+// ---------------------------------------------------
+
+#define BIT(bitoff) (1<<(bitoff))
+#define CLEAR_BIT(var, bitoff) ((var) &= ~(BIT(bitoff)))
+#define SET_BIT(var, bitoff) ((var) |= (BIT(bitoff)))
+#define BIT_IS_SET(var, bitoff) ((var) & (BIT(bitoff)))
 
 // Since we set the RS bit on the descriptors, the network card will set
 // the DD bit once a descriptor has been consumed. 
@@ -104,7 +134,6 @@ void transmit_init() {
 	for (i = 0; i < TXDESC_ARRAY_SIZE; i++) {
 		struct txdesc *desc = &txdesc_array[i];
 		desc->addr = PADDR(&txbuffers[i]);
-		desc->length = sizeof(struct txbuf);
 
 		// set the RS bit so that the e1000 will let us know once it's
 		// consumed a descriptor
@@ -114,7 +143,8 @@ void transmit_init() {
 		SET_BIT(desc->status, TXDESC_STATUS_DD_BITOFF);
 		assert (!descriptor_is_in_use(desc));
 
-		// set the EOP bit because all packets will fit in one descriptor
+		// set the EOP bit once and for all, because all packets will fit in
+		// one descriptor
 		SET_BIT(desc->cmd, TXDESC_CMD_EOP_BITOFF);
 	}
 	
@@ -165,6 +195,72 @@ void transmit_init() {
 
 }
 
+
+// prepare the e1000 to receive packets; we need to set certain
+// registers/flags and set up the receive queue. Most comments are from
+// Section 14.4.
+void receive_init() {
+	int i;
+
+	// Program the Receive Address Register(s) (RAL/RAH) with the desired
+	// Ethernet addresses. RAL[0]/RAH[0] should always be used to store the
+	// Individual Ethernet MAC address of the Ethernet controller.
+
+	// For now, hardcode this to 52:54:00:12:34:56 which is the QEMU default.
+	RAL = 0x12005452;
+	RAH = 0x00005634;
+
+	// Initialize the MTA (Multicast Table Array) to 0b. Per software, entries
+	// can be added to this table as desired.
+	// "The multicast table array is a way to extend address filtering"
+	// for now, do nothing here.
+
+	// Program the Interrupt Mask Set/Read (IMS) register to enable any
+	// interrupt the software driver wants to be notified of when the event
+	// occurs. Suggested bits include RXT, RXO, RXDMT, RXSEQ, and LSC. There
+	// is no immediate reason to enable the transmit interrupts.
+	IMS = 0; // no interrupts for now
+
+	// If software uses the Receive Descriptor Minimum Threshold Interrupt,
+	// the Receive Delay Timer (RDTR) register should be initialized with the
+	// desired delay time.
+	// do nothing for now
+
+	// Allocate a region of memory for the receive descriptor list. Software
+	// should insure this memory is aligned on a paragraph (16-byte) boundary.
+	// Program the Receive Descriptor Base Address (RDBAL/RDBAH) register(s)
+	// with the address of the region. 
+	assert (sizeof(struct rxdesc) == 16);
+	memset(rxdesc_array, '\0', RXDESC_ARRAY_SIZE * sizeof(struct rxdesc));
+	RDBAL = PADDR(rxdesc_array);
+	RDBAH = 0;
+
+	// Set the Receive Descriptor Length (RDLEN) register to the size (in
+	// bytes) of the descriptor ring. This register must be 128-byte aligned.
+	RDLEN = RXDESC_ARRAY_SIZE * sizeof(struct rxdesc);
+
+	// Receive buffers of appropriate size should be allocated and pointers to
+	// these buffers should be stored in the receive descriptor ring. 
+	for (i = 0; i < RXDESC_ARRAY_SIZE; i++) {
+		struct rxdesc *desc = &rxdesc_array[i];
+		desc->addr = PADDR(&rxbuffers[i]);
+	}
+	
+	// Software initializes the Receive Descriptor Head (RDH) register and
+	// Receive Descriptor Tail (RDT) with the appropriate head and tail
+	// addresses. Head should point to the first valid receive descriptor in
+	// the descriptor ring and tail should point to one descriptor beyond the
+	// last valid descriptor in the descriptor ring.
+	RDH = RDT = 0;
+
+	// Program the Receive Control (RCTL) register with appropriate values for
+	// desired operation.
+	// we explicitly set EN=1 (enable), SECRC=1 (strip CRC; the grade script
+	// expects this)
+	// we implicitly set LPE=0, LBM=0, BAM=0, BSIZE=00, and more..
+	RCTL = BIT(RCTL_EN_BITOFF) | BIT(RCTL_SECRC_BITOFF);
+}
+
 int attach_e1000(struct pci_func *pcif) {
 	// enable the device; this negotiates a PA at which we can do MMIO to talk
 	// to the device. The PA and size go in BAR0.
@@ -180,6 +276,7 @@ int attach_e1000(struct pci_func *pcif) {
 	assert (e1000_va[2] == 0x80080783);
 
 	transmit_init();
+	receive_init();
 
 	return 0;
 }
