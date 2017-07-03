@@ -79,16 +79,6 @@ i386_init(void)
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
 
-	unsigned char data[16];
-
-	cprintf("transmitting!\n");
-	memcpy(data, "AAAABBBBCCCCDDDD", 16);
-	transmit(data, 16);
-
-	memcpy(data, "1234123412341234", 12);
-	transmit(data, 16);
-	cprintf("done.\n");
-
 	// Schedule and run the first user environment!
 	sched_yield();
 }

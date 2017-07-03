@@ -18,6 +18,7 @@ volatile uint32_t *e1000_va;
 #define TXDESC_STATUS_DD_BITOFF 0
 // "RS tells the hardware to report the status information for this
 // descriptor."
+#define TXDESC_CMD_EOP_BITOFF 0
 #define TXDESC_CMD_RS_BITOFF 3
 
 struct txdesc
@@ -112,6 +113,9 @@ void transmit_init() {
 		// set the DD bit to indicate that this descriptor is safe to use
 		SET_BIT(desc->status, TXDESC_STATUS_DD_BITOFF);
 		assert (!descriptor_is_in_use(desc));
+
+		// set the EOP bit because all packets will fit in one descriptor
+		SET_BIT(desc->cmd, TXDESC_CMD_EOP_BITOFF);
 	}
 	
 	// Program the Transmit Descriptor Base Address (TDBAL/TDBAH) register(s)
@@ -200,6 +204,7 @@ int transmit(unsigned char *data, size_t length) {
 	struct txdesc *desc = &txdesc_array[index];
 
 	assert (BIT_IS_SET(desc->cmd, TXDESC_CMD_RS_BITOFF));
+	assert (BIT_IS_SET(desc->cmd, TXDESC_CMD_EOP_BITOFF));
 
 	if (length > sizeof(struct txbuf)) {
 		cprintf("warning: dropping packet of length %d (too big)\n", length);
