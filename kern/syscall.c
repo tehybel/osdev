@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -356,7 +357,6 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *src_va, unsigned perm)
 		if (PGOFF(src_va) != 0)
 			return -E_INVAL;
 
-
 		if (!(pinfo = page_lookup(curenv->env_pgdir, src_va, &pte)))
 			// page must exist in curenv
 			return -E_INVAL;
@@ -443,6 +443,11 @@ sys_time_msec(void)
 	return time_msec();
 }
 
+static int sys_transmit(unsigned char *data, size_t length) {
+	user_mem_assert(curenv, data, length, 0);
+	return transmit(data, length);
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -498,6 +503,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_time_msec:
 		return sys_time_msec();
+	
+	case SYS_transmit:
+		return sys_transmit((void *) a1, (size_t) a2);
 
 	default:
 		return -E_NOSYS;
