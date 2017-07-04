@@ -370,6 +370,8 @@ int e1000_receive(unsigned char *buf, size_t bufsize) {
 	if (desc->length > bufsize)
 		return -E_NO_MEM;
 	
+	cprintf("copy to 0x%x from 0x%x of length %d\n", buf,
+	&rxbuffers[index].data, desc->length);
 	memcpy(buf, &rxbuffers[index].data, desc->length);
 
 	// the EOP bit should be set since every packet fits into one descriptor
