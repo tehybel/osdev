@@ -120,7 +120,7 @@ static void mark_descriptor_in_use(struct txdesc *desc) {
 
 // prepares the e1000 for transmission. The process is described in Section
 // 14.5 and is copied into the comments here.
-void transmit_init() {
+static void e1000_tx_init() {
 	int i;
 
 	// 14.5: Transmit Initialization
@@ -210,7 +210,7 @@ void transmit_init() {
 // prepare the e1000 to receive packets; we need to set certain
 // registers/flags and set up the receive queue. Most comments are from
 // Section 14.4.
-void receive_init() {
+static void e1000_rx_init() {
 	int i;
 
 	// Program the Receive Address Register(s) (RAL/RAH) with the desired
@@ -287,7 +287,7 @@ void receive_init() {
 	CLEAR_BIT(RCTL, RCTL_LPE_BITOFF);
 }
 
-int attach_e1000(struct pci_func *pcif) {
+int e1000_attach(struct pci_func *pcif) {
 	// enable the device; this negotiates a PA at which we can do MMIO to talk
 	// to the device. The PA and size go in BAR0.
 	pci_func_enable(pcif);
@@ -301,8 +301,8 @@ int attach_e1000(struct pci_func *pcif) {
 	// 0x80080783, which means "full duplex link up, 1000 MB/s" and more.
 	assert (e1000_va[2] == 0x80080783);
 
-	transmit_init();
-	receive_init();
+	e1000_tx_init();
+	e1000_rx_init();
 
 	return 0;
 }
@@ -316,7 +316,7 @@ int attach_e1000(struct pci_func *pcif) {
 // 
 // Later we might want to return an error code, so that the transmitting
 // process can retry if it wants to.
-int transmit(unsigned char *data, size_t length) {
+int e1000_transmit(unsigned char *data, size_t length) {
 
 	// "Note that TDT is an index into the transmit descriptor array, not a
 	// byte offset; the documentation isn't very clear about this."
@@ -358,7 +358,7 @@ int transmit(unsigned char *data, size_t length) {
 //   -E_NOT_READY if there's no packet to receive
 //   -E_NO_MEM    if the buffer was too small
 //   the size of the received packet otherwise
-int receive(unsigned char *buf, size_t bufsize) {
+int e1000_receive(unsigned char *buf, size_t bufsize) {
 	int index = (RDT + 1) % RXDESC_ARRAY_SIZE;
 	struct rxdesc *desc = &rxdesc_array[index];
 

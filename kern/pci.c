@@ -35,7 +35,7 @@ struct pci_driver pci_attach_vendor[] = {
 	// QEMU emulates the 82540EM, so we look in the Intel manual, Table 5-1,
 	// to find these values. We can also look at the PCI devices printed on
 	// boot.
-	{ 0x8086, 0x100e, attach_e1000 },
+	{ 0x8086, 0x100e, e1000_attach },
 
 	{ 0, 0, 0 } // end
 };

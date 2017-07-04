@@ -5,8 +5,9 @@
 #ifndef JOS_KERN_E1000_H
 #define JOS_KERN_E1000_H
 
-int attach_e1000(struct pci_func *pcif);
-int transmit(unsigned char *data, size_t length);
+int e1000_attach(struct pci_func *pcif);
+int e1000_transmit(unsigned char *data, size_t length);
+int e1000_receive(unsigned char *buf, size_t bufsize);
 
 struct txdesc {
 	uint64_t addr;

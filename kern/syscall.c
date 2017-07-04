@@ -445,7 +445,7 @@ sys_time_msec(void)
 
 static int sys_transmit(unsigned char *data, size_t length) {
 	user_mem_assert(curenv, data, length, 0);
-	return transmit(data, length);
+	return e1000_transmit(data, length);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
