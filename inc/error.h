@@ -28,6 +28,8 @@ enum {
 
 	E_NOSYS		,	// syscall not implemented
 
+	E_NOT_READY ,
+
 	MAXERROR
 };
 

@@ -1,5 +1,6 @@
 #include <kern/e1000.h>
 #include <inc/string.h>
+#include <inc/error.h>
 
 /*
 	Driver for the e1000 network adapter which QEMU emulates.
@@ -95,6 +96,8 @@ __attribute__ ((aligned (16)));
 #define RCTL_LBM_BITOFF 6
 #define RCTL_BAM_BITOFF 15
 #define RCTL_SECRC_BITOFF 26
+#define RXDESC_STATUS_DD_BITOFF 0
+#define RXDESC_STATUS_EOP_BITOFF 1
 
 
 // ---------------------------------------------------
@@ -347,4 +350,38 @@ int transmit(unsigned char *data, size_t length) {
 	TDT = (index + 1) % TXDESC_ARRAY_SIZE;
 
 	return 0;
+}
+
+// takes a packet from the receive descriptors array and returns it via the
+// 'buf' argument. 
+// returns:
+//   -E_NOT_READY if there's no packet to receive
+//   -E_NO_MEM    if the buffer was too small
+//   the size of the received packet otherwise
+int receive(unsigned char *buf, size_t bufsize) {
+	int index = (RDT + 1) % RXDESC_ARRAY_SIZE;
+	struct rxdesc *desc = &rxdesc_array[index];
+
+	// first we must check if the descriptor has been filled out by the
+	// hardware. If not, the queue is empty; there's nothing to receive.
+	if (!BIT_IS_SET(desc->status, RXDESC_STATUS_DD_BITOFF))
+		return -E_NOT_READY;
+	
+	if (desc->length > bufsize)
+		return -E_NO_MEM;
+	
+	memcpy(buf, &rxbuffers[index].data, desc->length);
+
+	// the EOP bit should be set since every packet fits into one descriptor
+	// (because we disallow jumbo frames)
+	assert (BIT_IS_SET(desc->status, RXDESC_STATUS_EOP_BITOFF));
+
+	// clear EOP and DD
+	CLEAR_BIT(desc->status, RXDESC_STATUS_DD_BITOFF);
+	CLEAR_BIT(desc->status, RXDESC_STATUS_EOP_BITOFF);
+
+	// finally, update RDT
+	RDT = index;
+
+	return desc->length;
 }
