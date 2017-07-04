@@ -78,7 +78,9 @@ __attribute__ ((aligned (16)));
 
 #define RAL e1000_va[0x5400/sizeof(uint32_t)]
 #define RAH e1000_va[0x5404/sizeof(uint32_t)]
+#define RAH_AV_BITOFF 31
 #define IMS e1000_va[0xd0/sizeof(uint32_t)]
+#define MTA e1000_va[0x5200/sizeof(uint32_t)]
 #define RDBAL e1000_va[0x2800/sizeof(uint32_t)]
 #define RDBAH e1000_va[0x2804/sizeof(uint32_t)]
 #define RDLEN e1000_va[0x2808/sizeof(uint32_t)]
@@ -86,8 +88,14 @@ __attribute__ ((aligned (16)));
 #define RDT e1000_va[0x2818/sizeof(uint32_t)]
 #define RCTL e1000_va[0x100/sizeof(uint32_t)]
 #define RCTL_EN_BITOFF 1
+#define RCTL_SBP_BITOFF 2
+#define RCTL_UPE_BITOFF 3
+#define RCTL_MPE_BITOFF 4
 #define RCTL_LPE_BITOFF 5
+#define RCTL_LBM_BITOFF 6
+#define RCTL_BAM_BITOFF 15
 #define RCTL_SECRC_BITOFF 26
+
 
 // ---------------------------------------------------
 
@@ -175,10 +183,10 @@ void transmit_init() {
 	//   For full duplex operation, this value should be set to 40h. For gigabit
 	//   half duplex, this value should be set to 200h. For 10/100 half duplex,
 	//   this value should be set to 40h.
-	TCTL = (1 << TCTL_EN_BITOFF) 
-		 | (1 << TCTL_PSP_BITOFF) 
-		 | (0x10 << TCTL_CT_BITOFF) 
-		 | (0x40 << TCTL_COLD_BITOFF);
+	SET_BIT(TCTL, TCTL_EN_BITOFF);
+	SET_BIT(TCTL, TCTL_PSP_BITOFF);
+	TCTL |= (0x10 << TCTL_CT_BITOFF);
+	TCTL |= (0x40 << TCTL_COLD_BITOFF);
 
 	// Program the Transmit IPG (TIPG) register with the following decimal
 	// values to get the minimum legal Inter Packet Gap: <not included>.
@@ -208,12 +216,16 @@ void receive_init() {
 
 	// For now, hardcode this to 52:54:00:12:34:56 which is the QEMU default.
 	RAL = 0x12005452;
-	RAH = 0x00005634;
+	RAH = 0x00005634 | BIT(RAH_AV_BITOFF);
+	// RAL = 0x52540012;
+	// RAH = 0x34560000;
 
 	// Initialize the MTA (Multicast Table Array) to 0b. Per software, entries
 	// can be added to this table as desired.
 	// "The multicast table array is a way to extend address filtering"
-	// for now, do nothing here.
+	volatile uint32_t *ptr = &MTA;
+	for (i = 0; i < 128; i++)
+		ptr[i] = 0;
 
 	// Program the Interrupt Mask Set/Read (IMS) register to enable any
 	// interrupt the software driver wants to be notified of when the event
@@ -237,6 +249,7 @@ void receive_init() {
 
 	// Set the Receive Descriptor Length (RDLEN) register to the size (in
 	// bytes) of the descriptor ring. This register must be 128-byte aligned.
+	assert ((RXDESC_ARRAY_SIZE * sizeof(struct rxdesc)) % 128 == 0);
 	RDLEN = RXDESC_ARRAY_SIZE * sizeof(struct rxdesc);
 
 	// Receive buffers of appropriate size should be allocated and pointers to
@@ -251,14 +264,24 @@ void receive_init() {
 	// addresses. Head should point to the first valid receive descriptor in
 	// the descriptor ring and tail should point to one descriptor beyond the
 	// last valid descriptor in the descriptor ring.
-	RDH = RDT = 0;
+	RDT = RXDESC_ARRAY_SIZE - 1;
+	RDH = 0;
 
 	// Program the Receive Control (RCTL) register with appropriate values for
 	// desired operation.
 	// we explicitly set EN=1 (enable), SECRC=1 (strip CRC; the grade script
 	// expects this)
 	// we implicitly set LPE=0, LBM=0, BAM=0, BSIZE=00, and more..
-	RCTL = BIT(RCTL_EN_BITOFF) | BIT(RCTL_SECRC_BITOFF);
+	SET_BIT(RCTL, RCTL_EN_BITOFF);
+	SET_BIT(RCTL, RCTL_SECRC_BITOFF);
+	SET_BIT(RCTL, RCTL_BAM_BITOFF);
+	// SET_BIT(RCTL, RCTL_UPE_BITOFF);
+	SET_BIT(RCTL, RCTL_MPE_BITOFF);
+	SET_BIT(RCTL, RCTL_SBP_BITOFF);
+	CLEAR_BIT(RCTL, RCTL_LPE_BITOFF);
+	CLEAR_BIT(RCTL, RCTL_LBM_BITOFF);
+	CLEAR_BIT(RCTL, RCTL_LBM_BITOFF + 1);
+	CLEAR_BIT(RCTL, RCTL_LPE_BITOFF);
 }
 
 int attach_e1000(struct pci_func *pcif) {

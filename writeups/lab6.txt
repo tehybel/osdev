@@ -1,6 +1,6 @@
 
 
-Time: 11:45-15:30, 11:30-14, 12:30-14, 14:30-15:30, 
+Time: 11:45-15:30, 11:30-14, 12:30-14, 14:30-15:30, 11:30-TODO
 
 
 TODO clean this up:
@@ -10,6 +10,17 @@ then fixed it; include new diff. Custom compiled qemu.
 
 remember to export QEMU=/path/to/customqemu
 and configure qemu with --target-list=i386-softmmu when compiling it
+
+
+remember to show the full ./configure invocation
+
+I had to change the line in hw/net/e1000x_common.c, from:
+
+	trace_e1000x_rx_flt_ucast_match((int)(rp - mac - RA) / 2, MAC_ARG(buf));
+
+To a simple printf that confirms the match. The reason is that tracing isn't
+enabled by default unless we use their qemu (which isn't public).
+
 
 
 
