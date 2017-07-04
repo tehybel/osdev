@@ -445,8 +445,18 @@ sys_time_msec(void)
 
 static int sys_transmit(unsigned char *data, size_t length) {
 	user_mem_assert(curenv, data, length, 0);
+
+	// for now, always use the e1000 network card and driver
 	return e1000_transmit(data, length);
 }
+
+static int sys_receive(unsigned char *buf, size_t bufsize) {
+	user_mem_assert(curenv, buf, bufsize, 0);
+
+	// for now, always use the e1000 network card and driver
+	return e1000_receive(buf, bufsize);
+}
+
 
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
@@ -506,6 +516,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_transmit:
 		return sys_transmit((void *) a1, (size_t) a2);
+
+	case SYS_receive:
+		return sys_receive((void *) a1, (size_t) a2);
 
 	default:
 		return -E_NOSYS;

@@ -127,3 +127,8 @@ int
 sys_transmit(void *addr, size_t length) {
 	return syscall(SYS_transmit, 0, (uint32_t) addr, length, 0, 0, 0);
 }
+
+int
+sys_receive(void *buf, size_t bufsize) {
+	return syscall(SYS_receive, 0, (uint32_t) buf, bufsize, 0, 0, 0);
+}
