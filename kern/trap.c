@@ -240,6 +240,9 @@ trap_dispatch(struct Trapframe *tf)
 
 	// breakpoints invoke the kernel monitor
 	if (tf->tf_trapno == T_BRKPT) {
+		struct Env *e = curenv;
+		curenv = NULL;
+		env_destroy(e);
 		monitor(tf); // never returns
 	}
 

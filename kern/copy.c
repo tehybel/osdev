@@ -22,7 +22,6 @@ static void dup_range(void *begin, void *end) {
 	for (cur = ROUNDDOWN(begin, PGSIZE); cur < end; cur += PGSIZE) {
 
 		// look it up in the page table
-		cprintf("cur: 0x%x\n", cur);
 		struct PageInfo* pageinfo = page_lookup(curenv->env_pgdir, cur, &pte);
 
 		// is it not present?
