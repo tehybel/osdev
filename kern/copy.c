@@ -33,10 +33,26 @@ static void dup_range(void *begin, void *end) {
 	}
 }
 
+void copy_from_user(void *dst, void *src, size_t length) {
+	user_mem_assert(curenv, src, length, 0);
+	assert (dst >= (void *) ULIM);
+	assert (dst + length >= (void *) ULIM);
+
+	// we are now guaranteed that the source and destination areas don't
+	// overlap, since one is in kernelland and the other is in userland.
+
+	// walk over the destination pages and add them to the kernel page table
+	// before copying.
+	dup_range(src, src + length);
+
+	// load new page table, copy the data, load old page table
+	uint32_t old_pgdir = rcr3();
+	lcr3(PADDR(kern_pgdir));
+	memcpy(dst, src, length);
+	lcr3(old_pgdir);
+}
+
 void copy_to_user(void *dst, void *src, size_t length) {
-
-	size_t offset;
-
 	user_mem_assert(curenv, dst, length, 0);
 	assert (src >= (void *) ULIM);
 	assert (src + length >= (void *) ULIM);

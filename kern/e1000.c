@@ -343,7 +343,7 @@ int e1000_transmit(unsigned char *data, size_t length) {
 	}
 
 	// there is space, so copy the data there
-	memcpy(&txbuffers[index].data, data, length);
+	copy_from_user(&txbuffers[index].data, data, length);
 	desc->length = length;
 	mark_descriptor_in_use(desc);
 
@@ -372,7 +372,6 @@ int e1000_receive(unsigned char *buf, size_t bufsize) {
 		return -E_NO_MEM;
 	
 	copy_to_user(buf, &rxbuffers[index].data, desc->length);
-	// TODO: also fix to use copy_from_user in e1000_transmit.
 
 	// the EOP bit should be set since every packet fits into one descriptor
 	// (because we disallow jumbo frames)
