@@ -1,6 +1,7 @@
 #include <kern/e1000.h>
 #include <inc/string.h>
 #include <inc/error.h>
+#include <kern/copy.h>
 
 /*
 	Driver for the e1000 network adapter which QEMU emulates.
@@ -370,9 +371,8 @@ int e1000_receive(unsigned char *buf, size_t bufsize) {
 	if (desc->length > bufsize)
 		return -E_NO_MEM;
 	
-	cprintf("copy to 0x%x from 0x%x of length %d\n", buf,
-	&rxbuffers[index].data, desc->length);
-	memcpy(buf, &rxbuffers[index].data, desc->length);
+	copy_to_user(buf, &rxbuffers[index].data, desc->length);
+	// TODO: also fix to use copy_from_user in e1000_transmit.
 
 	// the EOP bit should be set since every packet fits into one descriptor
 	// (because we disallow jumbo frames)

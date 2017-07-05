@@ -20,6 +20,7 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/monitor.c \
 			kern/pmap.c \
 			kern/env.c \
+			kern/copy.c \
 			kern/kclock.c \
 			kern/picirq.c \
 			kern/printf.c \

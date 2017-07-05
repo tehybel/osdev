@@ -27,7 +27,7 @@ void input(envid_t ns_envid) {
 		// a new packet into the same page. That's why we need to allocate a
 		// fresh page each time.
 		void *buf = get_fresh_va();
-		if ((r = sys_page_alloc(0, buf, PTE_U | PTE_P))) {
+		if ((r = sys_page_alloc(0, buf, PTE_U | PTE_P | PTE_W))) {
 			cprintf("warning: input environment allocation failed: %e\n", r);
 			sys_yield();
 			continue;
