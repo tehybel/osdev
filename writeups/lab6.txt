@@ -23,5 +23,11 @@ To a simple printf that confirms the match. The reason is that tracing isn't
 enabled by default unless we use their qemu (which isn't public).
 
 
+- remember to talk about the design decisions we made, about transmit/receive
+  on full/empty queues.
+
+
+
+
 
 
