@@ -384,5 +384,7 @@ int e1000_receive(unsigned char *buf, size_t bufsize) {
 	// finally, update RDT
 	RDT = index;
 
+	cprintf("RDT is now %d\n", index);
+
 	return desc->length;
 }

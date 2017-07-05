@@ -15,6 +15,21 @@ static void *get_fresh_va() {
 	return result;
 }
 
+static void transmit_packet(envid_t ns_envid, void *buf) {
+	int r;
+	do {
+		r = sys_ipc_try_send(ns_envid, NSREQ_INPUT, buf, PTE_U | PTE_P);
+		if (r == -E_IPC_NOT_RECV) {
+			// the network stack was not ready; retry in a bit.
+			sys_yield();
+		}
+		else if (r) {
+			cprintf("warning: input env got an error during IPC: %e\n", r);
+		}
+
+	} while (r);
+}
+
 void input(envid_t ns_envid) {
 
 	int r;
@@ -56,9 +71,7 @@ void input(envid_t ns_envid) {
 		pkt->jp_len = r;
 
 		// send the packet to the network server
-		if ((r = sys_ipc_try_send(ns_envid, NSREQ_INPUT, buf, PTE_U | PTE_P))) {
-			cprintf("warning: input environment got error during IPC: %e\n", r);
-		}
+		transmit_packet(ns_envid, buf);
 
 		// unmap the page in this process so it gets cleaned up
 		r = sys_page_unmap(0, buf);
