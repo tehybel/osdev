@@ -6,30 +6,276 @@ Time: 11:45-15:30, 11:30-14, 12:30-14, 14:30-15:30, 11:30-16:30 (-1h break),
 Total: 15:05.
 
 
-TODO clean this up:
-found an old diff here:
-http://www.cs.technion.ac.il/~cs236376/software/qemu/e1000_debug.diff
-then fixed it; include new diff. Custom compiled qemu.  
-
-remember to export QEMU=/path/to/customqemu
-and configure qemu with --target-list=i386-softmmu when compiling it
+The purpose of this lab was to get the OS connected to the internet. This
+involved writing a driver for the e1000 network card which QEMU emulates.
 
 
-remember to show the full ./configure invocation
+Packet transmission will work like this: a process wants to transmit some
+data, say "ABCD", over a socket. It uses the send() library function on the
+socket to do this. The library function then uses IPC to transmit the "ABCD"
+to another process which implements a network stack. This network stack
+process will craft the corresponding packet and hand it over to the OS via a
+syscall. The OS then uses the e1000 driver to hand over this raw packet to the
+network card. The network card finally transmits the packet on the wire.
 
-I had to change the line in hw/net/e1000x_common.c, from:
+Packet reception will work similarly, only in reverse. A packet arrives on the
+wire. The e1000 network card picks it up and stores it in a queue, inside RAM.
+A process eventually calls the receive() library function on a socket. The
+receive function is implemented such that an IPC call is performed, talking to
+the network stack process. The network stack process asks the OS for a raw
+packet. The OS will get the raw packet by having the e1000 driver look inside
+the queue, grabbing the raw packet from memory and handing it over to the
+network stack process, which parses it and sends the data to the receiving
+process.
+
+That's the overview. Next I'll describe the implementation details.
+
+
+We did not write the full network stack ourselves; according to the exercise
+page, that would be too much work. Instead we use lwIP ("lightweight IP"),
+which is "an open source lightweight TCP/IP protocol suite that among many
+things includes a network stack". 
+
+lwIP will run in its own process, in accordance with our exokernel design. We
+can think of lwIP as a black box: another process can tell it "send ABCD on
+this socket", and the lwIP process constructs the raw packet to be sent and
+hands it over to the OS. Likewise, a process can say "I want to receive on
+this socket", and lwIP receives a raw packet from the OS, parses the packet,
+and sends the actual data to the receiving environment. Sockets are thus
+implemented with IPC.
+
+Once lwIP has constructed a raw packet, we need a way to "put it on the wire".
+That's the job of the network card. Our main task in this lab is to implement
+two syscalls, sys_transmit and sys_receive, which will allow transmission and
+reception of raw packets.
+
+Exactly how sys_transmit and sys_receive work depends on the network card.
+A driver implements the interaction with a specific network card.
+
+To begin development, we download Intel's manual for the e1000 card:
+
+	PCI/PCI-X Family of Gigabit Ethernet Controllers Software Developer’s Manual
+
+	https://pdos.csail.mit.edu/6.828/2016/readings/hardware/8254x_GBe_SDM.pdf
+
+The manual specifies how to initialize the network card for transmission and
+reception, and how to send and receive packets.
+
+First we need a way to communicate with the card. This is done via MMIO. The
+e1000 is a PCI device. This means that it's dropped into these slots on the
+motherboard:
+
+	https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/PCI_Slots_Digon3.JPG/1200px-PCI_Slots_Digon3.JPG
+
+We were given code to interact with the PCI bus. This code will essentially
+use the "in" and "out" x86 instructions to talk with the devices on the PCI
+bus. 
+
+Each attached PCI device has two magic numbers which determine its "class" and
+"subclass", effectively identifying the device. The PCI code looks over every
+attached device and checks if the magic numbers are known. If so, the code
+negotiates a physical address with the device at which we can perform MMIO.
+Once the e1000 has been assigned a physical address, we update our kernel page
+table such that we can directly write to memory to talk to the card. 
+
+The developer manual tells us what each offset into this memory is for. For
+example, at offset 0x400 is the "transmit control register" which has flags
+used during packet transmission.
+
+Thus the real task of our e1000 driver is to write the right values into the
+right offsets in this memory, in order to make the card receive and transmit
+packets.
+
+To initialize the card, we need to follow a number of steps from the manual.
+Here's a sample:
+
+	14.4 Receive Initialization
+	- Program the Receive Address Register(s) (RAL/RAH) with the desired
+	  Ethernet addresses.
+	- Initialize the MTA (Multicast Table Array) to 0b. Per software, entries
+	  can be added to this table as desired.
+	- Program the Interrupt Mask Set/Read (IMS) register to enable any
+	  interrupt the software driver wants to be notified of when the event
+	  occurs. 
+	... and so on.
+
+This initialization process is simply a matter of carefully following every
+step, looking up register and flag offsets and meanings in the manual. 
+
+Most of the steps are unimportant details. The most important part of the
+initialization process is to prepare the memory that the card will use to hold
+packets. 
+
+Packets which are yet to be transmitted are stored in a circular queue of
+descriptors. Each descriptor describes a region of memory (a physical address
+and a length) at which a packet resides.
+
+Concretely this queue is implemented as an array of descriptor structs. There
+is a head and tail register, holding offsets into the queue; the hardware
+consumes descriptors from the head and we add packets to the tail. 
+
+So while initializing the card, we must allocate space for this descriptor
+queue, and allocate enough buffers to hold the packets. We must also tell the
+card where this queue can be found, by storing the physical address into a
+certain register.
+
+Receiving packets is conceptually similar to transmitting them; there is
+another circular queue, and the card puts packets at the head, while the OS
+takes packets from the tail. If the queue is full, the card drops the packets.
+
+Once all these structures are set up, implementing sys_transmit and
+sys_receive is relatively simple. To transmit a packet, we simply check if the
+queue is full. If so we drop the packet. Otherwise we add the packet at the
+tail and update the tail register. Receiving a packet is similar.
+
+
+
+In practice it's a tedious process to develop a driver. I followed every step
+in the manual, being careful to get everything right. Then, when I tried to
+send packets.... nothing happened. 
+
+(I could observe that nothing happened, because the "-net dump,file=qemu.pcap"
+option was given to QEMU, giving us a packet capture file with details of all
+transmitted and received packets.)
+
+If we were using real hardware, I'd just have to stare harder at the code.
+Fortunately we're using QEMU, which allows us to see what the emulated
+hardware is doing.
+
+Normally the 6.828 lab provides a patched QEMU which prints out useful
+debugging information. Unfortunately you need to be an MIT student to get
+access to that. But I managed to find a diff on github:
+
+	http://www.cs.technion.ac.il/~cs236376/software/qemu/e1000_debug.diff
+
+The diff doesn't quite work anymore; it's for an old version of QEMU. But I
+applied it and after a few small tweaks, I got it working and managed to
+compile QEMU after applying it. This involved using the following configure
+line:
+
+	./configure --python=/usr/bin/python2.7 --target-list="i386-softmmu" --enable-trace-backends=simple
+
+A diff with my changes to QEMU is included at the end of the writeup.
+
+With the debugging information, I could more easily tell what my mistakes
+were. They were little things like wrongly deciding not to set a flag on a
+control register, because I'd misinterpreted the meaning of the flag.
+
+
+
+
+All in all, the OS can now receive and transmit packets via the QEMU e1000
+network card. To transmit some data, a process uses sockets, which send the
+data via IPC to the lwIP process. The lwIP process constructs a packet, then
+hands it over to the OS via the sys_transmit syscall. The OS uses the e1000
+driver which we wrote. The driver copies the packet into an empty descriptor
+and updates the tail register. The network card will eventually catch up and
+consume the packet, putting it on the wire.
+
+
+
+As a final task during this lab, we were given the skeleton code for a small
+web server which can serve static files. We completed the implementation of
+this web server. The OS can now serve files from our file system to the
+outside world!
+
+
+
+
+
+
+
+Below is the diff to the QEMU source code:
+
+$ diff ./hw/net/e1000.c.orig ./hw/net/e1000.c
+35a36
+> #include "qapi/qmp/qerror.h"
+43c44,45
+< /* #define E1000_DEBUG */
+---
+> #define E1000_DEBUG 1
+>
+45a48,53
+> #define E1000_FOR_DEBUG(x)                                              \
+>     x(GENERAL)		x(IO)		x(MMIO)		x(INTERRUPT)    \
+>     x(RX)		x(TX)		x(MDIC)		x(EEPROM)       \
+>     x(UNKNOWN)		x(TXSUM)	x(TXERR)	x(RXERR)        \
+>     x(RXFILTER)		x(PHY)		x(NOTYET)
+>
+47,50c55,64
+<     DEBUG_GENERAL,      DEBUG_IO,       DEBUG_MMIO,     DEBUG_INTERRUPT,
+<     DEBUG_RX,           DEBUG_TX,       DEBUG_MDIC,     DEBUG_EEPROM,
+<     DEBUG_UNKNOWN,      DEBUG_TXSUM,    DEBUG_TXERR,    DEBUG_RXERR,
+<     DEBUG_RXFILTER,     DEBUG_PHY,      DEBUG_NOTYET,
+---
+> #define E1000_DEBUG_ENUM(name) DEBUG_##name,
+>     E1000_FOR_DEBUG(E1000_DEBUG_ENUM)
+> #undef E1000_DEBUG_ENUM
+>
+> };
+> static const char *debugnames[] = {
+> #define E1000_DEBUG_NAME(name) #name,
+>     E1000_FOR_DEBUG(E1000_DEBUG_NAME)
+>     NULL
+> #undef E1000_DEBUG_NAME
+388a403
+>
+862a878
+>
+1730a1747,1795
+>
+> #ifdef E1000_DEBUG
+> static void e1000_init_debug(void)
+> {
+>
+>     const char *e1000_debug;
+>     const char *p, *p1;
+>     const char **debugname;
+>     int i;
+>
+>     e1000_debug = getenv("E1000_DEBUG");
+>     if (!e1000_debug || !*e1000_debug)
+>         return;
+>
+>     if (strcmp(e1000_debug, "?") == 0) {
+>         error_printf("E1000_DEBUG flags:\n");
+>         for (debugname = debugnames; *debugname; debugname++) {
+>             error_printf("%s\n", *debugname);
+>         }
+>         exit(0);
+>     }
+>
+>     p = e1000_debug;
+>     debugflags = 0;
+>     for (p = e1000_debug; ; p = p1 + 1) {
+>         p1 = strchr(p, ',');
+>         if (!p1)
+>             p1 = p + strlen(p);
+>         for (i = 0, debugname = debugnames; *debugname; i++, debugname++) {
+>             if (strlen(*debugname) == p1 - p &&
+>                 strncasecmp(p, *debugname, p1 - p) == 0) {
+>                 debugflags |= 1<<i;
+>                 break;
+>             }
+>         }
+>         if (!*debugname) {
+>             // qerror_report(QERR_INVALID_PARAMETER_VALUE, "E1000_DEBUG",
+>                           // "a comma-separated list of E1000 debug flags");
+>             error_printf_unless_qmp(
+>                 "Try with argument '?' for a list.\n");
+>             exit(1);
+>         }
+>         if (*p1 != ',')
+>             break;
+>     }
+> }
+>
+> type_init(e1000_init_debug)
+> #endif
+
+I also had to change the line in hw/net/e1000x_common.c, from:
 
 	trace_e1000x_rx_flt_ucast_match((int)(rp - mac - RA) / 2, MAC_ARG(buf));
 
 To a simple printf that confirms the match. The reason is that tracing isn't
-enabled by default unless we use their qemu (which isn't public).
-
-
-- remember to talk about the design decisions we made, about transmit/receive
-  on full/empty queues.
-
-
-
-
-
-
+enabled by default unless we use their patched QEMU.
