@@ -22,9 +22,7 @@
 static void boot_aps(void);
 static void start_environments();
 
-void
-i386_init(void)
-{
+void i386_init(void) {
 	extern char edata[], end[];
 
 	// clear out the .bss
@@ -69,10 +67,7 @@ i386_init(void)
 	sched_yield();
 }
 
-static void
-start_environments()
-{
-
+static void start_environments() {
 	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
 
@@ -95,9 +90,7 @@ start_environments()
 void *mpentry_kstack;
 
 // Start the application processors (APs), i.e., the "secondary processors".
-static void
-boot_aps(void)
-{
+static void boot_aps(void) {
 	extern unsigned char mpentry_start[], mpentry_end[];
 	void *code;
 	int i;
@@ -109,7 +102,7 @@ boot_aps(void)
 	code = KADDR(MPENTRY_PADDR);
 
 	size_t code_size = mpentry_end - mpentry_start;
-	assert (code_size <= PGSIZE); // we only reserved one physical page
+	assert(code_size <= PGSIZE); // we only reserved one physical page
 
 	memmove(code, mpentry_start, code_size);
 
@@ -133,9 +126,7 @@ boot_aps(void)
 }
 
 // Setup code for APs
-void
-mp_main(void)
-{
+void mp_main(void) {
 	// We are in high EIP now, safe to switch to kern_pgdir 
 	lcr3(PADDR(kern_pgdir));
 	cprintf("SMP: CPU %d starting\n", cpunum());
@@ -162,9 +153,7 @@ const char *panicstr;
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor.
  */
-void
-_panic(const char *file, int line, const char *fmt,...)
-{
+void _panic(const char *file, int line, const char *fmt, ...) {
 	va_list ap;
 
 	if (panicstr)
@@ -184,16 +173,14 @@ _panic(const char *file, int line, const char *fmt,...)
 	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 	cprintf("\nDropping into the monitor.\n");
 
-dead:
+	dead:
 	/* break into the kernel monitor */
 	while (1)
 		monitor(NULL);
 }
 
 /* like panic, but don't */
-void
-_warn(const char *file, int line, const char *fmt,...)
-{
+void _warn(const char *file, int line, const char *fmt, ...) {
 	va_list ap;
 
 	va_start(ap, fmt);
