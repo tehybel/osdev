@@ -21,7 +21,7 @@
 #include <inc/x86.h>
 
 extern uint16_t irq_mask_8259A;
-void pic_init(void);
+void init_pic(void);
 void irq_setmask_8259A(uint16_t mask);
 void irq_eoi(void);
 #endif // !__ASSEMBLER__

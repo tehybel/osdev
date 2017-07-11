@@ -4,7 +4,7 @@
 # error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
-void time_init(void);
+void init_time(void);
 void time_tick(void);
 unsigned int time_msec(void);
 

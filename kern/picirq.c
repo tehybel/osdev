@@ -13,7 +13,7 @@ static bool didinit;
 
 /* Initialize the 8259A interrupt controllers. */
 void
-pic_init(void)
+init_pic(void)
 {
 	didinit = 1;
 

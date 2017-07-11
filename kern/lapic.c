@@ -53,7 +53,7 @@ lapicw(int index, int value)
 }
 
 void
-lapic_init(void)
+init_lapic(void)
 {
 	if (!lapicaddr)
 		return;

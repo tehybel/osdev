@@ -254,7 +254,7 @@ pci_func_enable(struct pci_func *f)
 }
 
 int
-pci_init(void)
+init_pci_devices(void)
 {
 	static struct pci_bus root_bus;
 	memset(&root_bus, 0, sizeof(root_bus));

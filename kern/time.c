@@ -4,7 +4,7 @@
 static unsigned int ticks;
 
 void
-time_init(void)
+init_time(void)
 {
 	ticks = 0;
 }

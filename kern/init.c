@@ -20,7 +20,7 @@
 #include <kern/e1000.h>
 
 static void boot_aps(void);
-
+static void start_environments();
 
 void
 i386_init(void)
@@ -43,24 +43,37 @@ i386_init(void)
 	// set up the IDT to handle exceptions and other interrupts
 	init_idt();
 
-	// multiprocessor initialization functions
-	mp_init();
-	lapic_init();
+	init_multiprocessing();
 
-	// multitasking initialization functions
-	pic_init();
+	// set up the local and global interrupt controllers
+	init_lapic();
+	init_pic();
 
-	// Lab 6 hardware initialization functions
-	time_init();
-	pci_init();
+	// init the subsystem responsible for keeping track of time
+	init_time();
 
-	// Acquire the big kernel lock before waking up APs
+	// scan the PCI bus and initialize any recognized devices, e.g. the network card
+	init_pci_devices();
+
+	// Acquire the big kernel lock before waking up secondary processors
 	lock_kernel();
-
-	// Starting non-boot CPUs
 	boot_aps();
 
-	// Start fs.
+	// start all the environments that need to run to provide exokernel services
+	start_environments();
+
+	// Should not be necessary - drains keyboard because interrupt has given up.
+	kbd_intr();
+
+	// Schedule and run the first user environment!
+	sched_yield();
+}
+
+static void
+start_environments()
+{
+
+	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
 
 #if !defined(TEST_NO_NS)
@@ -68,19 +81,12 @@ i386_init(void)
 	ENV_CREATE(net_ns, ENV_TYPE_NS);
 #endif
 
+	// used by grading scripts (for testing)
 #if defined(TEST)
-	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
-	// Touch all you want.
 	ENV_CREATE(user_icode, ENV_TYPE_USER);
-#endif // TEST*
-
-	// Should not be necessary - drains keyboard because interrupt has given up.
-	kbd_intr();
-
-	// Schedule and run the first user environment!
-	sched_yield();
+#endif
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core
@@ -134,7 +140,7 @@ mp_main(void)
 	lcr3(PADDR(kern_pgdir));
 	cprintf("SMP: CPU %d starting\n", cpunum());
 
-	lapic_init();
+	init_lapic();
 	env_init_percpu();
 	init_idt_percpu();
 	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up

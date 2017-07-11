@@ -37,8 +37,8 @@ extern unsigned char percpu_kstacks[NCPU][KSTKSIZE];
 int cpunum(void);
 #define thiscpu (&cpus[cpunum()])
 
-void mp_init(void);
-void lapic_init(void);
+void init_multiprocessing(void);
+void init_lapic(void);
 void lapic_startap(uint8_t apicid, uint32_t addr);
 void lapic_eoi(void);
 void lapic_ipi(int vector);

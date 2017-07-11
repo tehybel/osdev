@@ -37,7 +37,7 @@ struct pci_bus {
     uint32_t busno;
 };
 
-int  pci_init(void);
+int  init_pci_devices(void);
 void pci_func_enable(struct pci_func *f);
 
 #endif

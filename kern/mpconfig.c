@@ -166,7 +166,7 @@ mpconfig(struct mp **pmp)
 // such as the total number of CPUs, by reading 'conf' which is a table filled
 // out by the BIOS.
 void
-mp_init(void)
+init_multiprocessing(void)
 {
 	struct mp *mp;
 	struct mpconf *conf;
