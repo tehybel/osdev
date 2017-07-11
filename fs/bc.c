@@ -127,8 +127,6 @@ check_bc(void)
 	// fix it
 	memmove(diskaddr(1), &backup, sizeof backup);
 	flush_block(diskaddr(1));
-
-	cprintf("block cache is good\n");
 }
 
 void

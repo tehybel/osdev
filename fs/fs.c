@@ -16,8 +16,6 @@ check_super(void)
 
 	if (super->s_nblocks > DISKSIZE/BLKSIZE)
 		panic("file system is too large");
-
-	cprintf("superblock is good\n");
 }
 
 // --------------------------------------------------------------
@@ -91,8 +89,6 @@ check_bitmap(void)
 	// Make sure the reserved and root blocks are marked in-use.
 	assert(!block_is_free(0));
 	assert(!block_is_free(1));
-
-	cprintf("bitmap is good\n");
 }
 
 // --------------------------------------------------------------
