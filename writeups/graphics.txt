@@ -1,0 +1,68 @@
+
+
+The next task is figuring out how to get graphics working. I'll keep some
+unpolished notes here.
+
+Some links:
+
+	https://web.archive.org/web/20150725135958/http://web.mit.edu/amdragon/www/pubs/sqrtx-6.828.html
+	http://wiki.osdev.org/Graphics_stack
+	http://wiki.osdev.org/VESA_Video_Modes 
+	http://wiki.osdev.org/User:Omarrx024/VESA_Tutorial
+	http://wiki.osdev.org/VGA_Hardware
+	http://wiki.osdev.org/How_do_I_set_a_graphics_mode
+	http://wiki.osdev.org/GUI
+	https://en.wikipedia.org/wiki/VESA_BIOS_Extensions
+	https://wiki.gentoo.org/wiki/QEMU/Options#Graphics_card
+
+
+VESA is apparently a standard that lets you interface uniformly with a number
+of different graphics cards. So we just need to write a VESA driver.
+
+First, though, I need an overview of how graphics are actually drawn on the
+screen. I have no clue yet how it all works.
+
+Maybe we want VGA rather than VESA; according to a forum thread, it's the
+easier option to start with.
+
+	Many video cards have two interfaces, one VGA interface for low
+	resolutions, and the VESA VBE interface for higher resolutions.
+	Alternatively, you can write your own code to directly deal with the
+	graphics hardware.
+		- http://wiki.osdev.org/How_do_I_set_a_graphics_mode
+
+
+What I'm really missing at the moment is an overview of how graphics work. I
+have *no clue* how these colored pixels are showing up on my screen.
+
+This page gives a bit of an overview:
+
+	http://wiki.osdev.org/Graphics_stack
+
+Apparently the device driver interacts with the graphics card and can only do
+very simple things like "draw a pixel here". Instead of writing a driver for
+every card, you instead write a driver for the VESA or VGA interface, which
+most cards support. VGA is simpler, but lower resolution, than VESA.
+
+Once you can draw pixels, you can create a stack on top: a library to draw
+lines and rectangles, and then you can draw "widgets" like windows and
+buttons. The window manager uses these widget-drawing functions and manages
+where windows are placed on screen.
+
+We're also going to need a driver for a USB mouse.
+
+Here are more details on how to actually implement this from the bottom up:
+
+	http://wiki.osdev.org/GUI
+
+
+
+
+
+
+
+
+- others must have done this already. Can I find source somewhere to read?
+- 
+
+
