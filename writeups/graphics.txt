@@ -59,6 +59,75 @@ Here are more details on how to actually implement this from the bottom up:
 
 
 
+According to that page:
+
+	The tutorial assumes ... the video resolution has been set using VBE in a
+	linear frame buffer
+	
+	The kernel should probe the BIOS for the VBE Mode Info Block (see Getting
+	VBE Mode Info), which returns information about the established video
+	resolution mode.
+
+So let's figure out how to do that.
+
+
+According to this page:
+
+	http://wiki.osdev.org/Getting_VBE_Mode_Info
+
+We need to use int 0x10. But that's not available in protected mode.
+
+So we need to call it from real mode, before we switch to protected mode.
+
+We need to use function 0x4F02, with a value of 0xC118 (?) to create a linear
+frame buffer, then use 0x4F01 to get the physical address of the LFB. More
+details here:
+
+	http://wiki.osdev.org/Getting_VBE_Mode_Info
+
+But to use 0x4F02 ("Set Video Mode") we first need to pick a mode.
+
+The example code on that page uses virtual86 interrupts. What's that?
+
+According to this page:
+
+	http://wiki.osdev.org/Virtual_8086_Mode
+
+It's a way to emulate real mode from within protected mode. You set a flag in
+the EFLAGS register, and then you're emulating real mode.
+
+It seems that we need the ability to run v86 (virtual-8086) processes, because
+then we can simply spawn a process which switches video modes for us.
+
+So that should be the first step.
+
+How do you enter v86? By setting a flag in the eflags register before doing an
+iret. So that should be doable..
+
+I've added a mode that does this, but now the created process segfaults with a
+page fault upon the first instruction at 0x20. Why is it at 0x20? The entry
+point is 0x800020. I guess registers are 16-bit now, then.
+
+How do we compile for v86? Turns out that gcc can't do that. We need an 8086
+compiler. But I think we're going off track, now.
+
+Now that I think about it, we just need to be able to perform the int 0x10
+instruction, nothing else. So we need a "v86int" function.
+
+To switch to and from v86 mode, we can have syscalls that do this.
+
+But actually this is going to be really hard. We need access to physical
+addresses inside the function which sets up modes. We only have that from the
+kernel.
+
+It would be far easier to do all this work directly in the early kernel code,
+rather than having to switch to v86 mode.
+
+
+
+So let's try to do that instead.
+
+
 
 
 
