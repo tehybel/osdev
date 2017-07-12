@@ -128,9 +128,30 @@ rather than having to switch to v86 mode.
 So let's try to do that instead.
 
 
+...
+
+Nope, that's really hard, too.
+
+I guess we do want to be able to switch to v86 after all.
 
 
 
+So I propose the following syscall:
+
+	sys_v86
+
+which switches to virtual-8086 mode by setting the flag in eflags. It will
+then set $ip=0, $sp=0x1000, and go from there. So the program must first have
+copied the right code into address 0, and have mapped 0x1000, too.
+
+How does the program "get back"? The OS can remember the next instruction's
+address. When the program is done running in v86 mode, it will do..
+something.. and then the OS restores its state.
+
+What will the program do to signal that it wants to return to normal mode? It
+could issue a breakpoint instruction.
+
+That should work. Maybe.
 
 
 - others must have done this already. Can I find source somewhere to read?
