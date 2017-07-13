@@ -1,6 +1,6 @@
 
 
-Time: 13-15, 13-15:15, 
+Time: 13-15, 13-15:15, 21:30-TODO
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.

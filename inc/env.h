@@ -75,6 +75,13 @@ struct Env {
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	// used when switching to virtual-8086 mode
+	bool in_v86_mode;
+	uint32_t saved_eip;
+	uint32_t saved_esp;
+	uint32_t saved_cs;
+	uint32_t saved_ss;
 };
 
 #endif // !JOS_INC_ENV_H

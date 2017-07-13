@@ -132,3 +132,7 @@ int
 sys_receive(void *buf, size_t bufsize) {
 	return syscall(SYS_receive, 0, (uint32_t) buf, bufsize, 0, 0, 0);
 }
+
+void sys_v86() {
+	syscall(SYS_v86, 0, 0, 0, 0, 0, 0);
+}

@@ -457,6 +457,27 @@ static int sys_receive(unsigned char *buf, size_t bufsize) {
 	return e1000_receive(buf, bufsize);
 }
 
+/* switches the current environment to virtual-8086 mode, 
+ * setting ip=0, sp=0x1000. The current $pc and $sp will be remembered and
+ * restored upon the next breakpoint instruction. 
+ */
+static int sys_v86() {
+	curenv->env_tf.tf_eflags |= FL_VM; 
+	curenv->in_v86_mode = true;
+
+	curenv->saved_eip = curenv->env_tf.tf_eip;
+	curenv->saved_esp = curenv->env_tf.tf_esp;
+	curenv->saved_cs = curenv->env_tf.tf_cs;
+	curenv->saved_ss = curenv->env_tf.tf_ss;
+
+	curenv->env_tf.tf_eip = 0;
+	curenv->env_tf.tf_esp = 0x1000;
+	curenv->env_tf.tf_cs = 0;
+	curenv->env_tf.tf_ss = 0;
+
+	return 0;
+}
+
 
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
@@ -519,6 +540,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	case SYS_receive:
 		return sys_receive((void *) a1, (size_t) a2);
+	
+	case SYS_v86:
+		return sys_v86();
 
 	default:
 		return -E_NOSYS;
