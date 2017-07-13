@@ -154,7 +154,22 @@ could issue a breakpoint instruction.
 That should work. Maybe.
 
 
+........
+
+This turns out to be a total mess. Switching to virtual-8086 mode isn't easy.
+And then, interrupts are handled in a very complicated manner. We can't just
+do an "int 0x10", because that will trigger a GPF, going via the IDT. There
+should be a way to make the interrupt work as it would in real mode, but it's
+complicated.
+
+
+http://f.osdev.org/viewtopic.php?f=1&t=11108
+
+
+
+
 - others must have done this already. Can I find source somewhere to read?
+
 - 
 
 

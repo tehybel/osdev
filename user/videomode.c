@@ -10,7 +10,8 @@ void umain(int argc, char **argv) {
 	
 	cprintf("graphics allocated.\n");
 
-	memcpy((void *) 0, "\xcc", 1);
+	// int 0x10; int3
+	memcpy((void *) 0, "\xcd\x10\xcc", 3);
 
 	sys_v86();
 

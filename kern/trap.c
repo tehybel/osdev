@@ -229,10 +229,8 @@ static void revert_v86_mode() {
 
 // this function handles processor exceptions based on their type.
 static void
-trap_dispatch(struct Trapframe *tf)
+trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 {
-	int trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
-
 	// page faults are handled specially
 	if (tf->tf_trapno == T_PGFLT && !trapped_from_kernel) {
 		page_fault_handler(tf);
@@ -337,8 +335,6 @@ trap(struct Trapframe *tf)
 		lock_kernel();
 	}
 
-
-
 	// Check that interrupts are disabled. This should always be the case once
 	// we're in kernel land. If this assertion fails, Don't "fix" it by
 	// inserting a "cli" in the interrupt path.
@@ -374,7 +370,7 @@ trap(struct Trapframe *tf)
 	last_tf = tf;
 
 	// Dispatch based on what type of trap occurred
-	trap_dispatch(tf);
+	trap_dispatch(tf, trapped_from_kernel);
 
 	// We can make it here on e.g. syscalls, spurious interrupts, etc.
 	// Return to the current environment if doing so makes sense.
