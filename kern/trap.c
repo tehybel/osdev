@@ -217,6 +217,16 @@ print_regs(struct PushRegs *regs)
 	cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
+static void revert_v86_mode() {
+	curenv->env_tf.tf_eflags &= ~FL_VM; 
+	curenv->in_v86_mode = false;
+
+	curenv->env_tf.tf_eip = curenv->saved_eip;
+	curenv->env_tf.tf_esp = curenv->saved_esp;
+	curenv->env_tf.tf_cs = curenv->saved_cs;
+	curenv->env_tf.tf_ss = curenv->saved_ss;
+}
+
 // this function handles processor exceptions based on their type.
 static void
 trap_dispatch(struct Trapframe *tf)
@@ -238,7 +248,14 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
-	// breakpoints invoke the kernel monitor
+	// if a breakpoint was hit in virtual-8086 mode, switch back to protected
+	// mode.
+	if (tf->tf_trapno == T_BRKPT && curenv->in_v86_mode) {
+		revert_v86_mode();
+		return;
+	}
+
+	// normal breakpoints invoke the kernel monitor
 	if (tf->tf_trapno == T_BRKPT) {
 		struct Env *e = curenv;
 		curenv = NULL;
@@ -246,18 +263,13 @@ trap_dispatch(struct Trapframe *tf)
 		monitor(tf); // never returns
 	}
 
-	// Add time tick increment to clock interrupts.
-	// Be careful! In multiprocessors, clock interrupts are
-	// triggered on every CPU.
-	// LAB 6: Your code here.
-
-
 	// input to qemu's graphical interface (if any) appear as input from the
 	// keyboard and must be handled here
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
 		kbd_intr();
 		return;
 	}
+
 	// console input appear on the serial port and must be handled here
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
 		serial_intr();
@@ -281,6 +293,8 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts by switching to the next process to be
 	// scheduled. Also record a time tick.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		// TODO what about multiple CPUs? Clock interrupts will happen on
+		// every CPU..
 		lapic_eoi();
 		time_tick();
 		sched_yield();
@@ -309,7 +323,12 @@ trap(struct Trapframe *tf)
 	if (panicstr)
 		asm volatile("hlt");
 
-	int trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
+	bool trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
+
+	assert (curenv);
+	if (curenv->in_v86_mode) {
+		trapped_from_kernel = false;
+	}
 
 	// Re-acquire the big kernel lock if we were halted in
 	// sched_yield()
@@ -317,6 +336,8 @@ trap(struct Trapframe *tf)
 		assert (trapped_from_kernel); // otherwise we lock the kernel twice
 		lock_kernel();
 	}
+
+
 
 	// Check that interrupts are disabled. This should always be the case once
 	// we're in kernel land. If this assertion fails, Don't "fix" it by
