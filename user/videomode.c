@@ -11,7 +11,7 @@ void umain(int argc, char **argv) {
 	cprintf("graphics allocated.\n");
 
 	// int 0x10; int3
-	memcpy((void *) 0, "\xcd\x10\xcc", 3);
+	memcpy((void *) 0, "\x90\x90\xcd\x10\xcc", 0x10);
 
 	sys_v86();
 

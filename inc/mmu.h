@@ -252,7 +252,7 @@ struct Taskstate {
 	uint16_t ts_padding10;
 	uint16_t ts_t;		// Trap on task switch
 	uint16_t ts_iomb;	// I/O map base address
-	unsigned char interrupt_bitmap[16];
+	uint8_t interrupt_bitmap[32];
 };
 
 // Gate descriptors for interrupts and traps

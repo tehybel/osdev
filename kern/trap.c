@@ -1,6 +1,7 @@
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
+#include <inc/string.h>
 
 #include <kern/pmap.h>
 #include <kern/trap.h>
@@ -157,6 +158,7 @@ init_idt_percpu(void)
 	ts->ts_esp0 = stack_top;
 	ts->ts_ss0 = GD_KD;
 	ts->ts_iomb = sizeof(struct Taskstate);
+	memset(ts->interrupt_bitmap, '\0', sizeof(ts->interrupt_bitmap));
 
 	// Initialize the TSS slot of the gdt.
 	gdt[GD_TSSi >> 3] = SEG16(STS_T32A, (uint32_t) (ts),

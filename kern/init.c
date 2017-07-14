@@ -63,6 +63,8 @@ void i386_init(void) {
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
 
+	// enable v86 mode extensions
+	lcr4(rcr4() | CR4_VME);
 
 	// Schedule and run the first user environment!
 	sched_yield();
