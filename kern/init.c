@@ -21,6 +21,7 @@
 
 static void boot_aps(void);
 static void start_environments();
+static void enable_v86();
 
 void i386_init(void) {
 	extern char edata[], end[];
@@ -63,11 +64,24 @@ void i386_init(void) {
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
 
-	// enable v86 mode extensions
-	lcr4(rcr4() | CR4_VME);
+	enable_v86();
 
 	// Schedule and run the first user environment!
 	sched_yield();
+}
+
+// enable v86 mode extensions
+static void enable_v86() {
+	// first ensure that VME is supported on this CPU
+	uint32_t edx;
+
+	// EAX = 1: Returns Feature Information in ECX and EDX
+	cpuid(1, NULL, NULL, NULL, &edx);
+
+	int vme_supported = edx & 0x2;
+	assert (vme_supported);
+
+	lcr4(rcr4() | CR4_VME);
 }
 
 static void start_environments() {

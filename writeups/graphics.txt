@@ -1,6 +1,6 @@
 
 
-Time: 13-15, 13-15:15, 21:30-00, 11:30-TODO
+Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
@@ -262,6 +262,45 @@ it be the IOPL? IOPL is bits 12+13 in the eflags register, which is
 Yeah, it should be 3. Now I set it to 3, but still I get a GPF..
 
 Let's try to move to another page than 0...
+
+
+The problem is that I don't understand why I'm getting a GPF. Let's google..
+
+Aha. If I set the privilege level of entry 0x10 in the IDT such that user-mode
+processes are allowed to do an "int 0x10", I no longer get a GPF -- I get a
+FPE. But this shouldn't be happening at all, since we're supposed to be in
+8086 mode.
+
+It almost seems as though the bitmap isn't properly set up.. But it seems to
+be.
+
+
+Let's try to make sure that address 0 is mapped.... that didn't help.
+
+It almost seems as though v86 extensions isn't enabled. But I did set the bit
+in CR4...
+
+This page could be useful:
+
+	http://wiki.osdev.org/Virtual_Monitor
+
+Perhaps we can have the GPF-handler redirect execution back to the v86
+process?
+
+From that page:
+
+	VME aren't available on QEMU, though
+
+Can we confirm this somehow? Yes, with CPUID.
+
+...
+
+Oh. QEMU really doesn't support VME. So that's why I'm not seeing the expected
+behavior. I should have checked for that right away...
+
+That also explains why the guys who implemented this used Bochs instead of
+QEMU...
+
 
 
 

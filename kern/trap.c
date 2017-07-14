@@ -128,7 +128,7 @@ init_idt(void)
 	SETGATE (idt[T_STACK],   0, GD_KT, trap_stack,   0) // stack exception
 	SETGATE (idt[T_GPFLT],   0, GD_KT, trap_gpflt,   0) // general protection fault
 	SETGATE (idt[T_PGFLT],   0, GD_KT, trap_pgflt,   0) // page fault
-	SETGATE (idt[T_FPERR],   0, GD_KT, trap_fperr,   0) // floating point error
+	SETGATE (idt[T_FPERR],   0, GD_KT, trap_fperr,   3) // floating point error
 	SETGATE (idt[T_ALIGN],   0, GD_KT, trap_align,   0) // aligment check
 	SETGATE (idt[T_MCHK],    0, GD_KT, trap_mchk,    0) // machine check
 	SETGATE (idt[T_SIMDERR], 0, GD_KT, trap_simerr,  0)	// SIMD floating point err

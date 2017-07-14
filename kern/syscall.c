@@ -462,6 +462,8 @@ static int sys_receive(unsigned char *buf, size_t bufsize) {
  * next breakpoint instruction. 
  */
 static int sys_v86() {
+	assert (rcr4() & CR4_VME);
+
 	curenv->env_tf.tf_eflags |= FL_VM; 
 	curenv->in_v86_mode = true;
 
