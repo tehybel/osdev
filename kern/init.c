@@ -71,6 +71,8 @@ void i386_init(void) {
 }
 
 static void start_environments() {
+	ENV_CREATE(user_videomode, ENV_TYPE_V86);
+
 	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
 

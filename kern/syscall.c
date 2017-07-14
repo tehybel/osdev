@@ -457,9 +457,9 @@ static int sys_receive(unsigned char *buf, size_t bufsize) {
 	return e1000_receive(buf, bufsize);
 }
 
-/* switches the current environment to virtual-8086 mode, 
- * setting ip=0, sp=0x1000. The current $pc and $sp will be remembered and
- * restored upon the next breakpoint instruction. 
+/* switches the current environment to virtual-8086 mode, setting ip=0x8000,
+ * sp=0x9000. The current $pc and $sp will be remembered and restored upon the
+ * next breakpoint instruction. 
  */
 static int sys_v86() {
 	curenv->env_tf.tf_eflags |= FL_VM; 
@@ -470,8 +470,8 @@ static int sys_v86() {
 	curenv->saved_cs = curenv->env_tf.tf_cs;
 	curenv->saved_ss = curenv->env_tf.tf_ss;
 
-	curenv->env_tf.tf_eip = 0;
-	curenv->env_tf.tf_esp = 0x1000;
+	curenv->env_tf.tf_eip = 0x8000;
+	curenv->env_tf.tf_esp = 0x9000;
 	curenv->env_tf.tf_cs = 0;
 	curenv->env_tf.tf_ss = 0;
 
