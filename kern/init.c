@@ -71,7 +71,9 @@ void i386_init(void) {
 	sched_yield();
 
 }
-void do_init_graphics();
+
+physaddr_t lfb_pa;
+int do_init_graphics();
 extern void *realmode_gdt;
 
 static void init_graphics() {
@@ -82,8 +84,17 @@ static void init_graphics() {
 	memcpy((void *) 0x8000, do_init_graphics, 0x1000);
 	memcpy((void *) 0x9000, &realmode_gdt, 0x1000);
 
-	void (*fptr)() = (void *) 0x8000;
-	fptr();
+	cprintf("Setting video mode..\n");
+
+	int (*fptr)() = (void *) 0x8000;
+	lfb_pa = fptr();
+
+	if (lfb_pa == 0) {
+		cprintf("Failed to set a video mode.\n");
+	} 
+	else {
+		cprintf("Managed to set video mode! LFB PA: 0x%x\n", lfb_pa);
+	}
 
 }
 

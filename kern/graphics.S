@@ -1,3 +1,8 @@
+#include <inc/mmu.h>
+#include <inc/memlayout.h>
+#include <inc/trap.h>
+
+#define	RELOC(x) ((x) - KERNBASE)
 
 .intel_syntax noprefix
 
@@ -6,8 +11,11 @@
 .globl do_init_graphics
 .type do_init_graphics, @function
 
-
 do_init_graphics:
+	
+	# save the stack pointer for later
+	mov eax, 0x7000
+	mov [eax], esp
 
 # first we need to switch to real mode to use int 0x10.
 
@@ -186,7 +194,10 @@ do_init_graphics:
 	jmp .find_mode
 
 .error:
-	jmp .error
+	# on errors, we pretend that the PA is 0
+	mov eax, (0xd000 + 40)
+	xor ebx, ebx
+	mov [eax], ebx
 
 success:
 
@@ -197,6 +208,43 @@ success:
 
 # finally we must switch back to 32 bits protected mode
 # TODO
+	# use a proper 32-bit GDT
+	mov eax, (0x9000 + protmode_gdtdesc - realmode_gdt)
+	lgdt [eax]
+
+	# real mode -> protected mode
+	mov eax, cr0
+	or eax, 1
+	mov cr0, eax
+
+	# go to 32-bit mode
+	ljmp 0x8:(0x8000 + 1f - do_init_graphics)
+
+.code32
+1:
+	
+	# fix up the other segment selectors
+	mov eax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+
+	# we need to re-enable paging
+	lea eax, (RELOC(entry_pgdir))
+	mov cr3, eax
+	mov eax, cr0
+	or eax, (CR0_PG | CR0_WP)
+	mov cr0, eax
+
+	# restore the trashed esp
+	mov eax, 0x7000
+	mov esp, [eax]
+
+	# return the PA of the LFB 
+	mov eax, (0xd000 + 40)
+	mov eax, [eax]
 
 	ret
 
@@ -236,6 +284,16 @@ realmode_idt:
 .long   0x0                         # IDT Table base
 
 
+
+.p2align 2                                # force 4 byte alignment
+protmode_gdt:
+  SEG_NULL				# null seg
+  SEG(STA_X|STA_R, 0x0, 0xffffffff)	# code seg
+  SEG(STA_W, 0x0, 0xffffffff)	        # data seg
+
+protmode_gdtdesc:
+  .word   0x17                            # sizeof(gdt) - 1
+  .long   (0x9000 + protmode_gdt - realmode_gdt)                             # address gdt
 
 
 
