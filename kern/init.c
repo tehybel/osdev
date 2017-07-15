@@ -73,7 +73,6 @@ void i386_init(void) {
 
 }
 
-
 static void init_graphics() {
 	
 	// since we're switching to real mode, we need to do so from code which
@@ -87,16 +86,18 @@ static void init_graphics() {
 	int (*fptr)() = (void *) 0x8000;
 	physaddr_t pa = fptr();
 
+	graphics.lfb_pa = pa;
+	graphics.lfb = (void *) LFB_BASE; 
+
 	if (!pa) {
+		graphics.lfb_size = 0;
 		cprintf("Failed to set a video mode.\n");
 		return;
-	} 
+	}
 
+	graphics.lfb_size = GRAPHICS_WIDTH * GRAPHICS_HEIGHT * (GRAPHICS_BPP / 8);
 	cprintf("Managed to set video mode! LFB PA: 0x%x\n", pa);
 
-	graphics.lfb_pa = pa;
-	graphics.lfb_size = GRAPHICS_WIDTH * GRAPHICS_HEIGHT * (GRAPHICS_BPP / 8);
-	graphics.lfb = (void *) LFB_BASE; 
 }
 
 // enable v86 mode extensions. Note that QEMU doesn't support VME.

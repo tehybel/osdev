@@ -3,6 +3,7 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/graphics.h>
 
 #include <kern/pmap.h>
 #include <kern/kclock.h>
@@ -281,6 +282,10 @@ init_memory(void)
 	boot_map_region(kern_pgdir, MMIOBASE, MMIOLIM - MMIOBASE, 
 					MMIOBASE, PTE_W);
 
+	// set up the mapping for the LFB used in graphics
+	boot_map_region(kern_pgdir, (uintptr_t) graphics.lfb, graphics.lfb_size,
+					graphics.lfb_pa, PTE_W);
+
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
 
@@ -384,6 +389,10 @@ page_init(void)
 
 		// the MMIO region is allocated by dedicated functions
 		if (addr >= MMIOBASE && addr < MMIOLIM)
+			continue;
+
+		// the LFB used for graphics should never be handed out
+		if (addr >= graphics.lfb_pa && addr < graphics.lfb_pa + graphics.lfb_size)
 			continue;
 
 		pageinfo->pp_ref = MAGIC2;
