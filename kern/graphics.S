@@ -105,13 +105,95 @@ do_init_graphics:
 # now we can use int 0x10
 # thus we will set the video mode
 
-	mov ax, 0x4f03
+
+
+# the following mode-setting code is inspired by:
+# http://wiki.osdev.org/User:Omarrx024/VESA_Tutorial
+
+
+.set WIDTH, 1024
+.set HEIGHT, 768
+.set BPP, 32 # bits per pixel
+
+
+
+	push es					# some VESA BIOSes destroy ES, or so I read
+	mov di, 0xc000
+	mov eax, 0x32454256 	# "VBE2"
+	mov dword [di], eax
+	mov ax, 0x4F00				# get VBE BIOS info
 	int 0x10
+	pop es
+
+	cmp ax, 0x4F				# BIOS doesn't support VBE?
+	jne .error
+
+	mov bx, (0xc000 + 16) # get video_modes (.segment)
+	mov fs, [bx]
+	mov bx, (0xc000 + 14) # get video_modes (.offset)
+	mov si, [bx]
+
+.find_mode:
+	mov dx, fs:[si] # mode
+	add si, 2
+
+	cmp dx, 0xFFFF			# end of list?
+	je .error
+
+	push es
+	mov ax, 0x4F01				# get VBE mode info
+	mov cx, dx
+	mov di, 0xd000
+	int 0x10
+	pop es
+
+	cmp ax, 0x4F
+	jne .error
+
+	mov bx, (0xd000 + 18)
+	mov bx, [bx]
+	cmp bx, WIDTH
+	jne .next_mode
+
+	mov bx, (0xd000 + 20)
+	mov bx, [bx]
+	cmp bx, HEIGHT
+	jne .next_mode
+
+	mov bx, (0xd000 + 25)
+	mov bl, [bx]
+	cmp bl, BPP
+	jne .next_mode
+
+	# If we make it here, we've found the correct mode!
+
+	# Set the mode
+	push es
+	mov ax, 0x4F02
+	mov bx, fs:[si] # mode
+	or bx, 0x4000			# enable LFB
+	mov di, 0			# not sure if some BIOSes need this... anyway it doesn't hurt
+	int 0x10
+	pop es
+
+	cmp ax, 0x4F
+	jne .error
+
+	clc
+	jmp success
+
+.next_mode:
+	jmp .find_mode
+
+.error:
+	jmp .error
+
+success:
 
 
 
-
-
+# we've set the video mode!
+# now the physical address of the LFB should be in (0xd000 + 40)
 
 # finally we must switch back to 32 bits protected mode
 # TODO
@@ -152,6 +234,9 @@ realmode_gdt:
 realmode_idt:
 .word   0x3FF                       # IDT Table Limit
 .long   0x0                         # IDT Table base
+
+
+
 
 
 
