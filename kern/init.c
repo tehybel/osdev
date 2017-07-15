@@ -22,6 +22,7 @@
 static void boot_aps(void);
 static void start_environments();
 static void enable_v86();
+static void init_graphics();
 
 void i386_init(void) {
 	extern char edata[], end[];
@@ -31,6 +32,8 @@ void i386_init(void) {
 
 	// initialize the console subsystem; cprintf will not work otherwise
 	init_console();
+
+	init_graphics();
 
 	// initialize the physical page management system 
 	// also initialize the page table to support proper virtual memory
@@ -64,14 +67,28 @@ void i386_init(void) {
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
 
-	enable_v86();
-
 	// Schedule and run the first user environment!
 	sched_yield();
+
+}
+void do_init_graphics();
+static void init_graphics() {
+	
+	// since we're switching to real mode, we need to do so from code which
+	// resides at a place which is 1:1 mapped, which should currently be true
+	// for the first 1MB of code.
+	uint8_t *code_ptr = (uint8_t *) 0x8000;
+
+	memcpy(code_ptr, do_init_graphics, 0x1000);
+
+	void (*fptr)() = (void *) 0x8000;
+	fptr();
+
 }
 
-// enable v86 mode extensions
+// enable v86 mode extensions. Note that QEMU doesn't support VME.
 static void enable_v86() {
+
 	// first ensure that VME is supported on this CPU
 	uint32_t edx;
 
@@ -85,7 +102,6 @@ static void enable_v86() {
 }
 
 static void start_environments() {
-	ENV_CREATE(user_videomode, ENV_TYPE_V86);
 
 	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
