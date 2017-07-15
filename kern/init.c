@@ -3,6 +3,7 @@
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/graphics.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>
@@ -72,9 +73,6 @@ void i386_init(void) {
 
 }
 
-physaddr_t lfb_pa;
-int do_init_graphics();
-extern void *realmode_gdt;
 
 static void init_graphics() {
 	
@@ -87,15 +85,18 @@ static void init_graphics() {
 	cprintf("Setting video mode..\n");
 
 	int (*fptr)() = (void *) 0x8000;
-	lfb_pa = fptr();
+	physaddr_t pa = fptr();
 
-	if (lfb_pa == 0) {
+	if (!pa) {
 		cprintf("Failed to set a video mode.\n");
+		return;
 	} 
-	else {
-		cprintf("Managed to set video mode! LFB PA: 0x%x\n", lfb_pa);
-	}
 
+	cprintf("Managed to set video mode! LFB PA: 0x%x\n", pa);
+
+	graphics.lfb_pa = pa;
+	graphics.lfb_size = GRAPHICS_WIDTH * GRAPHICS_HEIGHT * (GRAPHICS_BPP / 8);
+	graphics.lfb = (void *) LFB_BASE; 
 }
 
 // enable v86 mode extensions. Note that QEMU doesn't support VME.

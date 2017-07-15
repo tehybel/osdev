@@ -1,6 +1,7 @@
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
 #include <inc/trap.h>
+#include <inc/graphics.h>
 
 #define	RELOC(x) ((x) - KERNBASE)
 
@@ -115,16 +116,8 @@ do_init_graphics:
 # now we can use int 0x10
 # thus we will set the video mode
 
-
-
 # the following mode-setting code is inspired by:
 # http://wiki.osdev.org/User:Omarrx024/VESA_Tutorial
-
-
-.set WIDTH, 1024
-.set HEIGHT, 768
-.set BPP, 32 # bits per pixel
-
 
 
 	push es					# some VESA BIOSes destroy ES, or so I read
@@ -162,17 +155,17 @@ do_init_graphics:
 
 	mov bx, (0xd000 + 18)
 	mov bx, [bx]
-	cmp bx, WIDTH
+	cmp bx, GRAPHICS_WIDTH
 	jne .next_mode
 
 	mov bx, (0xd000 + 20)
 	mov bx, [bx]
-	cmp bx, HEIGHT
+	cmp bx, GRAPHICS_HEIGHT
 	jne .next_mode
 
 	mov bx, (0xd000 + 25)
 	mov bl, [bx]
-	cmp bl, BPP
+	cmp bl, GRAPHICS_BPP
 	jne .next_mode
 
 	# If we make it here, we've found the correct mode!
