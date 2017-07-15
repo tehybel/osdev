@@ -72,14 +72,15 @@ void i386_init(void) {
 
 }
 void do_init_graphics();
+extern void *realmode_gdt;
+
 static void init_graphics() {
 	
 	// since we're switching to real mode, we need to do so from code which
 	// resides at a place which is 1:1 mapped, which should currently be true
 	// for the first 1MB of code.
-	uint8_t *code_ptr = (uint8_t *) 0x8000;
-
-	memcpy(code_ptr, do_init_graphics, 0x1000);
+	memcpy((void *) 0x8000, do_init_graphics, 0x1000);
+	memcpy((void *) 0x9000, &realmode_gdt, 0x1000);
 
 	void (*fptr)() = (void *) 0x8000;
 	fptr();

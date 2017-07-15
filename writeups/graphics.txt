@@ -1,6 +1,6 @@
 
 
-Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 
+Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-TODO
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
