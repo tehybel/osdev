@@ -13,6 +13,8 @@
 
 do_init_graphics:
 	
+	pushad
+	
 	# save the stack pointer for later
 	mov eax, 0x7000
 	mov [eax], esp
@@ -207,7 +209,7 @@ success:
 # now the physical address of the LFB should be in (0xd000 + 40)
 
 # finally we must switch back to 32 bits protected mode
-# TODO
+
 	# use a proper 32-bit GDT
 	mov eax, (0x9000 + protmode_gdtdesc - realmode_gdt)
 	lgdt [eax]
@@ -242,9 +244,16 @@ success:
 	mov eax, 0x7000
 	mov esp, [eax]
 
+	# restore all registers
+	popad
+
 	# return the PA of the LFB 
 	mov eax, (0xd000 + 40)
 	mov eax, [eax]
+
+	# we should clear interrupts too, we don't allow those in kernel mode..
+	cli
+
 
 	ret
 
