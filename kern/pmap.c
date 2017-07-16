@@ -283,8 +283,12 @@ init_memory(void)
 					MMIOBASE, PTE_W);
 
 	// set up the mapping for the LFB used in graphics
-	boot_map_region(kern_pgdir, (uintptr_t) graphics.lfb, graphics.lfb_size,
-					graphics.lfb_pa, PTE_W);
+	if (have_graphics) {
+		int bytes_needed = 
+			mode_info.width * mode_info.height * mode_info.bpp / 8;
+		boot_map_region(kern_pgdir, (uintptr_t) LFB_BASE,
+						bytes_needed, mode_info.framebuffer, PTE_W);
+	}
 
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -392,7 +396,7 @@ page_init(void)
 			continue;
 
 		// the LFB used for graphics should never be handed out
-		if (addr >= graphics.lfb_pa && addr < graphics.lfb_pa + graphics.lfb_size)
+		if (addr >= mode_info.framebuffer && addr < mode_info.framebuffer + lfb_size)
 			continue;
 
 		pageinfo->pp_ref = MAGIC2;

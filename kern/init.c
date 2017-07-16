@@ -84,19 +84,21 @@ static void init_graphics() {
 	cprintf("Setting video mode..\n");
 
 	int (*fptr)() = (void *) 0x8000;
-	physaddr_t pa = fptr();
+	int res = fptr();
 
-	graphics.lfb_pa = pa;
-	graphics.lfb = (void *) LFB_BASE; 
-
-	if (!pa) {
-		graphics.lfb_size = 0;
+	if (!res) {
+		have_graphics = 0;
 		cprintf("Failed to set a video mode.\n");
 		return;
 	}
 
-	graphics.lfb_size = GRAPHICS_WIDTH * GRAPHICS_HEIGHT * (GRAPHICS_BPP / 8);
-	cprintf("Managed to set video mode! LFB PA: 0x%x\n", pa);
+	// if do_int_graphics succeeded, a mode info struct now resides at 0xd000
+	mode_info = *(struct vbe_mode_info *) 0xd000;
+
+	have_graphics = 1;
+	lfb_size = mode_info.width * mode_info.height * mode_info.bpp / 8;
+
+	cprintf("Managed to set video mode! LFB PA: 0x%x\n", mode_info.framebuffer);
 
 }
 

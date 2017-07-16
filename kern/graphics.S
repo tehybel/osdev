@@ -189,13 +189,13 @@ do_init_graphics:
 	jmp .find_mode
 
 .error:
-	# on errors, we pretend that the PA is 0
-	mov eax, (0xd000 + 40)
 	xor ebx, ebx
-	mov [eax], ebx
+	jmp .finish
 
 success:
+	mov ebx, 1
 
+.finish:
 
 
 # we've set the video mode!
@@ -237,16 +237,17 @@ success:
 	mov eax, 0x7000
 	mov esp, [eax]
 
+	# put return values temporarily at 0x7000
+	mov [eax], ebx
+
 	# restore all registers
 	popad
 
-	# return the PA of the LFB 
-	mov eax, (0xd000 + 40)
+	mov eax, 0x7000
 	mov eax, [eax]
 
 	# we should clear interrupts too, we don't allow those in kernel mode..
 	cli
-
 
 	ret
 
