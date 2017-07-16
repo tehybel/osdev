@@ -29,7 +29,7 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/sched.c \
 			kern/syscall.c \
 			kern/kdebug.c \
-			kern/graphics.S \
+			kern/videomode.S \
 			kern/graphics.c \
 			lib/printfmt.c \
 			lib/readline.c \
@@ -115,6 +115,9 @@ KERN_BINFILES +=	user/testpteshare \
 
 # Binary files for graphics
 KERN_BINFILES += user/videomode
+
+# NOTE: if you have foo.S and foo.c then they'll both land in foo.o, one
+# overwriting the other!!! This is really bad design.
 
 KERN_OBJFILES := $(patsubst %.c, $(OBJDIR)/%.o, $(KERN_SRCFILES))
 KERN_OBJFILES := $(patsubst %.S, $(OBJDIR)/%.o, $(KERN_OBJFILES))

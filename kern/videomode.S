@@ -1,13 +1,15 @@
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
 #include <inc/trap.h>
-#include <inc/graphics.h>
+#include <kern/graphics.h>
+
+
 
 #define	RELOC(x) ((x) - KERNBASE)
 
 .intel_syntax noprefix
 
-.section .text
+
 
 .globl do_init_graphics
 .type do_init_graphics, @function

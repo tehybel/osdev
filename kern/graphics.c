@@ -13,7 +13,6 @@ void init_graphics() {
 	// for the first 1MB of code.
 	memcpy((void *) 0x8000, do_init_graphics, 0x1000);
 
-	/*
 	memcpy((void *) 0x9000, &realmode_gdt, 0x1000);
 
 	cprintf("Setting video mode..\n");
@@ -34,7 +33,6 @@ void init_graphics() {
 	lfb_size = mode_info.width * mode_info.height * mode_info.bpp / 8;
 
 	cprintf("Managed to set video mode! LFB PA: 0x%x\n", mode_info.framebuffer);
-	*/
 
 }
 
