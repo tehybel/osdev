@@ -33,6 +33,7 @@ void init_graphics() {
 	lfb_size = mode_info.width * mode_info.height * mode_info.bpp / 8;
 
 	cprintf("Managed to set video mode! LFB PA: 0x%x\n", mode_info.framebuffer);
+	cprintf("pitch is: %d\n", mode_info.pitch);
 
 }
 

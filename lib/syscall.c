@@ -136,3 +136,7 @@ sys_receive(void *buf, size_t bufsize) {
 void sys_v86() {
 	syscall(SYS_v86, 0, 0, 0, 0, 0, 0);
 }
+
+int sys_map_lfb() {
+	return syscall(SYS_map_lfb, 0, 0, 0, 0, 0, 0);
+}

@@ -21,6 +21,7 @@ enum {
 	SYS_transmit,
 	SYS_receive,
 	SYS_v86,
+	SYS_map_lfb,
 	NSYSCALLS
 };
 

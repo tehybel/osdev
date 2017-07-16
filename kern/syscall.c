@@ -5,6 +5,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 
+#include <kern/graphics.h>
 #include <kern/env.h>
 #include <kern/pmap.h>
 #include <kern/trap.h>
@@ -480,6 +481,28 @@ static int sys_v86() {
 	return 0;
 }
 
+/* maps the LFB into the address space of the current process, but only if
+ * it's a graphics process */
+static int sys_map_lfb() {
+	if (curenv->env_type != ENV_TYPE_GRAPHICS)
+		return -E_BAD_ENV;
+	
+	physaddr_t pa = mode_info.framebuffer;
+	size_t size = lfb_size;
+	void *va = (void *) LFB_BASE;
+
+	size_t offset;
+	for (offset = 0; offset < lfb_size; offset += PGSIZE) {
+		pte_t *pte = pgdir_walk(curenv->env_pgdir, (void *) (va + offset), 1);
+		if (!pte)
+			panic("sys_map_lfb allocation failed");
+		*pte = (pa + offset) | PTE_U | PTE_W | PTE_P;
+	}
+
+	return 0;
+}
+
+
 
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
@@ -545,6 +568,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	case SYS_v86:
 		return sys_v86();
+
+	case SYS_map_lfb:
+		return sys_map_lfb();
 
 	default:
 		return -E_NOSYS;
