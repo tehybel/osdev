@@ -29,10 +29,11 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/sched.c \
 			kern/syscall.c \
 			kern/kdebug.c \
+			kern/graphics.S \
+			kern/graphics.c \
 			lib/printfmt.c \
 			lib/readline.c \
-			lib/string.c \
-			kern/graphics.S
+			lib/string.c
 
 # Source files for LAB4
 KERN_SRCFILES +=	kern/mpentry.S \
@@ -41,8 +42,7 @@ KERN_SRCFILES +=	kern/mpentry.S \
 			kern/spinlock.c
 
 # Source files for LAB6
-KERN_SRCFILES +=	kern/e100.c \
-			kern/e1000.c \
+KERN_SRCFILES += kern/e1000.c \
 			kern/pci.c \
 			kern/time.c
 

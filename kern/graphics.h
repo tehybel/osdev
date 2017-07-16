@@ -1,7 +1,6 @@
 #ifndef JOS_INC_GRAPHICS_H
 #define JOS_INC_GRAPHICS_H
 
-
 #define GRAPHICS_HEIGHT 768
 #define GRAPHICS_WIDTH 1024
 // bits per pixel
@@ -12,8 +11,8 @@
 
 #ifndef __ASSEMBLER__
 
-int do_init_graphics();
-extern void *realmode_gdt;
+void init_graphics();
+
 
 struct vbe_mode_info {
 	uint16_t attributes;		// deprecated, only bit 7 should be of interest to you, and it indicates the mode supports a linear frame buffer.

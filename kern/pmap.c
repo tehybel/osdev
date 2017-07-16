@@ -3,8 +3,8 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
-#include <inc/graphics.h>
 
+#include <kern/graphics.h>
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 #include <kern/env.h>
