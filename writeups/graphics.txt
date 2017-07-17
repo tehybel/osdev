@@ -1,7 +1,7 @@
 
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
-17:50-19:50, 10-11:45
+17:50-19:50, 10-11:45, 19:30-20,
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
@@ -335,11 +335,13 @@ Now we can draw pixels and rectangles. I have no overview of what should
 happen next. What are we still missing?
 
 - a memory allocator (malloc, free, realloc etc.)
-- ability to render fonts
-- functions to draw widgets, e.g. windows, buttons etc.
+- window system, including:
+	- ability to render fonts
+	- functions to draw widgets, e.g. windows, buttons etc.
+	- window server
+	- communications protocol
 - terminal emulator
 - mouse driver
-- window server/system/manager
 
 
 I currently have no idea how a window manager / x server / etc. works. That's
@@ -416,5 +418,53 @@ The linux program "xev" displays all events it gets from the X server. That
 could be useful for inspiration.
 
 
+To proceed, we need to define a protocol used between the window server and
+clients. We also need to figure out how this communication will happen.
 
+We can create some subgoals:
+- handle mouse events, passing them to the graphics server
+- make the graphics server display the mouse
+- make the graphics server receive all keyboard input
+- define a protocol between server and clients
+
+
+We can start on the first subgoal already, getting mouse input to work.
+
+But I'd like to think about the protocol already. One thing that isn't clear
+to me yet is this: the server is notified by the OS when keyboard/mouse input
+is ready (but how?). Then this information must flow to the client
+applications (but how?). If an application wants to draw its canvas, it must
+tell the server this (but how?). 
+
+First question: how does input (mouse click, keyboard press, etc.) reach the
+window server? Currently an application can run getc() or such to grab input
+from the OS, while the OS has stored the input in some buffer. We could have
+the window server periodically drain this queue, but that seems slow. I don't
+see a better option, though, so okay. We'll need a syscall to drain the mouse
+and keyboard queues.
+
+Second question: how do events go from the server to client(s)? We could again
+have a queue, and the client will drain it whenever that's convenient.
+
+Essentially what we need is the concept of pipes from unix. That would be
+extremely convenient. Then the kernel just stuffs events into a pipe which
+leads to the window server, and the window server puts the events into other
+pipes leading to clients.
+
+Graphical applications will have a sort of event loop where they drain the
+pipes, handle all inputs, then yield and retry later.
+
+We could even make this efficient by having a "wait on pipe" syscall which
+puts the application to sleep until the pipe is nonempty.
+
+It turns out that this is exactly the approach used in the X window system:
+
+	https://en.wikipedia.org/wiki/Event_loop#X_Window_System
+
+	X applications using Xlib directly are built around the XNextEvent family
+	of functions; XNextEvent blocks until an event appears on the event queue,
+	whereupon the application processes it appropriately.
+
+Third question: how can a client application "talk back" to the window server,
+telling it to draw its canvas? 
 
