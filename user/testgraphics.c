@@ -2,16 +2,6 @@
 
 #define LFB_BASE 0xff000000
 
-/* this process should be special; it should have access to the LFB directly.
- * So we need a syscall or such to map the LFB into this process's address
- * space. 
-
- * then we need to allocate a big zbuffer.
-
- * we also need to know certain information from the mode buffer, so being
- * able to retrieve that would be useful. We'll need another syscall for that.
- * */
-
 uint8_t *lfb;
 uint8_t *zbuffer;
 
@@ -20,7 +10,6 @@ size_t pitch;
 size_t width;
 size_t height;
 size_t bpp;
-
 
 static void init_lfb() {
 	int r;
@@ -57,19 +46,19 @@ int color(int r, int g, int b) {
 void draw_pixel(uint8_t *zbuffer, int x, int y, int color) {
 	// For 32-bit modes, each pixel value is 0x00RRGGBB in little endian
 
-	if (x < 0 || y < 0 || x >= width || y >= height)
+	if (x < 0 || y < 0 || x >= width || y >= height) {
+		cprintf("oob write in draw_pixel: %d %d\n", x, y);
 		return;
-	
-	uint32_t offset = y * pitch + x * bpp / 8;
+	}
 
-	zbuffer[offset+0] = BLUE(color);
-	zbuffer[offset+1] = GREEN(color);
-	zbuffer[offset+2] = RED(color);
+	// if bpp isn't 32, we can't use a uint32_t*.
+	assert (bpp == 32);
+	uint32_t *p = (uint32_t *) zbuffer;
+	p[y*((width+pitch)/4)  + x] = color;
 }
 
-
 void umain(int argc, char **argv) {
-	int i, j;
+	int i, j, c;
 
 	cprintf("graphics environment started!\n");
 
@@ -79,11 +68,27 @@ void umain(int argc, char **argv) {
 
 	for (i = 0; i < width; i++) {
 		for (j = 0; j < height; j++) {
-			int c = color(i, j, 0xff);
+			int r = 256*i/width;
+			int g = 256*j/height;
+			int c = color(r, g, 0xff);
 			draw_pixel(lfb, i, j, c);
 		}
 	}
 
+	c = color(0xff, 0xff, 0);
+
+#define D(x, y) draw_pixel(lfb, x, y, c)
+
+	D(5, 0);
+	D(5, 1);
+	D(5, 2);
+	D(5, 3);
+	D(5, 4);
+	D(5, 5);
+	D(5, 6);
+	D(5, 7);
+	D(5, 8);
+	D(5, 9);
 
 
 }

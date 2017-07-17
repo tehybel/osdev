@@ -6,6 +6,15 @@
 extern void *realmode_gdt;
 extern int do_init_graphics();
 
+static void print_mode_info(struct vbe_mode_info *m) {
+	cprintf("height: %d\n", m->height);
+	cprintf("width:  %d\n", m->width);
+	cprintf("pitch:  %d\n", m->pitch);
+	cprintf("bpp:    %d\n", m->bpp);
+	cprintf("LFB:    0x%x\n", m->framebuffer);
+
+}
+
 void init_graphics() {
 	
 	// since we're switching to real mode, we need to do so from code which
@@ -30,10 +39,10 @@ void init_graphics() {
 	mode_info = *(struct vbe_mode_info *) 0xd000;
 
 	have_graphics = 1;
-	lfb_size = mode_info.width * mode_info.height * mode_info.bpp / 8;
+	lfb_size = (mode_info.width + mode_info.pitch) * mode_info.height *
+		mode_info.bpp / 8;
 
-	cprintf("Managed to set video mode! LFB PA: 0x%x\n", mode_info.framebuffer);
-	cprintf("pitch is: %d\n", mode_info.pitch);
-
+	cprintf("Managed to set video mode!\n");
+	print_mode_info(&mode_info);
 }
 
