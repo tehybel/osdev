@@ -80,7 +80,6 @@ void draw_rectangle(int x1, int y1, int x2, int y2, int color) {
 			draw_pixel(x, y, color);
 		}
 	}
-
 }
 
 void refresh_screen() {

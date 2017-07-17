@@ -1,7 +1,7 @@
 
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
-17:50-19:50, 10-TODO
+17:50-19:50, 10-11:45
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
@@ -328,16 +328,93 @@ I figured it out with the help of:
 
 
 
+...........
 
 
+Now we can draw pixels and rectangles. I have no overview of what should
+happen next. What are we still missing?
+
+- a memory allocator (malloc, free, realloc etc.)
+- ability to render fonts
+- functions to draw widgets, e.g. windows, buttons etc.
+- terminal emulator
+- mouse driver
+- window server/system/manager
 
 
+I currently have no idea how a window manager / x server / etc. works. That's
+probably the main thing to figure out next.
+
+It seems like we'll have one process that's a "graphics server" which will be
+responsible for drawing to the LFB. But then how do other processes tell it
+how their window looks? And what about mouse and keyboard input? Should that
+go directly to the graphics process? And then it can send the input on to the
+other processes?
+
+I need to find some resource that explains all this..
+
+This page explains some of it, but not everything:
+
+	http://wiki.osdev.org/GUI
 
 
+I guess the graphics server will keep track of all the different windows. When
+an application wants to paint a window, it'll have to delegate to the graphics
+server.
+
+Then the graphics server can keep track of which window is selected, and if we
+press a key it can send the input to the relevant process. Or the process can
+listen for input. I'm not sure how that part should work yet.
+
+Each process can have a "default look" with a window, an X button to close the
+application, etc.
+
+What about mouse presses? And graphics? How will an application tell the
+graphics server how it looks?
+
+An application could tell the graphics server, "here, draw this object for me.
+And if anyone clicks it, call this callback." That would be one way. But I'm
+making this up as I go; I should find a resource describing the right way.
 
 
-- others must have done this already. Can I find source somewhere to read?
+I guess we'll give each process a canvas, if it asks for it. The canvas is
+defined as what's inside a window. The process can then do whatever it wants
+to the canvas, and can ask to have it drawn by the graphics server. Whenever
+an event happens, we will deliver it to the appropriate application. Then it's
+up to the application to decide what to do with it. So we could send like:
 
-- 
+	event(mouse_click, x=100, y=124)
+	event(key_press, key="A")
+
+I'll look for more resources..
+
+
+It turns out that what I'm coming up with is called a windowing system:
+
+	https://en.wikipedia.org/wiki/Windowing_system
+
+The "graphics server", as I called it, is also called a display server, window
+server or compositor. For now let's call it a window server.
+
+
+So a window system is a full "package" that provides a window server, as well
+as primitives for e.g. rendering fonts, drawing windows, rectangles, etc.
+
+This rendering is done by a window server. The server has clients; those are
+the GUI applications. There is a protocol for communication between the
+clients and the server. Thus an application can say "draw this text at this
+position with this font" and the window server does the actual work.
+
+In this terminology, on Unix there's the X window system, which has the X
+server which I've heard of.
+
+More info here:
+
+	https://en.wikipedia.org/wiki/Display_server
+
+The linux program "xev" displays all events it gets from the X server. That
+could be useful for inspiration.
+
+
 
 
