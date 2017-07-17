@@ -57,6 +57,22 @@ void draw_pixel(uint8_t *zbuffer, int x, int y, int color) {
 	p[y*((width+pitch)/4)  + x] = color;
 }
 
+/* draws a rectangle from upper left corner (x1, y1) to lower right corner
+ * (x2, y2) */
+void draw_rectangle(uint8_t *zbuffer, int x1, int y1, int x2, int y2, 
+					int color) {
+	assert (x2 >= x1);
+	assert (y2 >= y1);
+
+	int x, y;
+	for (x = x1; x < x2; x++) {
+		for (y = y1; y < y2; y++) {
+			draw_pixel(zbuffer, x, y, color);
+		}
+	}
+
+}
+
 void umain(int argc, char **argv) {
 	int i, j, c;
 
@@ -64,7 +80,6 @@ void umain(int argc, char **argv) {
 
 	init_lfb();
 	init_zbuffer();
-
 
 	for (i = 0; i < width; i++) {
 		for (j = 0; j < height; j++) {
@@ -76,20 +91,10 @@ void umain(int argc, char **argv) {
 	}
 
 	c = color(0xff, 0xff, 0);
+	draw_rectangle(lfb, 10, 10, 50, 100, c);
 
-#define D(x, y) draw_pixel(lfb, x, y, c)
-
-	D(5, 0);
-	D(5, 1);
-	D(5, 2);
-	D(5, 3);
-	D(5, 4);
-	D(5, 5);
-	D(5, 6);
-	D(5, 7);
-	D(5, 8);
-	D(5, 9);
-
+	c = color(0x20, 0x40, 0xe0);
+	draw_rectangle(lfb, 300, 300, 500, 500, c);
 
 }
 
