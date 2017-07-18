@@ -537,6 +537,10 @@ event for "mouse moved".
 Now I am getting proper packets from the mouse, but only when moving it.
 Clicks are not properly registered. I wonder what's wrong..
 
+Aha. We first had to initialize the mouse. This is done via command 0xf4. But
+a small protocol must be followed when sending commands to the mouse. It's
+described in the links above.
+
 
 
 

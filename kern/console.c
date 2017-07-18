@@ -405,6 +405,7 @@ kbd_intr(void)
 	cons_intr(kbd_proc_data);
 }
 
+// initializes the PS/2 keyboard (and mouse)
 static void
 kbd_init(void)
 {
@@ -475,6 +476,33 @@ cons_putc(int c)
 	cga_putc(c);
 }
 
+static void mouse_send_command(uint8_t command) {
+	uint8_t stat;
+
+	/* 
+	Sending a command or data byte to the mouse (to port 0x60) must be
+	preceded by sending a 0xD4 byte to port 0x64 (with appropriate waits on
+	port 0x64, bit 1, before sending each output byte). Note: this 0xD4 byte
+	does not generate any ACK, from either the keyboard or mouse. 
+	*/
+	outb(KBCMDP, KBC_AUXWRITE);
+
+	do {
+		stat = inb(KBSTATP);
+	} while (!(stat & KBS_DIB));
+
+	outb(KBDATAP, command);
+
+	do {
+		stat = inb(KBOUTP);
+	} while (!(stat & KBR_ACK));
+}
+
+static void mouse_init() {
+	// this enables the mouse
+	mouse_send_command(KBC_ENABLE);
+}
+
 // initialize the console devices
 void
 init_console(void)
@@ -482,6 +510,7 @@ init_console(void)
 	cga_init();
 	kbd_init();
 	serial_init();
+	mouse_init();
 
 	if (!serial_exists)
 		cprintf("Serial port does not exist!\n");
