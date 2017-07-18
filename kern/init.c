@@ -66,7 +66,7 @@ void i386_init(void) {
 	start_environments();
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
-	drain_keyboard();
+	drain_keyboard_and_mouse();
 
 	// Schedule and run the first user environment!
 	sched_yield();

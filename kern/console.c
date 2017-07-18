@@ -10,7 +10,14 @@
 #include <kern/trap.h>
 #include <kern/picirq.h>
 
-static void drain_to_console(int (*proc)(void));
+#define CONSBUFSIZE 512
+
+static struct {
+	uint8_t buf[CONSBUFSIZE];
+	uint32_t rpos;
+	uint32_t wpos;
+} cons;
+
 static void cons_putc(int c);
 
 // Stupid I/O delay routine necessitated by historical PC design flaws
@@ -57,11 +64,18 @@ serial_proc_data(void)
 	return inb(COM1+COM_RX);
 }
 
-void
-drain_serial(void)
-{
-	if (serial_exists)
-		drain_to_console(serial_proc_data);
+void drain_serial(void) {
+	if (!serial_exists)
+		return;
+
+	int c;
+	while ((c = serial_proc_data()) != -1) {
+		if (c == 0)
+			continue;
+		cons.buf[cons.wpos++] = c;
+		if (cons.wpos == CONSBUFSIZE)
+			cons.wpos = 0;
+	}
 }
 
 static void
@@ -356,7 +370,7 @@ static int get_data_from_keyboard() {
 	return c;
 }
 
-static int get_data_from_mouse() {
+static void handle_data_from_mouse() {
 	int i;
 	int32_t status, delta_x, delta_y;
 
@@ -364,8 +378,9 @@ static int get_data_from_mouse() {
 	delta_x = inb(KBDATAP);
 	delta_y = inb(KBDATAP);
 
+	// ignore overflowing packets
 	if ((status & MOUSE_X_OVERFLOW) || (status & MOUSE_Y_OVERFLOW))
-		return -1;
+		return;
 	
 	if (status & MOUSE_X_SIGNED)
 		delta_x |= 0xffffff00;
@@ -377,32 +392,28 @@ static int get_data_from_mouse() {
 		cprintf("warning: mouse packet misalignment\n");
 
 	cprintf("mouse event: 0x%x (%d, %d)\n", status, delta_x, delta_y);
-
-	return -1; // currently unhandled
 }
 
-/*
- * Get data from the keyboard or mouse, via the keyboard interface.  If we
- * finish a character, return it.  Else 0. Return -1 if no data.
- */
-static int
-kbd_proc_data(void)
-{
-	uint8_t stat = inb(KBSTATP);
-	if ((stat & KBS_DIB) == 0)
-		return -1;
-
-	// Ignore data from mouse.
-	if (stat & KBS_FROM_MOUSE) 
-		return get_data_from_mouse();
-	else 
-		return get_data_from_keyboard();
+static void handle_data_from_keyboard() {
+	int c;
+	if ((c = get_data_from_keyboard())) {
+		// we read a full char, so stuff it into the console buffer
+		cons.buf[cons.wpos++] = c;
+		if (cons.wpos == CONSBUFSIZE)
+			cons.wpos = 0;
+	}
 }
 
-void
-drain_keyboard(void)
-{
-	drain_to_console(kbd_proc_data);
+/* we have to drain keyboard and mouse at the same time, because they both go
+ * via the same port (they're both PS/2 devices). */
+void drain_keyboard_and_mouse() {
+	uint8_t stat;
+	while ((stat = inb(KBSTATP)) & KBS_DIB) {
+		if (stat & KBS_FROM_MOUSE)
+			handle_data_from_mouse();
+		else  
+			handle_data_from_keyboard();
+	}
 }
 
 // initializes the PS/2 keyboard
@@ -410,40 +421,15 @@ static void
 kbd_init(void)
 {
 	// Drain the kbd buffer so that QEMU generates interrupts.
-	drain_keyboard();
+	drain_keyboard_and_mouse();
 	irq_setmask_8259A(irq_mask_8259A & ~(1<<IRQ_KBD));
 }
-
-
 
 /***** General device-independent console code *****/
 // Here we manage the console input buffer,
 // where we stash characters received from the keyboard or serial port
 // whenever the corresponding interrupt occurs.
 
-#define CONSBUFSIZE 512
-
-static struct {
-	uint8_t buf[CONSBUFSIZE];
-	uint32_t rpos;
-	uint32_t wpos;
-} cons;
-
-// called by device interrupt routines to feed input characters
-// into the circular console input buffer.
-static void
-drain_to_console(int (*proc)(void))
-{
-	int c;
-
-	while ((c = (*proc)()) != -1) {
-		if (c == 0)
-			continue;
-		cons.buf[cons.wpos++] = c;
-		if (cons.wpos == CONSBUFSIZE)
-			cons.wpos = 0;
-	}
-}
 
 // return the next input character from the console, or 0 if none waiting
 int
@@ -455,7 +441,7 @@ cons_getc(void)
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
 	drain_serial();
-	drain_keyboard();
+	drain_keyboard_and_mouse();
 
 	// grab the next character from the input buffer.
 	if (cons.rpos != cons.wpos) {

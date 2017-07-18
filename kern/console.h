@@ -20,7 +20,7 @@
 void init_io(void);
 int cons_getc(void);
 
-void drain_keyboard(void); // irq 1
+void drain_keyboard_and_mouse(void); // irq 1
 void drain_serial(void); // irq 4
 
 #endif /* _CONSOLE_H_ */
