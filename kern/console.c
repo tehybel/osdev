@@ -313,23 +313,10 @@ static uint8_t *charcode[4] = {
 	ctlmap
 };
 
-/*
- * Get data from the keyboard.  If we finish a character, return it.  Else 0.
- * Return -1 if no data.
- */
-static int
-kbd_proc_data(void)
-{
+static int get_data_from_keyboard() {
 	int c;
-	uint8_t stat, data;
+	uint8_t data;
 	static uint32_t shift;
-
-	stat = inb(KBSTATP);
-	if ((stat & KBS_DIB) == 0)
-		return -1;
-	// Ignore data from mouse.
-	if (stat & KBS_TERR)
-		return -1;
 
 	data = inb(KBDATAP);
 
@@ -367,6 +354,49 @@ kbd_proc_data(void)
 	}
 
 	return c;
+}
+
+static int get_data_from_mouse() {
+	int i;
+	int32_t status, delta_x, delta_y;
+
+	status = inb(KBDATAP);
+	delta_x = inb(KBDATAP);
+	delta_y = inb(KBDATAP);
+
+	if ((status & MOUSE_X_OVERFLOW) || (status & MOUSE_Y_OVERFLOW))
+		return -1;
+	
+	if (status & MOUSE_X_SIGNED)
+		delta_x |= 0xffffff00;
+
+	if (status & MOUSE_Y_SIGNED)
+		delta_y |= 0xffffff00;
+	
+	if (!(status & MOUSE_ALWAYS_1))
+		cprintf("warning: mouse packet misalignment\n");
+
+	cprintf("mouse event: 0x%x (%d, %d)\n", status, delta_x, delta_y);
+
+	return -1; // currently unhandled
+}
+
+/*
+ * Get data from the keyboard or mouse, via the keyboard interface.  If we
+ * finish a character, return it.  Else 0. Return -1 if no data.
+ */
+static int
+kbd_proc_data(void)
+{
+	uint8_t stat = inb(KBSTATP);
+	if ((stat & KBS_DIB) == 0)
+		return -1;
+
+	// Ignore data from mouse.
+	if (stat & KBS_FROM_MOUSE) 
+		return get_data_from_mouse();
+	else 
+		return get_data_from_keyboard();
 }
 
 void

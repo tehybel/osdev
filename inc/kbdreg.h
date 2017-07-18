@@ -14,6 +14,16 @@
 #define KEY_DEL		0xE9
 
 
+#define MOUSE_LEFT_BTN 0x1
+#define MOUSE_RIGHT_BTN 0x2
+#define MOUSE_MID_BTN 0x4
+#define MOUSE_ALWAYS_1 0x8
+#define MOUSE_X_SIGNED 0x10
+#define MOUSE_Y_SIGNED 0x20
+#define MOUSE_X_OVERFLOW 0x40
+#define MOUSE_Y_OVERFLOW 0x80
+
+
 /* This is i8042reg.h + kbdreg.h from NetBSD. */
 
 #define	KBSTATP		0x64	/* kbd controller status port(I) */
@@ -22,7 +32,7 @@
 #define	 KBS_WARM	0x04	/* kbd input buffer low */
 #define	 KBS_OCMD	0x08	/* kbd output buffer has command */
 #define	 KBS_NOSEC	0x10	/* kbd security lock not engaged */
-#define	 KBS_TERR	0x20	/* kbd transmission error or from mouse */
+#define	 KBS_FROM_MOUSE	0x20	/* kbd transmission error or from mouse */
 #define	 KBS_RERR	0x40	/* kbd receive error */
 #define	 KBS_PERR	0x80	/* kbd parity error */
 

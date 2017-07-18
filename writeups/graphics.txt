@@ -1,7 +1,7 @@
 
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
-17:50-19:50, 10-11:45, 19:30-20,
+17:50-19:50, 10-11:45, 19:30-20, 11:30-TODO
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
@@ -467,4 +467,76 @@ It turns out that this is exactly the approach used in the X window system:
 
 Third question: how can a client application "talk back" to the window server,
 telling it to draw its canvas? 
+
+I guess that's a small implementation detail. We could use IPC to share the
+canvas. That would probably work well. Then the client can signal the server
+that it has drawn to the canvas somehow, e.g. via pipes.
+
+
+
+For now the most important steps are (1) a mouse driver, and (2) a pipe
+mechanism.
+
+Let's start with the mouse driver. We need the OS to get events from the mouse
+and handle those (by later putting them in the display server's queue).
+
+According to the QEMU manual, it emulates a "PS/2 mouse and keyboard". That's
+the purple/green 6-pin socket on some old motherboards, looking like this:
+	
+	https://en.wikipedia.org/wiki/File:Ps-2-ports.jpg
+
+Eventually we should also make a USB mouse driver, but for now let's go with
+this.
+
+Relevant linkes:
+
+	http://wiki.osdev.org/Mouse_Input
+	http://wiki.osdev.org/PS/2_Mouse
+	http://wiki.osdev.org/PS/2_Keyboard
+
+I guess the current keyboard driver must also work with the PS/2 interface.
+Let's look at that again..
+
+It uses the inb/outb instructions. This sends or receives a byte at a time
+from a (serial?) port.
+
+To read a byte of input, the OS first reads a byte from the status port using
+the inb instruction. This tells it whether there's new input. If so, it uses
+the inb instruction with the keyboard input data port (0x60). This gives a
+character at a time.
+
+The OS doesn't continuously check for new input. It only does the above
+process when kbd_intr() is called. kbd_intr() repeatedly reads a char and puts
+it into a circular buffer. Then a call to getchar() drains that buffer.
+
+How do we initialize the keyboard? Well, there's the PIC which determines
+which interrupts are registered based on a bitmask. In the function kbd_init()
+we change this mask so that we no longer ignore keyboard interrupts.
+
+
+So to get the PS/2 mouse working, we must first enable it, and then we must
+write functions which use inb to get mouse events. These events must be stored
+in a buffer.
+
+The kernel handles the KBD interrupt, draining the buffers when it happens.
+
+
+A PS/2 mouse generates input on the same input port as the keyboard.
+
+However note that IRQ 1 (IRQ_KBD) is *not* generated when mouse events occur.
+Instead IRQ 12 is generated. So we'll have to additionally handle that.
+
+
+Hmm.. For now we get lots of packets from the mouse, but I don't think it
+makes sense to send that many events to the display server. The kernel should
+process the packets. It will just keep track of the mouse x/y coordinate.
+Then, once a burst of packets has been received, we can generate a single
+event for "mouse moved".
+
+
+Now I am getting proper packets from the mouse, but only when moving it.
+Clicks are not properly registered. I wonder what's wrong..
+
+
+
 
