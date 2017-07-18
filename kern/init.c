@@ -31,8 +31,8 @@ void i386_init(void) {
 	// clear out the .bss
 	memset(edata, 0, end - edata);
 
-	// initialize the console subsystem; cprintf will not work otherwise
-	init_console();
+	// initializes keyboard-, mouse-, and serial-i/o
+	init_io();
 
 	init_graphics();
 
@@ -66,7 +66,7 @@ void i386_init(void) {
 	start_environments();
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
-	kbd_intr();
+	drain_keyboard();
 
 	// Schedule and run the first user environment!
 	sched_yield();

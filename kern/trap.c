@@ -266,13 +266,13 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 	// input to qemu's graphical interface (if any) appear as input from the
 	// keyboard and must be handled here
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
-		kbd_intr();
+		drain_keyboard();
 		return;
 	}
 
 	// console input appear on the serial port and must be handled here
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
-		serial_intr();
+		drain_serial();
 		return;
 	}
 

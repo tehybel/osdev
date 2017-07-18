@@ -17,10 +17,10 @@
 #define CRT_COLS	80
 #define CRT_SIZE	(CRT_ROWS * CRT_COLS)
 
-void init_console(void);
+void init_io(void);
 int cons_getc(void);
 
-void kbd_intr(void); // irq 1
-void serial_intr(void); // irq 4
+void drain_keyboard(void); // irq 1
+void drain_serial(void); // irq 4
 
 #endif /* _CONSOLE_H_ */

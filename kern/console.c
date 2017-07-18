@@ -10,7 +10,7 @@
 #include <kern/trap.h>
 #include <kern/picirq.h>
 
-static void cons_intr(int (*proc)(void));
+static void drain_to_console(int (*proc)(void));
 static void cons_putc(int c);
 
 // Stupid I/O delay routine necessitated by historical PC design flaws
@@ -58,10 +58,10 @@ serial_proc_data(void)
 }
 
 void
-serial_intr(void)
+drain_serial(void)
 {
 	if (serial_exists)
-		cons_intr(serial_proc_data);
+		drain_to_console(serial_proc_data);
 }
 
 static void
@@ -400,17 +400,17 @@ kbd_proc_data(void)
 }
 
 void
-kbd_intr(void)
+drain_keyboard(void)
 {
-	cons_intr(kbd_proc_data);
+	drain_to_console(kbd_proc_data);
 }
 
-// initializes the PS/2 keyboard (and mouse)
+// initializes the PS/2 keyboard
 static void
 kbd_init(void)
 {
 	// Drain the kbd buffer so that QEMU generates interrupts.
-	kbd_intr();
+	drain_keyboard();
 	irq_setmask_8259A(irq_mask_8259A & ~(1<<IRQ_KBD));
 }
 
@@ -432,7 +432,7 @@ static struct {
 // called by device interrupt routines to feed input characters
 // into the circular console input buffer.
 static void
-cons_intr(int (*proc)(void))
+drain_to_console(int (*proc)(void))
 {
 	int c;
 
@@ -454,8 +454,8 @@ cons_getc(void)
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
-	serial_intr();
-	kbd_intr();
+	drain_serial();
+	drain_keyboard();
 
 	// grab the next character from the input buffer.
 	if (cons.rpos != cons.wpos) {
@@ -498,14 +498,12 @@ static void mouse_send_command(uint8_t command) {
 	} while (!(stat & KBR_ACK));
 }
 
+// initializes the PS/2 mouse
 static void mouse_init() {
-	// this enables the mouse
 	mouse_send_command(KBC_ENABLE);
 }
 
-// initialize the console devices
-void
-init_console(void)
+void init_io(void)
 {
 	cga_init();
 	kbd_init();
