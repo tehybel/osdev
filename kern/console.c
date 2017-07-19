@@ -6,6 +6,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 
+#include <kern/graphics.h>
 #include <kern/console.h>
 #include <kern/trap.h>
 #include <kern/picirq.h>
@@ -17,6 +18,7 @@ static struct {
 	uint32_t rpos;
 	uint32_t wpos;
 } cons;
+
 
 static void cons_putc(int c);
 
@@ -370,7 +372,7 @@ static int get_data_from_keyboard() {
 	return c;
 }
 
-static void handle_data_from_mouse() {
+static int get_mouse_status(struct cursor *out) {
 	int i;
 	int32_t status, delta_x, delta_y;
 
@@ -378,9 +380,14 @@ static void handle_data_from_mouse() {
 	delta_x = inb(KBDATAP);
 	delta_y = inb(KBDATAP);
 
+	if (!(status & MOUSE_ALWAYS_1)) {
+		cprintf("warning: mouse packet misalignment\n");
+		return 0;
+	}
+
 	// ignore overflowing packets
 	if ((status & MOUSE_X_OVERFLOW) || (status & MOUSE_Y_OVERFLOW))
-		return;
+		return 0;
 	
 	if (status & MOUSE_X_SIGNED)
 		delta_x |= 0xffffff00;
@@ -388,19 +395,60 @@ static void handle_data_from_mouse() {
 	if (status & MOUSE_Y_SIGNED)
 		delta_y |= 0xffffff00;
 	
-	if (!(status & MOUSE_ALWAYS_1))
-		cprintf("warning: mouse packet misalignment\n");
+	out->x += delta_x;
 
-	cprintf("mouse event: 0x%x (%d, %d)\n", status, delta_x, delta_y);
+	// the y-direction is reported by the mouse such that up is negative;
+	// reverse it here for sanity
+	out->y -= delta_y;
+
+	// make sure we cannot go out of bounds
+	out->x = MAX(out->x, 0);
+	out->x = MIN(out->x, GRAPHICS_WIDTH - 1);
+	out->y = MAX(out->y, 0);
+	out->y = MIN(out->y, GRAPHICS_HEIGHT - 1);
+
+	out->left_pressed = (status & MOUSE_LEFT_BTN);
+	out->right_pressed = (status & MOUSE_RIGHT_BTN);
+	out->middle_pressed = (status & MOUSE_MID_BTN);
+
+	return 1;
 }
 
-static void handle_data_from_keyboard() {
+static bool cursor_eq(struct cursor *a, struct cursor *b) {
+	return (
+		a->x == b->x && 
+		a->y == b->y &&
+		a->left_pressed == b->left_pressed && 
+		a->right_pressed == b->right_pressed && 
+		a->middle_pressed == b->middle_pressed
+	);
+}
+
+static void handle_mouse_event() {
+	struct cursor new_cursor = cursor;
+	if (!get_mouse_status(&new_cursor))
+		return;
+	
+	if (cursor_eq(&new_cursor, &cursor))
+		return;
+
+	// TODO: generate io events here if one of the three buttons changes
+	// status
+
+	cursor = new_cursor;
+
+	cprintf("cursor is now at (%d, %d).\n", cursor.x, cursor.y);
+}
+
+static void handle_keyboard_event() {
 	int c;
 	if ((c = get_data_from_keyboard())) {
 		// we read a full char, so stuff it into the console buffer
 		cons.buf[cons.wpos++] = c;
 		if (cons.wpos == CONSBUFSIZE)
 			cons.wpos = 0;
+
+		// TODO: generate io event here
 	}
 }
 
@@ -410,10 +458,12 @@ void drain_keyboard_and_mouse() {
 	uint8_t stat;
 	while ((stat = inb(KBSTATP)) & KBS_DIB) {
 		if (stat & KBS_FROM_MOUSE)
-			handle_data_from_mouse();
+			handle_mouse_event();
 		else  
-			handle_data_from_keyboard();
+			handle_keyboard_event();
 	}
+
+	// TODO: generate a mouse io event if x/y changed
 }
 
 // initializes the PS/2 keyboard
@@ -484,13 +534,15 @@ static void mouse_send_command(uint8_t command) {
 	} while (!(stat & KBR_ACK));
 }
 
+
 // initializes the PS/2 mouse
 static void mouse_init() {
 	mouse_send_command(KBC_ENABLE);
+	cursor.x = cursor.y = 0;
 }
 
-void init_io(void)
-{
+void init_io() {
+
 	cga_init();
 	kbd_init();
 	serial_init();

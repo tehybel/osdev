@@ -51,6 +51,16 @@ struct vbe_mode_info {
 	uint16_t off_screen_mem_size;	// size of memory in the framebuffer but not being displayed on the screen
 } __attribute__ ((packed));
 
+struct cursor {
+	int x, y;
+	bool left_pressed, right_pressed, middle_pressed;
+} cursor;
+
+struct io_event {
+
+};
+
+
 
 struct vbe_mode_info mode_info;
 
