@@ -514,6 +514,9 @@ static int sys_get_io_events(struct io_event *events_array,
 	// take a number of events from the io_events queue, putting them into the
 	// events_array instead.
 
+	// TODO: if there's nothing in the queue, the process should be blocked
+	// TODO: only let the graphics process call this syscall
+
 	size_t num_to_drain = MIN(events_array_size, io_events_queue_cursize);
 	io_events_queue_cursize -= num_to_drain;
 

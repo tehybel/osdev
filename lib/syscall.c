@@ -140,3 +140,7 @@ void sys_v86() {
 int sys_map_lfb() {
 	return syscall(SYS_map_lfb, 0, 0, 0, 0, 0, 0);
 }
+
+int sys_get_io_events(void *arr, size_t size) {
+	return syscall(SYS_get_io_events, 0, (uint32_t) arr, (uint32_t) size, 0, 0, 0);
+}
