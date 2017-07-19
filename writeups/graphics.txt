@@ -1,7 +1,7 @@
 
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
-17:50-19:50, 10-11:45, 19:30-20, 11:30-13:40, 12:15-TODO
+17:50-19:50, 10-11:45, 19:30-20, 11:30-13:40, 12:15-14:15, TODO
 
 The next task is figuring out how to get graphics working. I'll keep some
 unpolished notes here.
@@ -558,3 +558,21 @@ We can call it sys_get_io_events. It will be called with a pointer to an array
 of events, and the size of the array. The syscall returns the number of events
 stored.
 
+
+.......
+
+That works now. Next we need a way for applications to set up their canvas and
+to receive events from the display server. 
+
+The display server should spawn GUI applications. It can create two pipes
+which are shared with the spawned client. Then the display server can send
+events to the client, and the client can send requests to the display server.
+
+The display server will send the io_events on to the appropriate client.
+
+The client can make requests like:
+	- spawn a new application
+	- draw my canvas again
+	- terminate me
+
+So we really need to implement a pipe system next.

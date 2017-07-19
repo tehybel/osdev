@@ -63,7 +63,7 @@ static int color(int r, int g, int b) {
 
 #define COLOR_WHITE color(0xff, 0xff, 0xff)
 
-static inline void draw_pixel(int x, int y, int color) {
+static inline void draw_pixel(const int x, const int y, const int color) {
 	// For 32-bit modes, each pixel value is 0x00RRGGBB in little endian
 
 	if (x < 0 || y < 0 || x >= width || y >= height) {
@@ -78,7 +78,8 @@ static inline void draw_pixel(int x, int y, int color) {
 
 /* draws a rectangle from upper left corner (x1, y1) to lower right corner
  * (x2, y2) */
-static void draw_rectangle(int x1, int y1, int x2, int y2, int color) {
+static void draw_rectangle(const int x1, const int y1, 
+						   const int x2, const int y2, const int color) {
 	assert (x2 >= x1);
 	assert (y2 >= y1);
 	assert (x1 >= 0);
