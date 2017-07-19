@@ -56,8 +56,17 @@ struct cursor {
 	bool left_pressed, right_pressed, middle_pressed;
 } cursor;
 
+enum event_type {
+	MOUSE_MOVE = 0,
+	MOUSE_CLICK,
+	KEYBOARD_KEY
+};
+
 struct io_event {
-	int TODO;
+	enum event_type type;
+
+	// holds mouse x/y, or (0/1/2) for (left/mid/right), or the pressed key
+	int data[2]; 
 };
 
 #define IO_EVENTS_QUEUE_SIZE 100

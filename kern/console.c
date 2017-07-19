@@ -426,18 +426,35 @@ static bool cursor_eq(struct cursor *a, struct cursor *b) {
 
 static void handle_mouse_event() {
 	struct cursor new_cursor = cursor;
+
 	if (!get_mouse_status(&new_cursor))
 		return;
 	
-	if (cursor_eq(&new_cursor, &cursor))
-		return;
+	// if any keys were pressed, we first need to generate an event with the
+	// current mouse position, so the click goes at the right place.
+	if ((new_cursor.left_pressed && !cursor.left_pressed) ||
+		(new_cursor.middle_pressed && !cursor.middle_pressed) ||
+		(new_cursor.right_pressed && !cursor.right_pressed)) {
+		struct io_event e = {MOUSE_MOVE, {new_cursor.x, new_cursor.y}};
+		io_event_put(&e);
+	}
+	
+	if (new_cursor.left_pressed && !cursor.left_pressed) {
+		struct io_event e = {MOUSE_CLICK, {0, 0}};
+		io_event_put(&e);
+	}
 
-	// TODO: generate io events here if one of the three buttons changes
-	// status
+	if (new_cursor.middle_pressed && !cursor.middle_pressed) {
+		struct io_event e = {MOUSE_CLICK, {1, 0}};
+		io_event_put(&e);
+	}
+
+	if (new_cursor.right_pressed && !cursor.right_pressed) {
+		struct io_event e = {MOUSE_CLICK, {2, 0}};
+		io_event_put(&e);
+	}
 
 	cursor = new_cursor;
-
-	cprintf("cursor is now at (%d, %d).\n", cursor.x, cursor.y);
 }
 
 static void handle_keyboard_event() {
@@ -448,7 +465,8 @@ static void handle_keyboard_event() {
 		if (cons.wpos == CONSBUFSIZE)
 			cons.wpos = 0;
 
-		// TODO: generate io event here
+		struct io_event e = {KEYBOARD_KEY, {c, 0}};
+		io_event_put(&e);
 	}
 }
 
@@ -456,6 +474,8 @@ static void handle_keyboard_event() {
  * via the same port (they're both PS/2 devices). */
 void drain_keyboard_and_mouse() {
 	uint8_t stat;
+	struct cursor old_cursor = cursor;
+
 	while ((stat = inb(KBSTATP)) & KBS_DIB) {
 		if (stat & KBS_FROM_MOUSE)
 			handle_mouse_event();
@@ -463,7 +483,11 @@ void drain_keyboard_and_mouse() {
 			handle_keyboard_event();
 	}
 
-	// TODO: generate a mouse io event if x/y changed
+	// generate a mouse io event if x/y changed
+	if (cursor.x != old_cursor.x || cursor.y != old_cursor.y) {
+		struct io_event e = {MOUSE_MOVE, {cursor.x, cursor.y}};
+		io_event_put(&e);
+	}
 }
 
 // initializes the PS/2 keyboard
