@@ -14,6 +14,7 @@
 #include <kern/sched.h>
 #include <kern/time.h>
 #include <kern/e1000.h>
+#include <kern/copy.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -502,6 +503,29 @@ static int sys_map_lfb() {
 	return 0;
 }
 
+static int sys_get_io_events(struct io_event *events_array, 
+							 size_t events_array_size) {
+
+	// TODO: handle integer overflows.
+	size_t length = events_array_size * sizeof(struct io_event);
+
+	user_mem_assert(curenv, events_array, length, PTE_W);
+
+	// take a number of events from the io_events queue, putting them into the
+	// events_array instead.
+
+	size_t num_to_drain = MIN(events_array_size, io_events_queue_cursize);
+	io_events_queue_cursize -= num_to_drain;
+
+	copy_to_user(events_array, io_events_queue, 
+				 num_to_drain * sizeof(struct io_event));
+	
+	memmove(&io_events_queue[0], &io_events_queue[num_to_drain], 
+			io_events_queue_cursize * sizeof(struct io_event));
+	
+	return num_to_drain;
+}
+
 
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -571,6 +595,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	case SYS_map_lfb:
 		return sys_map_lfb();
+
+	case SYS_get_io_events:
+		return sys_get_io_events((void *) a1, (size_t) a2);
 
 	default:
 		return -E_NOSYS;

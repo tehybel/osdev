@@ -543,4 +543,18 @@ described in the links above.
 
 
 
+......
+
+
+
+At this point we can properly track the mouse, and we're ready to generate
+events (like mouse movements, and mouse/keyboard presses). 
+
+Next we need a way to deliver these events to the display server. The plan was
+to use pipes, but we might as well use a syscall. That way we can easily make
+the display server block until there are events, too.
+
+We can call it sys_get_io_events. It will be called with a pointer to an array
+of events, and the size of the array. The syscall returns the number of events
+stored.
 

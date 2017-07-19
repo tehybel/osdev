@@ -22,6 +22,7 @@ enum {
 	SYS_receive,
 	SYS_v86,
 	SYS_map_lfb,
+	SYS_get_io_events,
 	NSYSCALLS
 };
 

@@ -57,8 +57,14 @@ struct cursor {
 } cursor;
 
 struct io_event {
-
+	int TODO;
 };
+
+#define IO_EVENTS_QUEUE_SIZE 100
+struct io_event io_events_queue[IO_EVENTS_QUEUE_SIZE];
+size_t io_events_queue_cursize;
+
+void io_event_put(struct io_event *event);
 
 
 

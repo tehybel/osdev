@@ -1,10 +1,23 @@
 #include <inc/stdio.h>
 #include <inc/string.h>
+#include <inc/assert.h>
 
 #include <kern/graphics.h>
 
 extern void *realmode_gdt;
 extern int do_init_graphics();
+
+void io_event_put(struct io_event *event) {
+	assert (io_events_queue_cursize >= 0);
+	assert (io_events_queue_cursize <= IO_EVENTS_QUEUE_SIZE);
+
+	if (io_events_queue_cursize == IO_EVENTS_QUEUE_SIZE) {
+		cprintf("warning: io events queue overflowed\n");
+		return;
+	}
+
+	io_events_queue[io_events_queue_cursize++] = *event;
+}
 
 static void print_mode_info(struct vbe_mode_info *m) {
 	cprintf("height: %d\n", m->height);
