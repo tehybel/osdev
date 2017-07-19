@@ -81,11 +81,17 @@ static inline void draw_pixel(int x, int y, int color) {
 static void draw_rectangle(int x1, int y1, int x2, int y2, int color) {
 	assert (x2 >= x1);
 	assert (y2 >= y1);
+	assert (x1 >= 0);
+	assert (y1 >= 0);
+
+	int times = (width + pitch)/4;
 
 	int x, y;
 	for (x = x1; x < x2; x++) {
 		for (y = y1; y < y2; y++) {
-			draw_pixel(x, y, color);
+			// we inline draw_pixel here for speed
+			uint32_t *p = (uint32_t *) zbuffer;
+			p[times*y  + x] = color;
 		}
 	}
 }
@@ -104,10 +110,10 @@ static void draw_windows() {
 
 static void draw_cursor() {
 	#define CURSOR_SIZE 20
-	int x1 = cursor_x - CURSOR_SIZE/2;
-	int x2 = cursor_x + CURSOR_SIZE/2;
-	int y1 = cursor_y - CURSOR_SIZE/2;
-	int y2 = cursor_y + CURSOR_SIZE/2;
+	int x1 = MAX(0, cursor_x - CURSOR_SIZE/2);
+	int x2 = MIN(cursor_x + CURSOR_SIZE/2, width);
+	int y1 = MAX(0, cursor_y - CURSOR_SIZE/2);
+	int y2 = MIN(cursor_y + CURSOR_SIZE/2, height);
 	draw_rectangle(x1, y1, x2, y2, COLOR_WHITE);
 }
 
@@ -134,7 +140,6 @@ static void process_event(struct io_event *e) {
 
 static int process_events() {
 	int n = sys_get_io_events(&events, NUM_EVENTS);
-	cprintf("process_events: %d\n", n);
 	int i;
 
 	for (i = 0; i < n; i++) {
