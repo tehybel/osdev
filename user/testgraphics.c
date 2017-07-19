@@ -132,7 +132,7 @@ static void process_event(struct io_event *e) {
 	}
 }
 
-static void process_events() {
+static int process_events() {
 	int n = sys_get_io_events(&events, NUM_EVENTS);
 	cprintf("process_events: %d\n", n);
 	int i;
@@ -140,10 +140,11 @@ static void process_events() {
 	for (i = 0; i < n; i++) {
 		process_event(&events[i]);
 	}
+
+	return n;
 }
 
 void umain(int argc, char **argv) {
-	int i, j, c;
 
 	cprintf("graphics environment started!\n");
 
@@ -151,11 +152,13 @@ void umain(int argc, char **argv) {
 	init_zbuffer();
 
 	while (1) {
-		process_events();
-		draw_background();
+		if (!process_events())
+			continue;
+
+		draw_background(); // slow
 		draw_windows();
 		draw_cursor();
-		refresh_screen();
+		refresh_screen(); // slow
 	}
 
 }
