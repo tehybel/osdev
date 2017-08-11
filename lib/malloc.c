@@ -138,3 +138,11 @@ free(void *v)
 		sys_page_unmap(0, c);
 }
 
+void *calloc(size_t n, size_t size) {
+	void * result = malloc(n*size);
+	if (!result)
+		return 0;
+	
+	memset(result, '\0', n*size);
+	return result;
+}

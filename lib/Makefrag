@@ -31,7 +31,8 @@ LIB_SRCFILES :=		$(LIB_SRCFILES) \
 			lib/malloc.c
 LIB_SRCFILES :=		$(LIB_SRCFILES) \
 			lib/pipe.c \
-			lib/wait.c
+			lib/wait.c \
+			lib/graphics.c
 
 LIB_OBJFILES := $(patsubst lib/%.c, $(OBJDIR)/lib/%.o, $(LIB_SRCFILES))
 LIB_OBJFILES := $(patsubst lib/%.S, $(OBJDIR)/lib/%.o, $(LIB_OBJFILES))

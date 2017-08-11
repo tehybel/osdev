@@ -1,8 +1,7 @@
 #include <inc/lib.h>
 #include <kern/graphics.h>
+#include <graphics/displayserver.h>
 
-#define LFB_BASE 0xff000000
-#define ZBUFFER_BASE 0xa0000000
 
 uint32_t *lfb;
 uint32_t *zbuffer;
@@ -15,9 +14,10 @@ size_t bpp;
 
 int cursor_x, cursor_y;
 
-
-#define NUM_EVENTS 100
 struct io_event events[NUM_EVENTS];
+
+Window * windows_list = NULL;
+
 
 static void init_lfb() {
 	int r;
@@ -56,12 +56,6 @@ static int color(int r, int g, int b) {
 			((g & 0xff) << 8 ) | 
 			((b & 0xff) << 0 );
 }
-
-#define RED(color)   (((color)>>16) & 0xff)
-#define GREEN(color) (((color)>> 8) & 0xff)
-#define BLUE(color)  (((color)>> 0) & 0xff)
-
-#define COLOR_WHITE color(0xff, 0xff, 0xff)
 
 static inline void draw_pixel(const int x, const int y, const int color) {
 	// For 32-bit modes, each pixel value is 0x00RRGGBB in little endian
@@ -105,12 +99,7 @@ static void draw_background() {
 	draw_rectangle(0, 0, width, height, color(0xa0, 0xa0, 0xa0));
 }
 
-static void draw_windows() {
-	// not implemented yet
-}
-
 static void draw_cursor() {
-	#define CURSOR_SIZE 20
 	int x1 = MAX(0, cursor_x - CURSOR_SIZE/2);
 	int x2 = MIN(cursor_x + CURSOR_SIZE/2, width);
 	int y1 = MAX(0, cursor_y - CURSOR_SIZE/2);
@@ -150,12 +139,101 @@ static int process_events() {
 	return n;
 }
 
+static Canvas *alloc_canvas(Window *w) {
+	size_t offset;
+	static void *canvas_mem = (void *) 0x30000000;
+
+	Canvas *c = calloc(1, sizeof(Canvas));
+	if (!c) panic("alloc_canvas");
+
+
+	c->size = w->height * w->width * (bpp/8);
+	c->raw_pixels = canvas_mem;
+
+	// allocate all the pages consecutively
+	for (offset = 0; offset < c->size; offset += PGSIZE) {
+		if (sys_page_alloc(0, canvas_mem, PTE_U | PTE_P | PTE_W))
+			panic("alloc_canvas sys_page_alloc");
+		canvas_mem += PGSIZE;
+	}
+
+	return c;
+}
+
+Window * alloc_window() {
+	Window *w = malloc(sizeof(Window));
+	if (!w) panic("alloc_window");
+
+	w->xpos = 0;
+	w->ypos = 0;
+
+	w->height = 100;
+	w->width = 200;
+
+	w->next = NULL;
+
+	w->canvas = alloc_canvas(w);
+
+	return w;
+}
+
+static void mark_perm (void *mem, size_t size, int perm) {
+	size_t offset;
+	for (offset = 0; offset < size; offset += PGSIZE) {
+		if (sys_page_map(0, mem + offset, 0, mem + offset, perm))
+			panic("mark_perm");
+	}
+}
+static void mark_nonshared (void *mem, size_t size) {
+	mark_perm(mem, size, PTE_U | PTE_P | PTE_W);
+}
+
+static void mark_shared (void *mem, size_t size) {
+	mark_perm(mem, size, PTE_U | PTE_P | PTE_W | PTE_SHARE);
+}
+
+static void spawn_program(char *progname) {
+
+	Window *w = alloc_window();
+
+	// add it to the list
+	w->next = windows_list;
+	windows_list = w;
+
+
+	// spawn the program
+	const char *argv[] = {progname, NULL};
+	int pid = spawn(progname, argv);
+
+	if (pid < 0)
+		panic("spawn_program: '%s' - %e", progname, pid);
+
+	// share the canvas with it
+	// TODO ??? 
+
+}
+
+static void draw_window(Window *w) {
+	
+	// not implemented yet
+
+}
+
+static void draw_windows() {
+	Window *w;
+	for (w = windows_list; w; w = w->next) {
+		draw_window(w);
+	}
+}
+
 void umain(int argc, char **argv) {
 
 	cprintf("graphics environment started!\n");
 
 	init_lfb();
 	init_zbuffer();
+
+	spawn_program("testcanvas");
 
 	while (1) {
 		if (!process_events())
