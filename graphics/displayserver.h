@@ -14,10 +14,6 @@
 
 #define COLOR_WHITE color(0xff, 0xff, 0xff)
 
-typedef struct canvas {
-	size_t size;
-	void *raw_pixels;
-} Canvas;
 
 typedef struct window {
 	int height, width;

@@ -16,9 +16,7 @@ static int copy_shared_pages(envid_t child);
 // argv: pointer to null-terminated array of pointers to strings,
 // 	 which will be passed to the child as its command-line arguments.
 // Returns child envid on success, < 0 on failure.
-int
-spawn(const char *prog, const char **argv)
-{
+static int _spawn(const char *prog, const char **argv, bool runnable) {
 	unsigned char elf_buf[512];
 	struct Trapframe child_tf;
 	envid_t child;
@@ -133,8 +131,10 @@ spawn(const char *prog, const char **argv)
 	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)
 		panic("sys_env_set_trapframe: %e", r);
 
-	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
-		panic("sys_env_set_status: %e", r);
+	if (runnable) {
+		if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
+			panic("sys_env_set_status: %e", r);
+	}
 
 	return child;
 
@@ -142,6 +142,14 @@ error:
 	sys_env_destroy(child);
 	close(fd);
 	return r;
+}
+
+int spawn(const char *prog, const char **argv) {
+	return _spawn(prog, argv, 1);
+}
+
+int spawn_not_runnable(const char *prog, const char **argv) {
+	return _spawn(prog, argv, 0);
 }
 
 // Spawn, taking command-line arguments array directly on the stack.

@@ -129,6 +129,7 @@ int     nsipc_socket(int domain, int type, int protocol);
 // spawn.c
 envid_t	spawn(const char *program, const char **argv);
 envid_t	spawnl(const char *program, const char *arg0, ...);
+envid_t	spawn_not_runnable(const char *program, const char **argv);
 
 // console.c
 void	cputchar(int c);

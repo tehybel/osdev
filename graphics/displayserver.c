@@ -1,4 +1,5 @@
 #include <inc/lib.h>
+#include <inc/graphics.h>
 #include <kern/graphics.h>
 #include <graphics/displayserver.h>
 
@@ -146,7 +147,6 @@ static Canvas *alloc_canvas(Window *w) {
 	Canvas *c = calloc(1, sizeof(Canvas));
 	if (!c) panic("alloc_canvas");
 
-
 	c->size = w->height * w->width * (bpp/8);
 	c->raw_pixels = canvas_mem;
 
@@ -193,6 +193,8 @@ static void mark_shared (void *mem, size_t size) {
 }
 
 static void spawn_program(char *progname) {
+	size_t offset;
+	int r;
 
 	Window *w = alloc_window();
 
@@ -203,14 +205,25 @@ static void spawn_program(char *progname) {
 
 	// spawn the program
 	const char *argv[] = {progname, NULL};
-	int pid = spawn(progname, argv);
+	int pid = spawn_not_runnable(progname, argv);
 
 	if (pid < 0)
 		panic("spawn_program: '%s' - %e", progname, pid);
 
-	// share the canvas with it
-	// TODO ??? 
+	// share the canvas with the child
+	for (offset = 0; offset < w->canvas->size; offset += PGSIZE) {
+		void *addr = w->canvas->raw_pixels + offset;
+		if ((r = sys_page_map(0, addr, pid, CANVAS_BASE, PTE_U | PTE_P | PTE_W)))
+			panic("spawn_program sys_page_map: %e", r);
+	}
 
+	// start the program
+	if (sys_env_set_status(pid, ENV_RUNNABLE) < 0)
+		panic("spawn_program sys_env_set_status");
+
+	// send the canvas size to the child
+	ipc_send(pid, w->canvas->size, NULL, 0);
+	
 }
 
 static void draw_window(Window *w) {
