@@ -6,13 +6,14 @@
 
 #define NUM_EVENTS 100
 
-#define CURSOR_SIZE 20
+#define CURSOR_SIZE 10
 
 typedef struct window {
 	int height, width;
-	int xpos, ypos;
+	int x_pos, y_pos;
 	struct window *next;
 	Canvas *canvas;
+	int pid;
 } Window;
 
 #endif

@@ -22,6 +22,8 @@ struct io_event events[NUM_EVENTS];
 
 Window * windows_list = NULL;
 
+struct graphics_event *events_queue = NULL;
+
 
 static void init_lfb() {
 	int r;
@@ -98,11 +100,49 @@ static void draw_background() {
 }
 
 static void draw_cursor() {
-	int x1 = MAX(0, cursor_x - CURSOR_SIZE/2);
-	int x2 = MIN(cursor_x + CURSOR_SIZE/2, width);
-	int y1 = MAX(0, cursor_y - CURSOR_SIZE/2);
-	int y2 = MIN(cursor_y + CURSOR_SIZE/2, height);
+	int x1 = MAX(0, cursor_x);
+	int x2 = MIN(cursor_x + CURSOR_SIZE, width);
+	int y1 = MAX(0, cursor_y);
+	int y2 = MIN(cursor_y + CURSOR_SIZE, height);
 	draw_rectangle(x1, y1, x2, y2, COLOR_WHITE);
+}
+
+static Window *get_window_for_coordinate(int x, int y) {
+	Window *w;
+	for (w = windows_list; w; w = w->next) {
+		if (x < w->x_pos)
+			continue;
+		if (y < w->y_pos)
+			continue;
+		if (x >= w->x_pos + w->width)
+			continue;
+		if (y >= w->y_pos + w->height)
+			continue;
+
+		return w;
+	}
+
+	return NULL;
+}
+
+static void add_event_to_queue(struct graphics_event *ev) {
+	ev->next = events_queue;
+	events_queue = ev;
+}
+
+static void handle_mouse_click(int button) {
+	Window *w = get_window_for_coordinate(cursor_x, cursor_y);
+	if (!w) return;
+
+	struct graphics_event *ev = calloc(1, sizeof(struct graphics_event));
+	if (!ev) panic("malloc event");
+
+	ev->type = EVENT_MOUSE_CLICK;
+	ev->d.emc.x = 0;
+	ev->d.emc.y = 0;
+	ev->recipient = w->pid;
+
+	add_event_to_queue(ev);
 }
 
 static void process_event(struct io_event *e) {
@@ -113,7 +153,7 @@ static void process_event(struct io_event *e) {
 		break;
 
 	case MOUSE_CLICK:
-		// TODO
+		handle_mouse_click(e->data[0]);
 		break;
 	
 	case KEYBOARD_KEY:
@@ -163,8 +203,8 @@ Window * alloc_window() {
 	Window *w = malloc(sizeof(Window));
 	if (!w) panic("alloc_window");
 
-	w->xpos = 10;
-	w->ypos = 10;
+	w->x_pos = 10;
+	w->y_pos = 10;
 
 	w->height = 100;
 	w->width = 200;
@@ -204,26 +244,25 @@ static void spawn_program(char *progname) {
 
 	// spawn the program
 	const char *argv[] = {progname, NULL};
-	int pid = spawn_not_runnable(progname, argv);
+	w->pid = spawn_not_runnable(progname, argv);
 
-	if (pid < 0)
-		panic("spawn_program: '%s' - %e", progname, pid);
+	if (w->pid < 0)
+		panic("spawn_program: '%s' - %e", progname, w->pid);
 
 	// share the raw canvas memory with the child
 	for (offset = 0; offset < w->canvas->size; offset += PGSIZE) {
 		void *addr = ((void *) w->canvas->raw_pixels) + offset;
-		if ((r = sys_page_map(0, addr, pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
+		if ((r = sys_page_map(0, addr, w->pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
 			panic("spawn_program sys_page_map: %e", r);
 	}
 
 	// start the program
-	if (sys_env_set_status(pid, ENV_RUNNABLE) < 0)
+	if (sys_env_set_status(w->pid, ENV_RUNNABLE) < 0)
 		panic("spawn_program sys_env_set_status");
 
 	// send the canvas struct to the child
 	memcpy(SHARE_PAGE, w->canvas, sizeof(Canvas));
-	ipc_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U | PTE_W);
-	
+	ipc_send(w->pid, 0, SHARE_PAGE, PTE_P | PTE_U | PTE_W);
 }
 
 static void draw_window(Window *w) {
@@ -235,7 +274,7 @@ static void draw_window(Window *w) {
 	for (x = 0; x < c->width; x++) {
 		for (y = 0; y < c->height; y++) {
 			Pixel p = c->raw_pixels[y*c->width + x];
-			do_draw_pixel(w->xpos + x, w->ypos + y, p);
+			do_draw_pixel(w->x_pos + x, w->y_pos + y, p);
 		}
 	}
 
@@ -244,8 +283,49 @@ static void draw_window(Window *w) {
 static void draw_windows() {
 	Window *w;
 	for (w = windows_list; w; w = w->next) {
-		cprintf("drawing window 0x%x\n", w);
 		draw_window(w);
+	}
+}
+
+static void transmit_events() {
+	struct graphics_event *ev = events_queue, *prev = NULL, *next;
+	int r;
+
+	while (ev) {
+		next = ev->next;
+		
+		// try to transmit the event
+		memcpy(SHARE_PAGE, ev, sizeof(struct graphics_event));
+		r = sys_ipc_try_send(ev->recipient, 0, SHARE_PAGE, PTE_P | PTE_U);
+
+		if (!r) {
+			// we sent the event, so remove it from the queue
+			goto remove_event;
+		}
+		else if (r == -E_IPC_NOT_RECV) {
+			// that's okay, try again later
+		}
+		else if (r == -E_BAD_ENV) {
+			cprintf("giving up on event because 0x%x is dead\n", ev->recipient);
+		}
+		else {
+			cprintf("unexpected error in transmit_events: %e\n", r);
+		}
+		
+		goto cont;
+
+remove_event:
+		if (ev == events_queue)
+			events_queue = next;
+		else if (prev) {
+			prev->next = next;
+		} 
+		free(ev);
+		ev = NULL;
+
+cont:
+		prev = ev;
+		ev = next;
 	}
 }
 
@@ -264,6 +344,9 @@ void umain(int argc, char **argv) {
 	spawn_program("testcanvas");
 
 	while (1) {
+
+		transmit_events();
+
 		if (!process_events())
 			continue;
 

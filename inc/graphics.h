@@ -27,4 +27,21 @@ typedef struct canvas {
 
 Canvas *canvas;
 
+enum event_types {
+	EVENT_MOUSE_CLICK = 0,
+};
+
+struct event_mouse_click {
+	int x, y;
+};
+
+struct graphics_event {
+	enum event_types type;
+	union {
+		struct event_mouse_click emc;
+	} d;
+	int recipient;
+	struct graphics_event *next;
+};
+
 #endif
