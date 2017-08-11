@@ -580,15 +580,11 @@ The client can make requests like:
 	- draw my canvas again
 	- terminate me
 
-So we really need to implement a pipe system next.
 
-........
 
-How will the pipe system work? It'll be like in Linux; you call sys_fork()
-which returns an fd. Writes to this fd can will store data in some internal
-buffer. Reads from this fd will return the previously-written data. If the
-pipe runs out of space, the write will block. If the pipe has no data, the
-read will block.
+..........
 
+Next we should write the display server. For now it will just spawn a simple
+program that does nothing.
 
 

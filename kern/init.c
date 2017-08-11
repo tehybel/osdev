@@ -92,7 +92,7 @@ static void enable_v86() {
 static void start_environments() {
 
 	if (have_graphics) {
-		ENV_CREATE(user_testgraphics, ENV_TYPE_GRAPHICS);
+		ENV_CREATE(graphics_displayserver, ENV_TYPE_GRAPHICS);
 	}
 
 	// file system process
