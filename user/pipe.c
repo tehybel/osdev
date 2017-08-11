@@ -3,23 +3,39 @@
 void
 umain(int argc, char **argv)
 {
-	envid_t who;
+	binaryname = "pipe";
 
-	if ((who = fork()) != 0) {
-		// get the ball rolling
-		cprintf("send 0 from %x to %x\n", sys_getenvid(), who);
-		ipc_send(who, 0, 0, 0);
+	cprintf("got spawned.\n");
+
+	char *data = "hello, world!";
+	int fds[2] = {0};
+
+	int r = pipe(fds);
+
+	if (r) {
+		panic("pipe failed: %e\n", r);
 	}
+	cprintf("forking\n");
 
-	while (1) {
-		uint32_t i = ipc_recv(&who, 0, 0);
-		cprintf("%x got %d from %x\n", sys_getenvid(), i, who);
-		if (i == 10)
-			return;
-		i++;
-		ipc_send(who, i, 0, 0);
-		if (i == 10)
-			return;
+	r = fork();
+	if (r < 0)
+		panic("fork failed\n");
+
+	if (r) {
+		cprintf("writing to fd..\n");
+		write(fds[1], data, strlen(data) + 1); 
+		cprintf("OK, wrote.\n");
+	}
+	else {
+		char buf[32];
+		int nb = read(fds[0], buf, sizeof(buf));
+
+		if (nb) {
+			cprintf("got: '%s'\n", buf);
+		} 
+		else {
+			cprintf("read failed\n");
+		}
 	}
 
 }

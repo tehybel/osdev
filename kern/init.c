@@ -91,11 +91,9 @@ static void enable_v86() {
 
 static void start_environments() {
 
-	/*
 	if (have_graphics) {
 		ENV_CREATE(user_testgraphics, ENV_TYPE_GRAPHICS);
 	}
-	*/
 
 	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
