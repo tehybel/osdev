@@ -17,6 +17,9 @@ int cursor_x, cursor_y;
 
 struct io_event events[NUM_EVENTS];
 
+// used to share values with child processes
+#define SHARE_PAGE (CANVAS_BASE - PGSIZE)
+
 Window * windows_list = NULL;
 
 
@@ -52,13 +55,7 @@ static void init_zbuffer() {
 	zbuffer = (uint32_t *) ZBUFFER_BASE;
 }
 
-static int color(int r, int g, int b) {
-	return 	((r & 0xff) << 16) | 
-			((g & 0xff) << 8 ) | 
-			((b & 0xff) << 0 );
-}
-
-static inline void draw_pixel(const int x, const int y, const int color) {
+static inline void do_draw_pixel(const int x, const int y, const int color) {
 	// For 32-bit modes, each pixel value is 0x00RRGGBB in little endian
 
 	if (x < 0 || y < 0 || x >= width || y >= height) {
@@ -85,7 +82,7 @@ static void draw_rectangle(const int x1, const int y1,
 	int x, y;
 	for (x = x1; x < x2; x++) {
 		for (y = y1; y < y2; y++) {
-			// we inline draw_pixel here for speed
+			// we inline do_draw_pixel here for speed
 			uint32_t *p = (uint32_t *) zbuffer;
 			p[times*y  + x] = color;
 		}
@@ -142,12 +139,14 @@ static int process_events() {
 
 static Canvas *alloc_canvas(Window *w) {
 	size_t offset;
-	static void *canvas_mem = (void *) 0x30000000;
+	static void *canvas_mem = CANVAS_BASE;
 
 	Canvas *c = calloc(1, sizeof(Canvas));
 	if (!c) panic("alloc_canvas");
 
 	c->size = w->height * w->width * (bpp/8);
+	c->height = w->height;
+	c->width = w->width;
 	c->raw_pixels = canvas_mem;
 
 	// allocate all the pages consecutively
@@ -164,8 +163,8 @@ Window * alloc_window() {
 	Window *w = malloc(sizeof(Window));
 	if (!w) panic("alloc_window");
 
-	w->xpos = 0;
-	w->ypos = 0;
+	w->xpos = 10;
+	w->ypos = 10;
 
 	w->height = 100;
 	w->width = 200;
@@ -210,10 +209,10 @@ static void spawn_program(char *progname) {
 	if (pid < 0)
 		panic("spawn_program: '%s' - %e", progname, pid);
 
-	// share the canvas with the child
+	// share the raw canvas memory with the child
 	for (offset = 0; offset < w->canvas->size; offset += PGSIZE) {
-		void *addr = w->canvas->raw_pixels + offset;
-		if ((r = sys_page_map(0, addr, pid, CANVAS_BASE, PTE_U | PTE_P | PTE_W)))
+		void *addr = ((void *) w->canvas->raw_pixels) + offset;
+		if ((r = sys_page_map(0, addr, pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
 			panic("spawn_program sys_page_map: %e", r);
 	}
 
@@ -221,27 +220,43 @@ static void spawn_program(char *progname) {
 	if (sys_env_set_status(pid, ENV_RUNNABLE) < 0)
 		panic("spawn_program sys_env_set_status");
 
-	// send the canvas size to the child
-	ipc_send(pid, w->canvas->size, NULL, 0);
+	// send the canvas struct to the child
+	memcpy(SHARE_PAGE, w->canvas, sizeof(Canvas));
+	ipc_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U | PTE_W);
 	
 }
 
 static void draw_window(Window *w) {
-	
-	// not implemented yet
+	int x, y;
+
+	Canvas *c = w->canvas;
+
+	// for now, just draw the canvas, no border/buttons/etc
+	for (x = 0; x < c->width; x++) {
+		for (y = 0; y < c->height; y++) {
+			Pixel p = c->raw_pixels[y*c->width + x];
+			do_draw_pixel(w->xpos + x, w->ypos + y, p);
+		}
+	}
 
 }
 
 static void draw_windows() {
 	Window *w;
 	for (w = windows_list; w; w = w->next) {
+		cprintf("drawing window 0x%x\n", w);
 		draw_window(w);
 	}
 }
 
 void umain(int argc, char **argv) {
+	int r;
 
 	cprintf("graphics environment started!\n");
+	binaryname = "displayserver";
+
+	if ((r = sys_page_alloc(0, SHARE_PAGE, PTE_U | PTE_P | PTE_W)))
+		panic("sys_page_alloc: %e", r);
 
 	init_lfb();
 	init_zbuffer();

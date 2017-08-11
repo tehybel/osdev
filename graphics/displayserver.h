@@ -8,13 +8,6 @@
 
 #define CURSOR_SIZE 20
 
-#define RED(color)   (((color)>>16) & 0xff)
-#define GREEN(color) (((color)>> 8) & 0xff)
-#define BLUE(color)  (((color)>> 0) & 0xff)
-
-#define COLOR_WHITE color(0xff, 0xff, 0xff)
-
-
 typedef struct window {
 	int height, width;
 	int xpos, ypos;
