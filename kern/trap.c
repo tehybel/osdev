@@ -325,11 +325,6 @@ trap(struct Trapframe *tf)
 
 	bool trapped_from_kernel = (tf->tf_cs & 3) != 3 || tf->tf_cs == GD_KT;
 
-	assert (curenv);
-	if (curenv->in_v86_mode) {
-		trapped_from_kernel = false;
-	}
-
 	// Re-acquire the big kernel lock if we were halted in
 	// sched_yield()
 	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED) {
@@ -351,6 +346,7 @@ trap(struct Trapframe *tf)
 		// This happens when process A kills process B, and they are running
 		// on different CPUs; then process A just marks B as dying, and we
 		// only notice now that B has trapped.
+		assert (curenv);
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);
 			curenv = NULL;

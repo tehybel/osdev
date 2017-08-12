@@ -32,6 +32,7 @@ static void process_event(struct graphics_event *ev) {
 static void event_loop() {
 	while (1) {
 		cprintf("before: %dx%d\n", canvas->width, canvas->height);
+		asm volatile("int3");
 		ipc_recv(NULL, SHARE_PAGE, NULL);
 		cprintf("after:  %dx%d\n", canvas->width, canvas->height);
 		struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
