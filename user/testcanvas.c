@@ -12,19 +12,27 @@ static void color_canvas() {
 	}
 }
 
+static void draw_square(int x, int y, int side_length) {
+	int i;
+	for (i = 0; i < side_length; i++) {
+		draw_pixel(x + i, y, COLOR_LIME);
+		draw_pixel(x + i, y + side_length, COLOR_LIME);
+		draw_pixel(x, y + i, COLOR_LIME);
+		draw_pixel(x + side_length, y + i, COLOR_LIME);
+	}
+}
+
 static void process_event(struct graphics_event *ev) {
-	cprintf("got an event: 0x%x\n", ev);
+
+	if (ev->type == EVENT_MOUSE_CLICK) {
+		draw_square(ev->d.emc.x, ev->d.emc.y, 20);
+	}
 }
 
 // continuously receive events from the display server and process them
 static void event_loop() {
-	int r;
-	if ((r = sys_page_alloc(0, SHARE_PAGE, PTE_U | PTE_P | PTE_W)))
-		panic("event_loop sys_page_alloc: %e", r);
-
 	while (1) {
 		ipc_recv(NULL, SHARE_PAGE, NULL);
-
 		struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
 		process_event(ev);
 	}

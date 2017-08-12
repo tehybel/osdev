@@ -196,6 +196,9 @@ static Canvas *alloc_canvas(Window *w) {
 		canvas_mem += PGSIZE;
 	}
 
+	assert (c->width != 0);
+	assert (c->height != 0);
+
 	return c;
 }
 
@@ -206,8 +209,8 @@ Window * alloc_window() {
 	w->x_pos = 10;
 	w->y_pos = 10;
 
-	w->height = 100;
-	w->width = 200;
+	w->height = 500;
+	w->width = 800;
 
 	w->next = NULL;
 
