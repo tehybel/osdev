@@ -24,8 +24,6 @@ inline int color(int r, int g, int b) {
 
 void draw_pixel(const int x, const int y, const int color) {
 	if (x < 0 || y < 0 || x >= canvas->width || y >= canvas->height) {
-		cprintf("invalid: (x, y) = (%d, %d)\n", x, y);
-		cprintf("canvas is %d x %d\n", canvas->width, canvas->height);
 		return;
 	}
 

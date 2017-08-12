@@ -567,6 +567,27 @@ env_pop_tf(struct Trapframe *tf)
 	panic("iret failed");  /* mostly to placate the compiler */
 }
 
+
+#define ENABLE_SLOW_CHECKS 1
+
+static void sanity_check_env(struct Env *e) {
+	int i;
+
+	if (!ENABLE_SLOW_CHECKS)
+		return;
+	
+	// a process should not use the kernel pgdir.
+	assert (e->env_pgdir != kern_pgdir);
+
+	// a process should not share a pgdir with another process
+	for (i = 0; i < NENV; i++) {
+		struct Env *other = &envs[i];
+		if (other == e)
+			continue;
+		assert (other->env_pgdir != e->env_pgdir);
+	}
+}
+
 //
 // Context switch from curenv to env.
 //
@@ -592,6 +613,8 @@ env_run(struct Env *new)
 	curenv = new;
 	new->env_status = ENV_RUNNING;
 	new->env_runs++;
+
+	sanity_check_env(new);
 
 	// unlock the big kernel lock before context switching to userland
 	unlock_kernel();

@@ -23,7 +23,6 @@ static void draw_square(int x, int y, int side_length) {
 }
 
 static void process_event(struct graphics_event *ev) {
-
 	if (ev->type == EVENT_MOUSE_CLICK) {
 		draw_square(ev->d.emc.x, ev->d.emc.y, 20);
 	}
