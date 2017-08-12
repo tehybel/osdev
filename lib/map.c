@@ -33,7 +33,7 @@ void print_process_mappings() {
 				cprintf("rC ");
 			else
 				cprintf("r- ");
-			cprintf("\n");
+			cprintf(" -> pa 0x%x\n", PTE_ADDR(pte));
 		}
 	}
 

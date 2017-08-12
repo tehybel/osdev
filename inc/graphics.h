@@ -25,7 +25,7 @@ typedef struct canvas {
 	Pixel *raw_pixels;
 } Canvas;
 
-Canvas *canvas;
+Canvas canvas;
 
 enum event_types {
 	EVENT_MOUSE_CLICK = 0,

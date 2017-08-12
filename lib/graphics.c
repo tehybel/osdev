@@ -7,15 +7,19 @@
  */
 void init_graphics() {
 	// receive the canvas from the display server
-	canvas = CANVAS_BASE - PGSIZE;
-	ipc_recv(NULL, canvas, NULL);
+	Canvas *tmp = CANVAS_BASE - PGSIZE;
+	ipc_recv(NULL, tmp, NULL);
 
-	canvas->raw_pixels = CANVAS_BASE;
+	// immediately move the canvas into the global variable, so that the
+	// IPC-shared page will never get messed with by others
+	canvas = *tmp;
 
-	assert (canvas->width != 0);
-	assert (canvas->height != 0);
+	canvas.raw_pixels = CANVAS_BASE;
 
-	cprintf("init_graphics got the canvas size: %d\n", canvas->size);
+	assert (canvas.width != 0);
+	assert (canvas.height != 0);
+
+	cprintf("init_graphics got the canvas size: %d\n", canvas.size);
 }
 
 inline int color(int r, int g, int b) {
@@ -23,9 +27,9 @@ inline int color(int r, int g, int b) {
 }
 
 void draw_pixel(const int x, const int y, const int color) {
-	if (x < 0 || y < 0 || x >= canvas->width || y >= canvas->height) {
+	if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
 		return;
 	}
 
-	canvas->raw_pixels[canvas->width*y + x] = color;
+	canvas.raw_pixels[canvas.width*y + x] = color;
 }
