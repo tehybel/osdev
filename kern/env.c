@@ -570,7 +570,7 @@ env_pop_tf(struct Trapframe *tf)
 }
 
 
-#define ENABLE_SLOW_CHECKS 1
+#define ENABLE_SLOW_CHECKS 0
 
 static void sanity_check_env(struct Env *e) {
 	int i;

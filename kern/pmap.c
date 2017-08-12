@@ -137,7 +137,7 @@ bool boot_alloc_should_not_be_called;
 static void *
 boot_alloc(uint32_t n)
 {
-	static char *nextfree;	// virtual address of next byte of free memory
+	static char *nextfree = NULL;	// virtual address of next byte of free memory
 	char *result;
 
 	// Initialize nextfree if this is the first time.
@@ -148,6 +148,7 @@ boot_alloc(uint32_t n)
 	if (!nextfree) {
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
+		cprintf("boot_alloc is allocating memory starting from 0x%x\n", nextfree);
 	}
 
 	// nextfree should always stay page aligned
@@ -162,11 +163,16 @@ boot_alloc(uint32_t n)
 	// Allocate a chunk large enough to hold 'n' bytes, then update
 	// nextfree.  Make sure nextfree is kept aligned
 	// to a multiple of PGSIZE.
+
 	result = nextfree;
 	nextfree += ROUNDUP(n, PGSIZE);
 
-	// todo: is this the right way to check for oom conditions?
+	// this weird constant comes from kern/entrypgdir.c where we set up the
+	// early page table such that we can access only the first 0x400000 bytes
 	if (nextfree >= (char *) 0xf0400000) {
+		// if this suddenly starts to happen, it's probably because the kernel
+		// image grew so large that very little space remains behind its bss
+		// section.
 		panic("boot_alloc ran out of memory!");
 	}
 

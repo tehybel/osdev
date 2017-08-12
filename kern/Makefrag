@@ -50,52 +50,21 @@ KERN_SRCFILES += kern/e1000.c \
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
 # Binary program images to embed within the kernel.
-# Binary files for LAB3
-KERN_BINFILES :=	user/hello \
-			user/buggyhello \
-			user/buggyhello2 \
-			user/evilhello \
-			user/testbss \
-			user/divzero \
-			user/breakpoint \
-			user/softint \
-			user/badsegment \
-			user/faultread \
-			user/faultreadkernel \
-			user/faultwrite \
-			user/faultwritekernel
-
-# Binary files for LAB4
+# An entry here is required to run a program via "qemu run-MYPROG"
+KERN_BINFILES :=	user/hello
 KERN_BINFILES +=	user/idle \
-			user/yield \
-			user/dumbfork \
-			user/stresssched \
-			user/faultdie \
-			user/faultregs \
-			user/faultalloc \
-			user/faultallocbad \
-			user/faultnostack \
-			user/faultbadhandler \
-			user/faultevilhandler \
-			user/forktree \
-			user/myfork \
-			user/sendpage \
 			user/spin \
 			user/fairness \
 			user/pingpong \
 			user/pipe \
 			user/pingpongs \
 			user/primes
-
-# Binary files for LAB5
 KERN_BINFILES +=	user/faultio\
-	      		user/spawnfaultio\
-	      		user/testfile \
+			user/spawnfaultio\
+			user/testfile \
 			user/spawnhello \
 			user/icode \
 			fs/fs
-
-# Binary files for LAB6
 KERN_BINFILES +=	user/testtime \
 			user/httpd \
 			user/echosrv \
@@ -103,18 +72,11 @@ KERN_BINFILES +=	user/testtime \
 			net/testoutput \
 			net/testinput \
 			net/ns
-
-# Binary files for LAB5
 KERN_BINFILES +=	user/testpteshare \
-			user/testfdsharing \
-			user/testpipe \
-			user/testpiperace \
-			user/testpiperace2 \
-			user/primespipe \
 			user/testkbd \
+			user/myipc \
 			user/testshell
 
-# Binary files for graphics
 KERN_BINFILES += user/videomode
 KERN_BINFILES += graphics/displayserver
 
