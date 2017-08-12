@@ -58,6 +58,7 @@ sys_env_destroy(envid_t envid)
 
 	if ((r = envid2env(envid, &e, 1)) < 0)
 		return r;
+
 	env_destroy(e);
 	return 0;
 }

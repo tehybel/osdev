@@ -190,7 +190,12 @@ env_setup_vm(struct Env *env)
 	// 
 	// This means that userland programs can access kernel space. We need a
 	// way to prevent this, perhaps with segmentation (GD_UD etc.)? TODO.
-	for (i = 0; i < NPDENTRIES; i++) {
+	// 
+	// Actually we must be careful only to copy the part above UTOP. Otherwise
+	// we'll accidentally map some pages into our address space which
+	// shouldn't be there. They would then wrongly get freed once a process
+	// exits.
+	for (i = PDX(UTOP); i < NPDENTRIES; i++) {
 		pde_t pde  = kern_pgdir[i];
 		if (!(pde & PTE_P))
 			continue;
@@ -481,9 +486,6 @@ env_free(struct Env *e)
 	// gets reused.
 	if (e == curenv)
 		lcr3(PADDR(kern_pgdir));
-
-	// Note the environment's demise.
-	// cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
 	// Flush all mapped pages in the user portion of the address space
 	static_assert(UTOP % PTSIZE == 0);

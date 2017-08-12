@@ -305,7 +305,7 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 	// if we get an unhandled trap in kernel land, panic
 	if (trapped_from_kernel)
 		panic("trap in kernel mode");
-
+	
 	// if we get an unhandled trap in user land, terminate the environment
 	env_destroy(curenv);
 }

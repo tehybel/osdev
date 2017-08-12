@@ -487,8 +487,9 @@ page_decref(struct PageInfo* pinfo)
 void page_incref(struct PageInfo* pinfo) {
 	assert (pinfo >= pages && pinfo <= &pages[npages]);
 
-	if (++pinfo->pp_ref >= MAGIC2) 
+	if (++pinfo->pp_ref >= MAGIC2) {
 		panic("page_incref overflow: 0x%x", pinfo);
+	}
 }
 
 // Given 'pgdir', a pointer to a page directory, pgdir_walk returns
