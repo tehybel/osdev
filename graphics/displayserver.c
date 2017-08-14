@@ -409,7 +409,7 @@ void umain(int argc, char **argv) {
 	init_lfb();
 	init_zbuffer();
 
-	spawn_program("testcanvas");
+	spawn_program("paint");
 
 	while (1) {
 
