@@ -3,6 +3,7 @@
 
 for the graphics subsystem:
 
+- in testcanvas.c, mouse clicks which draw squares are a little bit off
 - 
 
 
@@ -10,9 +11,5 @@ for the graphics subsystem:
 
 other stuff:
 
-
-- when run in -nox mode, the system just freezes
-- make a switch that can prevent graphics from being enabled
 - make the project run with higher optimization levels
-
-- write a proper subsystem with unit tests
+- write a proper subsystem for unit testing
