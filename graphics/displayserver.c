@@ -7,7 +7,9 @@
 uint32_t *lfb;
 uint32_t *zbuffer;
 
+// size of the LFB *in bytes*
 size_t lfb_size;
+
 size_t pitch;
 size_t width;
 size_t height;
@@ -94,7 +96,9 @@ static inline void do_draw_pixel(const int x, const int y, const int color) {
 	// if bpp isn't 32, we can't use a uint32_t*.
 	assert (bpp == 32);
 	uint32_t *p = (uint32_t *) zbuffer;
-	p[y*((width+pitch)/4)  + x] = color;
+
+	if (p[y*((width+pitch)/4) + x] != color)
+		p[y*((width+pitch)/4) + x] = color;
 }
 
 /* draws a rectangle from upper left corner (x1, y1) to lower right corner
@@ -109,17 +113,39 @@ static void draw_rectangle(const int x1, const int y1,
 	int times = (width + pitch)/4;
 
 	int x, y;
-	for (x = x1; x < x2; x++) {
-		for (y = y1; y < y2; y++) {
+	for (y = y1; y < y2; y++) {
+		int tmp = times*y;
+		for (x = x1; x < x2; x++) {
 			// we inline do_draw_pixel here for speed
 			uint32_t *p = (uint32_t *) zbuffer;
-			p[times*y  + x] = color;
+			int index = tmp + x;
+
+			if (p[index] != color)
+				p[index] = color;
 		}
 	}
 }
 
+/*
+	Walk over the zbuffer, checking if each byte was changed by comparing to
+	the LFB. If a byte was changed, update it.
+
+	We do this in a somewhat complicated way for performance; the efficiency
+	of this function is critical for the frame rate of our graphics.
+*/
 static void refresh_screen() {
-	memcpy(lfb, zbuffer, lfb_size);
+	int x, y, index, tmp;
+	Pixel p;
+		
+	for (y = 0; y < height; y++) {
+		tmp = y*((width+pitch)>>2);
+		for (x = 0; x < width; x++) {
+			index = tmp + x;
+			p = zbuffer[index];
+			if (lfb[index] != p)
+				lfb[index] = p;
+		}
+	}
 }
 
 static void draw_background() {
@@ -236,8 +262,8 @@ Window * alloc_window() {
 	w->x_pos = 10;
 	w->y_pos = 10;
 
-	w->height = 500;
-	w->width = 800;
+	w->height = 300;
+	w->width = 500;
 
 	w->next = NULL;
 
@@ -294,19 +320,36 @@ static void spawn_program(char *progname) {
 	share(w->pid, w->canvas, sizeof(Canvas));
 }
 
+// this code looks complicated because it's hand-optimized since it's
+// performance-critical. It should run fast even on -O0.
 static void draw_window(Window *w) {
 	int x, y;
+	int wx = w->x_pos, wy = w->y_pos;
 
 	Canvas *c = w->canvas;
+	Pixel *pixels = c->raw_pixels;
+
+	size_t c_height = c->height;
+	size_t c_width = c->width;
+
 
 	// for now, just draw the canvas, no border/buttons/etc
-	for (x = 0; x < c->width; x++) {
-		for (y = 0; y < c->height; y++) {
-			Pixel p = c->raw_pixels[y*c->width + x];
-			do_draw_pixel(w->x_pos + x, w->y_pos + y, p);
+
+	int tmp = ((width+pitch)>>2);
+	for (y = 0; y < c_height; y++) {
+		// these ugly variables are here since we manually lift computations
+		// outside of the inner loop when possible
+		int tmp2 = (y + wy)*tmp;
+		int tmp3 = y*c_width;
+		for (x = 0; x < c_width; x++) {
+			int index = tmp2 + x + wx;
+			Pixel p = pixels[tmp3 + x];
+			
+			// inline do_draw_pixel for speed
+			if (zbuffer[index] != p)
+				zbuffer[index] = p;
 		}
 	}
-
 }
 
 static void draw_windows() {
@@ -375,10 +418,10 @@ void umain(int argc, char **argv) {
 		if (!process_events())
 			continue;
 
-		draw_background(); // slow
+		draw_background();
 		draw_windows();
 		draw_cursor();
-		refresh_screen(); // slow
+		refresh_screen();
 	}
 
 }

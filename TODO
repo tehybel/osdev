@@ -11,8 +11,8 @@ for the graphics subsystem:
 other stuff:
 
 
-- make update rate of graphics faster; currently moving the mouse is laggy
 - when run in -nox mode, the system just freezes
 - make a switch that can prevent graphics from being enabled
+- make the project run with higher optimization levels
 
 - write a proper subsystem with unit tests
