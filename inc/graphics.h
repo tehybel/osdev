@@ -11,6 +11,7 @@
 #define BLUE(color)  (((color)>> 0) & 0xff)
 
 #define COLOR_WHITE 	color (0xff, 0xff, 0xff)
+#define COLOR_BLACK 	color (0, 0, 0)
 #define COLOR_CYAN 		color (0,255,255)
 #define COLOR_YELLOW	color (255,255,0)
 #define COLOR_CRIMSON	color (220,20,60)
@@ -48,9 +49,22 @@ struct graphics_event {
 	struct graphics_event *next;
 };
 
+typedef struct font {
+	char *name;
+	size_t width, height;
+	const unsigned char *data;
+} Font;
+
+
+
+// globals
+
+Font *font_10x18;
+
 
 
 // function declarations
+
 
 void init_graphics();
 void draw_pixel(const int x, const int y, const int color);
@@ -58,5 +72,6 @@ int color(int r, int g, int b);
 void draw_square(int x, int y, int side_length);
 void color_canvas(int col);
 void event_loop(void (*process_event)(struct graphics_event *));
+void draw_text(char *text, int x, int y, int col, Font *font);
 
 #endif

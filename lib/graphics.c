@@ -1,6 +1,10 @@
 #include <inc/lib.h>
 #include <inc/graphics.h>
+#include <lib/font_10x18.c>
 
+static void init_fonts() {
+	font_10x18 = &_font_10x18;
+}
 
 /* 
  * any program which uses graphics must call this function first
@@ -19,7 +23,7 @@ void init_graphics() {
 	assert (canvas.width != 0);
 	assert (canvas.height != 0);
 
-	cprintf("init_graphics got the canvas size: %d\n", canvas.size);
+	init_fonts();
 }
 
 inline int color(int r, int g, int b) {
@@ -62,3 +66,29 @@ void draw_square(int x, int y, int side_length) {
 		draw_pixel(x + side_length, y + i, COLOR_LIME);
 	}
 }
+
+static void draw_char(unsigned char ch, int begin_x, int begin_y, int col, Font *font) {
+	int x, y;
+
+	for (y = 0; y < font->height; y++) {
+		int index = 2 * (ch * font->height + y);
+		// the font is packed in a weird way..
+		int value = (font->data[index] << 8) | (font->data[index+1]);
+		value >>= (16 - font->width);
+		for (x = 0; x < font->width; x++) {
+			int should_draw_pixel = value & (1 << (font->width - 1 - x));
+			if (should_draw_pixel)
+				draw_pixel(begin_x + x, begin_y + y, col);
+		}
+	}
+}
+
+void draw_text(char *text, int x, int y, int col, Font *font) {
+	int i;
+	for (i = 0; i < strlen(text); i++) {
+		draw_char(text[i], x, y, col, font);
+		x += font->width;
+	}
+}
+
+

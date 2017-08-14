@@ -6,6 +6,10 @@
  * by Jurriaan Kalkman 06-2005  *
  ********************************/
 
+#include <inc/graphics.h>
+
+#define FONTDATAMAX 9216
+
 static const unsigned char fontdata_10x18[FONTDATAMAX] = {
 
 	/* 0 0x00 '^@' */
@@ -5130,16 +5134,9 @@ static const unsigned char fontdata_10x18[FONTDATAMAX] = {
 
 };
 
-
-const struct font_desc font_10x18 = {
-	.idx	= FONT10x18_IDX,
+Font _font_10x18 = {
 	.name	= "10x18",
 	.width	= 10,
 	.height	= 18,
 	.data	= fontdata_10x18,
-#ifdef __sparc__
-	.pref	= 5,
-#else
-	.pref	= -1,
-#endif
 };
