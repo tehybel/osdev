@@ -255,15 +255,15 @@ static Canvas *alloc_canvas(Window *w) {
 	return c;
 }
 
-Window * alloc_window() {
+Window * alloc_window(int x, int y, int height, int width) {
 	Window *w = malloc(sizeof(Window));
 	if (!w) panic("alloc_window");
 
-	w->x_pos = 10;
-	w->y_pos = 10;
+	w->x_pos = x;
+	w->y_pos = y;
 
-	w->height = 300;
-	w->width = 500;
+	w->height = height;
+	w->width = width;
 
 	w->next = NULL;
 
@@ -287,11 +287,11 @@ static void mark_shared (void *mem, size_t size) {
 	mark_perm(mem, size, PTE_U | PTE_P | PTE_W | PTE_SHARE);
 }
 
-static void spawn_program(char *progname) {
+static void spawn_program(char *progname, int x, int y, int height, int width) {
 	size_t offset;
 	int r;
 
-	Window *w = alloc_window();
+	Window *w = alloc_window(x, y, height, width);
 
 	// add it to the list
 	w->next = windows_list;
@@ -409,7 +409,7 @@ void umain(int argc, char **argv) {
 	init_lfb();
 	init_zbuffer();
 
-	spawn_program("paint");
+	spawn_program("paint", 10, 10, 300, 500);
 
 	while (1) {
 
