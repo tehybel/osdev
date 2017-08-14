@@ -56,6 +56,8 @@ KERN_BINFILES +=	user/idle \
 			user/spin \
 			user/fairness \
 			user/pingpong \
+			user/myfork \
+			user/forktree \
 			user/pipe \
 			user/pingpongs \
 			user/primes

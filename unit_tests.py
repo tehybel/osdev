@@ -6,16 +6,52 @@ import os, subprocess, select, time
 def test_hello(output):
 	return "hello, world" in output
 
+def test_spawnhello(o):
+	return "i am parent environment" in o and "hello, world" in o
 
+def test_pipe(o):
+	return all(s in o for s in [
+		"forking",
+		"writing to fd..",
+		"OK, wrote.",
+		"got: 'hello, world!'"
+	])
 
+def test_forktree(o):
+	return all(s in o for s in [
+		": I am '0'",
+		": I am '1'",
+		": I am '10'",
+		": I am '00'",
+		": I am '011'",
+		": I am '111'",
+	])
 
+def test_myfork(o):
+	return all(s in o for s in [
+		"I am the parent before A",
+		"I am the parent after A",
+		"I am A",
+		"I am the parent after B",
+		"I am B",
+	])
 
+def test_pingpong(o):
+	return all(s in o for s in 
+		[" got %d from " % i for i in range(11)])
 
-
+def test_myipc(o):
+	return "parent is OK" in o and "child is OK" in o
 
 tests_table = [
 	
+	("myipc", test_myipc),
 	("hello", test_hello),
+	("spawnhello", test_spawnhello),
+	("pipe", test_pipe),
+	("forktree", test_forktree),
+	("myfork", test_myfork),
+	("pingpong", test_pingpong),
 
 ]
 
@@ -91,6 +127,7 @@ def run_tests(tests):
 	print "%d tests failed" % failures
 
 def main():
+	os.system("killall qemu-system-i386 2>/dev/null")
 	run_tests(tests_table)
 
 if __name__ == "__main__":

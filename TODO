@@ -12,4 +12,7 @@ for the graphics subsystem:
 other stuff:
 
 - make the project run with higher optimization levels
-- write a proper subsystem for unit testing
+
+- improve unit testing framework to support i/o
+- add more unit tests
+
