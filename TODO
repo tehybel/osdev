@@ -4,6 +4,9 @@
 for the graphics subsystem:
 
 - in testcanvas.c, mouse clicks which draw squares are a little bit off
+- implement font rendering
+- write a terminal emulator
+- why does run-hello semi-freeze the cursor?
 - 
 
 
@@ -15,4 +18,6 @@ other stuff:
 
 - improve unit testing framework to support i/o
 - add more unit tests
+
+- grep for "TODO" for more
 

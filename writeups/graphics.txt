@@ -588,3 +588,23 @@ Next we should write the display server. For now it will just spawn a simple
 program that does nothing.
 
 
+...............
+
+
+I've got that working; the program testcanvas is spawned, which is a simply
+drawing program. Next we'll want fonts so that we can implement a terminal
+emulator.
+
+..............
+
+So.. fonts. What's a font file?
+
+From one of the links above: "For fonts, the Linux kernel's 8x8 and 4x6 fonts
+have been borrowed." Maybe we can do the same?
+
+Apparently some fonts are vector-based and can scale well, but we don't need
+that right now. We can just take a font file from the linux kernel and use it. 
+
+
+
+
