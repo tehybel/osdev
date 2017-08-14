@@ -4,8 +4,8 @@
 for the graphics subsystem:
 
 - make the windows look nicer, maybe add a border or such
-- in testcanvas.c, mouse clicks which draw squares are a little bit off
-- implement font rendering
+- in paint.c, mouse clicks which draw squares are a little bit off
+
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?
 - 
