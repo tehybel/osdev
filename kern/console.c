@@ -572,6 +572,10 @@ static void mouse_send_command(uint8_t command) {
 static void mouse_init() {
 	cursor.x = cursor.y = 0;
 	mouse_send_command(KBC_ENABLE);
+
+	// TODO: we might also want to set other settings, e.g. sample rate,
+	// scaling (?) etc. See this link for inspiration:
+	// https://github.com/leafi/because/blob/master/ps2.c
 }
 
 void init_io() {
