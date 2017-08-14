@@ -536,6 +536,14 @@ cons_putc(int c)
 	cga_putc(c);
 }
 
+// waits until the mouse is ready to handle more input
+static void wait() {
+	uint8_t stat;
+	do {
+		stat = inb(KBSTATP);
+	} while (stat & KBS_IBF);
+}
+
 static void mouse_send_command(uint8_t command) {
 	uint8_t stat;
 
@@ -545,13 +553,14 @@ static void mouse_send_command(uint8_t command) {
 	port 0x64, bit 1, before sending each output byte). Note: this 0xD4 byte
 	does not generate any ACK, from either the keyboard or mouse. 
 	*/
+	wait();
 	outb(KBCMDP, KBC_AUXWRITE);
+	wait();
+	outb(KBDATAP, command);
 
 	do {
 		stat = inb(KBSTATP);
 	} while (!(stat & KBS_DIB));
-
-	outb(KBDATAP, command);
 
 	do {
 		stat = inb(KBOUTP);
@@ -561,8 +570,8 @@ static void mouse_send_command(uint8_t command) {
 
 // initializes the PS/2 mouse
 static void mouse_init() {
-	mouse_send_command(KBC_ENABLE);
 	cursor.x = cursor.y = 0;
+	mouse_send_command(KBC_ENABLE);
 }
 
 void init_io() {
