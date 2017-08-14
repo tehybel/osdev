@@ -33,3 +33,32 @@ void draw_pixel(const int x, const int y, const int color) {
 
 	canvas.raw_pixels[canvas.width*y + x] = color;
 }
+
+// continuously receive events from the display server and process them
+void event_loop(void (*process_event)(struct graphics_event *)) {
+	while (1) {
+		ipc_recv(NULL, SHARE_PAGE, NULL);
+		struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
+		process_event(ev);
+	}
+}
+
+// just colors the whole canvas
+void color_canvas(int col) {
+	int x, y;
+	for (x = 0; x < canvas.width; x++) {
+		for (y = 0; y < canvas.height; y++) {
+			draw_pixel(x, y, col);
+		}
+	}
+}
+
+void draw_square(int x, int y, int side_length) {
+	int i;
+	for (i = 0; i < side_length; i++) {
+		draw_pixel(x + i, y, COLOR_LIME);
+		draw_pixel(x + i, y + side_length, COLOR_LIME);
+		draw_pixel(x, y + i, COLOR_LIME);
+		draw_pixel(x + side_length, y + i, COLOR_LIME);
+	}
+}

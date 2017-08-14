@@ -1,7 +1,10 @@
 #ifndef JOS_INC_LIBGRAPHICS_H
 #define JOS_INC_LIBGRAPHICS_H 1
 
+
 #define CANVAS_BASE ((void *) 0x30001000)
+#define SHARE_PAGE (CANVAS_BASE - PGSIZE*2)
+
 
 #define RED(color)   (((color)>>16) & 0xff)
 #define GREEN(color) (((color)>> 8) & 0xff)
@@ -13,9 +16,10 @@
 #define COLOR_CRIMSON	color (220,20,60)
 #define COLOR_LIME		color (50,205,50)
 
-void init_graphics();
-void draw_pixel(const int x, const int y, const int color);
-int color(int r, int g, int b);
+
+
+
+// types and structs
 
 typedef uint32_t Pixel;
 
@@ -43,5 +47,16 @@ struct graphics_event {
 	int recipient;
 	struct graphics_event *next;
 };
+
+
+
+// function declarations
+
+void init_graphics();
+void draw_pixel(const int x, const int y, const int color);
+int color(int r, int g, int b);
+void draw_square(int x, int y, int side_length);
+void color_canvas(int col);
+void event_loop(void (*process_event)(struct graphics_event *));
 
 #endif

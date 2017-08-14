@@ -20,7 +20,7 @@ int cursor_x, cursor_y;
 struct io_event events[NUM_EVENTS];
 
 // used to share values with child processes
-#define SHARE_PAGE (CANVAS_BASE - PGSIZE)
+#define D_SHARE_PAGE (CANVAS_BASE - PGSIZE)
 
 Application * applications_list = NULL;
 
@@ -28,28 +28,28 @@ struct graphics_event *events_queue = NULL;
 
 static void alloc_share_page() {
 	int r;
-	if ((r = sys_page_alloc(0, SHARE_PAGE, PTE_U | PTE_P | PTE_W)))
+	if ((r = sys_page_alloc(0, D_SHARE_PAGE, PTE_U | PTE_P | PTE_W)))
 		panic("sys_page_alloc: %e", r);
 }
 
 static void dealloc_share_page() {
-	if (sys_page_unmap(0, SHARE_PAGE))
+	if (sys_page_unmap(0, D_SHARE_PAGE))
 		panic("sys_page_unmap");
 }
 
-// shares some data via the SHARE_PAGE using IPC
+// shares some data via the D_SHARE_PAGE using IPC
 static void share(int pid, void *data, size_t size) {
 	alloc_share_page();
-	memcpy(SHARE_PAGE, data, size);
-	ipc_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U | PTE_W);
+	memcpy(D_SHARE_PAGE, data, size);
+	ipc_send(pid, 0, D_SHARE_PAGE, PTE_P | PTE_U | PTE_W);
 	dealloc_share_page();
 }
 
 static int try_share(int pid, void *data, size_t size) {
 	int r;
 	alloc_share_page();
-	memcpy(SHARE_PAGE, data, size);
-	r = sys_ipc_try_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U);
+	memcpy(D_SHARE_PAGE, data, size);
+	r = sys_ipc_try_send(pid, 0, D_SHARE_PAGE, PTE_P | PTE_U);
 	dealloc_share_page();
 	return r;
 }
@@ -405,6 +405,7 @@ void umain(int argc, char **argv) {
 	init_zbuffer();
 
 	spawn_program("paint", 10, 10, 300, 500);
+	spawn_program("font", 10, 400, 300, 500);
 
 	while (1) {
 
