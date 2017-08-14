@@ -22,7 +22,7 @@ struct io_event events[NUM_EVENTS];
 // used to share values with child processes
 #define SHARE_PAGE (CANVAS_BASE - PGSIZE)
 
-Window * windows_list = NULL;
+Application * applications_list = NULL;
 
 struct graphics_event *events_queue = NULL;
 
@@ -160,19 +160,19 @@ static void draw_cursor() {
 	draw_rectangle(x1, y1, x2, y2, COLOR_WHITE);
 }
 
-static Window *get_window_for_coordinate(int x, int y) {
-	Window *w;
-	for (w = windows_list; w; w = w->next) {
-		if (x < w->x_pos)
+static Application *get_app_for_coordinate(int x, int y) {
+	Application *app;
+	for (app = applications_list; app; app = app->next) {
+		if (x < app->window.x_pos)
 			continue;
-		if (y < w->y_pos)
+		if (y < app->window.y_pos)
 			continue;
-		if (x >= w->x_pos + w->width)
+		if (x >= app->window.x_pos + app->window.width)
 			continue;
-		if (y >= w->y_pos + w->height)
+		if (y >= app->window.y_pos + app->window.height)
 			continue;
 
-		return w;
+		return app;
 	}
 
 	return NULL;
@@ -184,7 +184,8 @@ static void add_event_to_queue(struct graphics_event *ev) {
 }
 
 static void handle_mouse_click(int button) {
-	Window *w = get_window_for_coordinate(cursor_x, cursor_y);
+	Application *app = get_app_for_coordinate(cursor_x, cursor_y);
+	Window *w = &app->window;
 	if (!w) return;
 
 	struct graphics_event *ev = calloc(1, sizeof(struct graphics_event));
@@ -193,7 +194,7 @@ static void handle_mouse_click(int button) {
 	ev->type = EVENT_MOUSE_CLICK;
 	ev->d.emc.x = cursor_x;
 	ev->d.emc.y = cursor_y;
-	ev->recipient = w->pid;
+	ev->recipient = app->pid;
 
 	add_event_to_queue(ev);
 }
@@ -255,21 +256,14 @@ static Canvas *alloc_canvas(Window *w) {
 	return c;
 }
 
-Window * alloc_window(int x, int y, int height, int width) {
-	Window *w = malloc(sizeof(Window));
-	if (!w) panic("alloc_window");
-
+static void init_window(Window *w, int x, int y, int height, int width) {
 	w->x_pos = x;
 	w->y_pos = y;
 
 	w->height = height;
 	w->width = width;
 
-	w->next = NULL;
-
 	w->canvas = alloc_canvas(w);
-
-	return w;
 }
 
 static void mark_perm (void *mem, size_t size, int perm) {
@@ -291,33 +285,34 @@ static void spawn_program(char *progname, int x, int y, int height, int width) {
 	size_t offset;
 	int r;
 
-	Window *w = alloc_window(x, y, height, width);
+	Application *app = calloc(1, sizeof(Application));
+	Window *w = &app->window;
+	init_window(w, x, y, height, width);
 
 	// add it to the list
-	w->next = windows_list;
-	windows_list = w;
-
+	app->next = applications_list;
+	applications_list = app;
 
 	// spawn the program
 	const char *argv[] = {progname, NULL};
-	w->pid = spawn_not_runnable(progname, argv);
+	app->pid = spawn_not_runnable(progname, argv);
 
-	if (w->pid < 0)
-		panic("spawn_program: '%s' - %e", progname, w->pid);
+	if (app->pid < 0)
+		panic("spawn_program: '%s' - %e", progname, app->pid);
 
 	// share the raw canvas memory with the child
 	for (offset = 0; offset < w->canvas->size; offset += PGSIZE) {
 		void *addr = ((void *) w->canvas->raw_pixels) + offset;
-		if ((r = sys_page_map(0, addr, w->pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
+		if ((r = sys_page_map(0, addr, app->pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
 			panic("spawn_program sys_page_map: %e", r);
 	}
 
 	// start the program
-	if (sys_env_set_status(w->pid, ENV_RUNNABLE) < 0)
+	if (sys_env_set_status(app->pid, ENV_RUNNABLE) < 0)
 		panic("spawn_program sys_env_set_status");
 
 	// send the canvas struct to the child
-	share(w->pid, w->canvas, sizeof(Canvas));
+	share(app->pid, w->canvas, sizeof(Canvas));
 }
 
 // this code looks complicated because it's hand-optimized since it's
@@ -352,10 +347,10 @@ static void draw_window(Window *w) {
 	}
 }
 
-static void draw_windows() {
-	Window *w;
-	for (w = windows_list; w; w = w->next) {
-		draw_window(w);
+static void draw_applications() {
+	Application *app;
+	for (app = applications_list; app; app = app->next) {
+		draw_window(&app->window);
 	}
 }
 
@@ -419,7 +414,7 @@ void umain(int argc, char **argv) {
 			continue;
 
 		draw_background();
-		draw_windows();
+		draw_applications();
 		draw_cursor();
 		refresh_screen();
 	}

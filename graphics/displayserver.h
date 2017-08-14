@@ -11,9 +11,13 @@
 typedef struct window {
 	int height, width;
 	int x_pos, y_pos;
-	struct window *next;
 	Canvas *canvas;
-	int pid;
 } Window;
+
+typedef struct application {
+	Window window;
+	int pid;
+	struct application *next;
+} Application;
 
 #endif
