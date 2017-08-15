@@ -1,5 +1,9 @@
-This repository holds the code I write while working through the MIT
-[6.828](https://pdos.csail.mit.edu/6.828/2016/) OS engineering course.
+
+
+The code in this repository is based on the MIT
+[6.828](https://pdos.csail.mit.edu/6.828/2016/) OS engineering course, which I
+have covered in full by now. I'm currently adding more advanced features, such
+as graphics, to the OS.
 
 The writeups/ directory contains writeups for each branch. The current status is:
 
@@ -13,3 +17,8 @@ The writeups/ directory contains writeups for each branch. The current status is
 | lab6     | done        | networking                                                 |
 | graphics | in progress | graphical user interface                                   |
 
+
+Here's a summary of what I've done so far:
+- test
+- test2
+- test3
