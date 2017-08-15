@@ -6,7 +6,7 @@
 
 #define NUM_EVENTS 100
 
-#define CURSOR_SIZE 10
+#define CURSOR_SIZE 16
 
 typedef struct window {
 	char *title;

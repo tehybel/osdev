@@ -140,6 +140,25 @@ static void draw_rectangle(const int x1, const int y1,
 	}
 }
 
+static void draw_border(const int x1, const int y1, 
+						   const int x2, const int y2,
+						   const int border_thickness, const int border_color) {
+
+	// north side border
+	draw_rectangle(x1, y1, x2, y1 + border_thickness, border_color);
+
+	// south side border
+	draw_rectangle(x1, y2 - border_thickness, x2, y2, border_color);
+
+	// east side border
+	draw_rectangle(x2 - border_thickness, y1, x2, y2, border_color);
+
+	// west side border
+	draw_rectangle(x1, y1, x1 + border_thickness, y2, border_color);
+
+}
+
+
 /*
 	Walk over the zbuffer, checking if each byte was changed by comparing to
 	the LFB. If a byte was changed, update it.
@@ -172,6 +191,7 @@ static void draw_cursor() {
 	int y1 = MAX(0, cursor_y);
 	int y2 = MIN(cursor_y + CURSOR_SIZE, height);
 	draw_rectangle(x1, y1, x2, y2, COLOR_WHITE);
+	draw_border(x1, y1, x2, y2, 2, COLOR_BLACK);
 }
 
 static Application *get_app_for_coordinate(int x, int y) {
@@ -359,24 +379,6 @@ static void draw_canvas(int wx, int wy, Canvas *c) {
 				zbuffer[index] = p;
 		}
 	}
-}
-
-static void draw_border(const int x1, const int y1, 
-						   const int x2, const int y2,
-						   const int border_thickness, const int border_color) {
-
-	// north side border
-	draw_rectangle(x1, y1, x2, y1 + border_thickness, border_color);
-
-	// south side border
-	draw_rectangle(x1, y2 - border_thickness, x2, y2, border_color);
-
-	// east side border
-	draw_rectangle(x2 - border_thickness, y1, x2, y2, border_color);
-
-	// west side border
-	draw_rectangle(x1, y1, x1 + border_thickness, y2, border_color);
-
 }
 
 
