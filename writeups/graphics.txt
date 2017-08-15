@@ -609,4 +609,13 @@ Okay, that works now.
 
 ..........
 
+Next we'll want a terminal emulator. How will it work?
+
+Well, it's a graphical application. It will spawn the "sh" program. It will
+have to listen for keyboard events from the display server. When it gets a
+keyboard event, it will send this to the stdin of the shell. When the shell
+outputs a character, that normally will go to stdout, and so we need to make
+stdout a pipe or somesuch, so that we can read from it and display the output
+graphically. To display the output we have to wrap the text. 
+
 

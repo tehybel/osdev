@@ -472,6 +472,7 @@ void umain(int argc, char **argv) {
 	init_zbuffer();
 	init_fonts();
 
+	spawn_program("terminal", 300, 150, 500, 700);
 	spawn_program("paint", 10, 10, 300, 500);
 	spawn_program("fonttest", 10, 400, 300, 500);
 

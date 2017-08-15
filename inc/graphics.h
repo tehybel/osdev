@@ -35,16 +35,22 @@ Canvas canvas;
 
 enum event_types {
 	EVENT_MOUSE_CLICK = 0,
+	EVENT_KEY_PRESS,
 };
 
 struct event_mouse_click {
 	int x, y;
 };
 
+struct event_key_press {
+	unsigned char ch;
+};
+
 struct graphics_event {
 	enum event_types type;
 	union {
 		struct event_mouse_click emc;
+		struct event_key_press ekp;
 	} d;
 	int recipient;
 	struct graphics_event *next;

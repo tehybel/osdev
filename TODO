@@ -3,8 +3,8 @@
 
 for the graphics subsystem:
 
-- make the windows look nicer, maybe add a border or such
-- in paint.c, mouse clicks which draw squares are a little bit off
+- in paint.c, mouse clicks which draw squares can't target the bottommost
+  pixels
 
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?
