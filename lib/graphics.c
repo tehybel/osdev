@@ -2,7 +2,7 @@
 #include <inc/graphics.h>
 #include <lib/font_10x18.c>
 
-static void init_fonts() {
+void init_fonts() {
 	font_10x18 = &_font_10x18;
 }
 
@@ -67,7 +67,8 @@ void draw_square(int x, int y, int side_length) {
 	}
 }
 
-static void draw_char(unsigned char ch, int begin_x, int begin_y, int col, Font *font) {
+void draw_char(unsigned char ch, int begin_x, int begin_y, int col,
+					  Font *font, void (*draw)(int, int, int)) {
 	int x, y;
 
 	for (y = 0; y < font->height; y++) {
@@ -78,7 +79,7 @@ static void draw_char(unsigned char ch, int begin_x, int begin_y, int col, Font 
 		for (x = 0; x < font->width; x++) {
 			int should_draw_pixel = value & (1 << (font->width - 1 - x));
 			if (should_draw_pixel)
-				draw_pixel(begin_x + x, begin_y + y, col);
+				draw(begin_x + x, begin_y + y, col);
 		}
 	}
 }
@@ -86,9 +87,8 @@ static void draw_char(unsigned char ch, int begin_x, int begin_y, int col, Font 
 void draw_text(char *text, int x, int y, int col, Font *font) {
 	int i;
 	for (i = 0; i < strlen(text); i++) {
-		draw_char(text[i], x, y, col, font);
+		draw_char(text[i], x, y, col, font, draw_pixel);
 		x += font->width;
 	}
 }
-
 

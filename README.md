@@ -37,7 +37,7 @@ To provide an overview, here's a summary of the different labs and work so far:
   copy-on-write fork function. Finally we added syscalls for IPC.
 - In lab 5 we implemented a file system. We then wrote an FS daemon which
   performs disk i/o in userland. The daemon uses block caching for efficiency.
-  We also implemented a simple shell.
+  We also implemented a simple shell for running programs from the disk.
 - In lab 6 we connected the OS to the internet by implementing a driver for
   the e1000 network card. We also wrote a small web server which can serve
   files from the file system.

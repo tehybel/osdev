@@ -26,6 +26,7 @@ typedef uint32_t Pixel;
 
 typedef struct canvas {
 	size_t size;
+	int x_pos, y_pos;
 	size_t width, height;
 	Pixel *raw_pixels;
 } Canvas;
@@ -73,5 +74,8 @@ void draw_square(int x, int y, int side_length);
 void color_canvas(int col);
 void event_loop(void (*process_event)(struct graphics_event *));
 void draw_text(char *text, int x, int y, int col, Font *font);
+void draw_char(unsigned char ch, int begin_x, int begin_y, int col,
+					  Font *font, void (*draw)(int, int, int));
+void init_fonts();
 
 #endif

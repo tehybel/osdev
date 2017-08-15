@@ -9,6 +9,7 @@
 #define CURSOR_SIZE 10
 
 typedef struct window {
+	char *title;
 	int height, width;
 	int x_pos, y_pos;
 	Canvas *canvas;

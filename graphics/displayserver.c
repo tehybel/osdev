@@ -26,6 +26,12 @@ Application * applications_list = NULL;
 
 struct graphics_event *events_queue = NULL;
 
+
+#define TITLEBAR_BGCOLOR COLOR_WHITE
+#define TITLEBAR_HEIGHT 30
+#define BORDER_COLOR COLOR_BLACK
+#define BORDER_THICKNESS 3
+
 static void alloc_share_page() {
 	int r;
 	if ((r = sys_page_alloc(0, D_SHARE_PAGE, PTE_U | PTE_P | PTE_W)))
@@ -99,6 +105,14 @@ static inline void do_draw_pixel(const int x, const int y, const int color) {
 
 	if (p[y*((width+pitch)/4) + x] != color)
 		p[y*((width+pitch)/4) + x] = color;
+}
+
+static void do_draw_text(char *text, int x, int y, int col, Font *font) {
+	int i;
+	for (i = 0; i < strlen(text); i++) {
+		draw_char(text[i], x, y, col, font, do_draw_pixel);
+		x += font->width;
+	}
 }
 
 /* draws a rectangle from upper left corner (x1, y1) to lower right corner
@@ -192,8 +206,8 @@ static void handle_mouse_click(int button) {
 	if (!ev) panic("malloc event");
 
 	ev->type = EVENT_MOUSE_CLICK;
-	ev->d.emc.x = cursor_x;
-	ev->d.emc.y = cursor_y;
+	ev->d.emc.x = cursor_x - w->canvas->x_pos;
+	ev->d.emc.y = cursor_y - w->canvas->y_pos;
 	ev->recipient = app->pid;
 
 	add_event_to_queue(ev);
@@ -256,7 +270,8 @@ static Canvas *alloc_canvas(Window *w) {
 	return c;
 }
 
-static void init_window(Window *w, int x, int y, int height, int width) {
+static void init_window(Window *w, int x, int y, int height, int width, 
+						char *title) {
 	w->x_pos = x;
 	w->y_pos = y;
 
@@ -264,6 +279,12 @@ static void init_window(Window *w, int x, int y, int height, int width) {
 	w->width = width;
 
 	w->canvas = alloc_canvas(w);
+
+	// the canvas begins below the title bar
+	w->canvas->y_pos = w->y_pos + TITLEBAR_HEIGHT; 
+	w->canvas->x_pos = w->x_pos;
+
+	w->title = title;
 }
 
 static void mark_perm (void *mem, size_t size, int perm) {
@@ -287,7 +308,7 @@ static void spawn_program(char *progname, int x, int y, int height, int width) {
 
 	Application *app = calloc(1, sizeof(Application));
 	Window *w = &app->window;
-	init_window(w, x, y, height, width);
+	init_window(w, x, y, height, width, progname);
 
 	// add it to the list
 	app->next = applications_list;
@@ -317,18 +338,11 @@ static void spawn_program(char *progname, int x, int y, int height, int width) {
 
 // this code looks complicated because it's hand-optimized since it's
 // performance-critical. It should run fast even on -O0.
-static void draw_window(Window *w) {
+static void draw_canvas(int wx, int wy, Canvas *c) {
 	int x, y;
-	int wx = w->x_pos, wy = w->y_pos;
-
-	Canvas *c = w->canvas;
 	Pixel *pixels = c->raw_pixels;
-
 	size_t c_height = c->height;
 	size_t c_width = c->width;
-
-
-	// for now, just draw the canvas, no border/buttons/etc
 
 	int tmp = ((width+pitch)>>2);
 	for (y = 0; y < c_height; y++) {
@@ -345,6 +359,57 @@ static void draw_window(Window *w) {
 				zbuffer[index] = p;
 		}
 	}
+}
+
+static void draw_border(const int x1, const int y1, 
+						   const int x2, const int y2,
+						   const int border_thickness, const int border_color) {
+
+	// north side border
+	draw_rectangle(x1, y1, x2, y1 + border_thickness, border_color);
+
+	// south side border
+	draw_rectangle(x1, y2 - border_thickness, x2, y2, border_color);
+
+	// east side border
+	draw_rectangle(x2 - border_thickness, y1, x2, y2, border_color);
+
+	// west side border
+	draw_rectangle(x1, y1, x1 + border_thickness, y2, border_color);
+
+}
+
+
+static void draw_window_titlebar(Window *w) {
+	// background
+	draw_rectangle(w->x_pos, w->y_pos, 
+				   w->x_pos + w->width, w->y_pos + TITLEBAR_HEIGHT,
+				   TITLEBAR_BGCOLOR);
+
+	// text
+	do_draw_text(w->title, 
+				 w->x_pos + BORDER_THICKNESS + 2,
+				 w->y_pos + BORDER_THICKNESS + 2,
+				 COLOR_BLACK, font_10x18);
+
+	// border
+	draw_border(w->x_pos, w->y_pos,
+				w->x_pos + w->width, w->y_pos + TITLEBAR_HEIGHT,
+				BORDER_THICKNESS, BORDER_COLOR);
+}
+
+static void draw_window_border(Window *w) {
+	draw_border(w->x_pos, 
+				w->y_pos + TITLEBAR_HEIGHT, 
+				w->x_pos + w->width, 
+				w->y_pos + w->height + TITLEBAR_HEIGHT,
+				BORDER_THICKNESS, BORDER_COLOR);
+}
+
+static void draw_window(Window *w) {
+	draw_canvas(w->x_pos, w->y_pos + TITLEBAR_HEIGHT, w->canvas);
+	draw_window_titlebar(w);
+	draw_window_border(w);
 }
 
 static void draw_applications() {
@@ -403,9 +468,10 @@ void umain(int argc, char **argv) {
 
 	init_lfb();
 	init_zbuffer();
+	init_fonts();
 
 	spawn_program("paint", 10, 10, 300, 500);
-	spawn_program("font", 10, 400, 300, 500);
+	spawn_program("fonttest", 10, 400, 300, 500);
 
 	while (1) {
 
