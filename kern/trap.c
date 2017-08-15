@@ -250,6 +250,7 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 
 	// if a breakpoint was hit in virtual-8086 mode, switch back to protected
 	// mode.
+	// TODO remove this since we no longer support v86
 	if (tf->tf_trapno == T_BRKPT && curenv->in_v86_mode) {
 		revert_v86_mode();
 		return;

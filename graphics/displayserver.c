@@ -26,6 +26,8 @@ Application * applications_list = NULL;
 
 struct graphics_event *events_queue = NULL;
 
+// current foregrounded application; any key presses will go here.
+Application *foreground_application = NULL;
 
 #define TITLEBAR_BGCOLOR COLOR_WHITE
 #define TITLEBAR_HEIGHT 30
@@ -233,6 +235,20 @@ static void handle_mouse_click(int button) {
 	add_event_to_queue(ev);
 }
 
+static void handle_key_press(char ch) {
+	// send key presses to the foregrounded application
+	Application *app = foreground_application;
+
+	struct graphics_event *ev = calloc(1, sizeof(struct graphics_event));
+	if (!ev) panic("malloc event");
+
+	ev->type = EVENT_KEY_PRESS;
+	ev->d.ekp.ch = ch;
+	ev->recipient = app->pid;
+
+	add_event_to_queue(ev);
+}
+
 static void process_event(struct io_event *e) {
 	switch (e->type) {
 	case MOUSE_MOVE:
@@ -245,10 +261,11 @@ static void process_event(struct io_event *e) {
 		break;
 	
 	case KEYBOARD_KEY:
-		// TODO
+		handle_key_press(e->data[0]);
 		break;
 
 	default:
+		cprintf("unhandled event: 0x%x (%d)\n", e, e->type);
 		break;
 
 	}
@@ -322,7 +339,7 @@ static void mark_shared (void *mem, size_t size) {
 	mark_perm(mem, size, PTE_U | PTE_P | PTE_W | PTE_SHARE);
 }
 
-static void spawn_program(char *progname, int x, int y, int height, int width) {
+static Application *spawn_application(char *progname, int x, int y, int height, int width) {
 	size_t offset;
 	int r;
 
@@ -354,6 +371,8 @@ static void spawn_program(char *progname, int x, int y, int height, int width) {
 
 	// send the canvas struct to the child
 	share(app->pid, w->canvas, sizeof(Canvas));
+
+	return app;
 }
 
 // this code looks complicated because it's hand-optimized since it's
@@ -472,9 +491,13 @@ void umain(int argc, char **argv) {
 	init_zbuffer();
 	init_fonts();
 
-	spawn_program("terminal", 300, 150, 500, 700);
-	spawn_program("paint", 10, 10, 300, 500);
-	spawn_program("fonttest", 10, 400, 300, 500);
+	Application *term = spawn_application("terminal", 300, 150, 200, 200);
+	spawn_application("paint", 10, 10, 300, 500);
+	spawn_application("fonttest", 10, 400, 300, 500);
+
+	// always bring the terminal to the foreground.. TODO improve this to be
+	// changeable by clicking things.
+	foreground_application = term;
 
 	while (1) {
 

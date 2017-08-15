@@ -8,6 +8,10 @@ for the graphics subsystem:
 
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?
+- change the generated mouse events to not just be (x, y) but to include
+  movements instead, so that we can support holding a mouse button down in
+  paint.c
+- handle z-coordinates so that you can change which window is foregrounded
 - 
 
 
