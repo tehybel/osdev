@@ -41,8 +41,14 @@ static void clear_line(char *line) {
 	line[outbuf.line_size] = '\0';
 }
 
-static void send_to_shell(unsigned char *line) {
-
+static void send_to_shell(unsigned char *line, size_t size) {
+	int r;
+	cprintf("terminal sends '%s' to shell\n", line);
+	r = write(shell_pipe, line, size);
+	if (r < size) {
+		// TODO handle short writes and errors better
+		cprintf("send_to_shell: r is only %d\n", r);
+	}
 }
 
 static void add_to_outbuf(unsigned char ch) {
@@ -73,15 +79,14 @@ static void add_to_inbuf(unsigned char ch) {
 // take the command that's in the input buffer and process it.
 static void drain_inbuf() {
 	add_to_inbuf('\0');
-	send_to_shell(inbuf);
+	send_to_shell(inbuf, inbuf_index);
 	inbuf_index = 0;
 }
 
 static void handle_inchar(unsigned char ch) {
 	add_to_outbuf(ch);
-	if (ch != '\n')
-		add_to_inbuf(ch);
-	else
+	add_to_inbuf(ch);
+	if (ch == '\n')
 		drain_inbuf();
 	
 	// since something changed, we should redraw everything
@@ -106,7 +111,6 @@ static void init_outbuf() {
 	outbuf.lines = malloc(outbuf.num_lines * sizeof(char *));
 	if (!outbuf.lines)
 		panic("alloc lines");
-	
 
 	for (i = 0; i < outbuf.num_lines; i++) {
 		outbuf.lines[i] = malloc(outbuf.line_size + 1);
@@ -139,7 +143,7 @@ static int runner_main() {
 	while (1) {
 		r = read(stdout_pipe[0], buf, sizeof(buf) - 1);
 		if (r < 0) {
-			cprintf("runner got r=%d\n", r);
+			cprintf("runner got r=%d -> %e\n", r, r);
 		}
 		else {
 			buf[r] = '\0';
