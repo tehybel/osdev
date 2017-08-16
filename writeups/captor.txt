@@ -1,0 +1,12 @@
+
+
+In this lab the idea is to implement capabilities, at least for networking.
+There will be three levels:
+- can network via normal connection
+- can network via Tor only
+- cannot use the network
+
+We will have a special "Tor daemon" that will ensure that all networking is
+performed over Tor. We can port Tor to our OS, or we can use a separate VM in
+a WHONIX-style setup.
+
