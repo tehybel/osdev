@@ -144,6 +144,7 @@ error:
 	return r;
 }
 
+// Returns child envid on success, < 0 on failure.
 int spawn(const char *prog, const char **argv) {
 	return _spawn(prog, argv, 1);
 }

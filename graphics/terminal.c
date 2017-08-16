@@ -4,7 +4,6 @@
 // how much to indent text in both the x- and y-direction
 #define BORDER_SIZE 10
 
-int cursor_x, cursor_y;
 Font *font;
 
 // this holds the current input
@@ -12,6 +11,7 @@ Font *font;
 unsigned char inbuf[INBUF_SIZE];
 size_t inbuf_index = 0;
 
+int shell_pipe = -1;
 
 // the output buffer is a circular list of lines
 struct outbuf {
@@ -41,8 +41,8 @@ static void clear_line(char *line) {
 	line[outbuf.line_size] = '\0';
 }
 
-static void drain_inbuf() {
-	// TODO
+static void send_to_shell(unsigned char *line) {
+
 }
 
 static void add_to_outbuf(unsigned char ch) {
@@ -56,7 +56,7 @@ static void add_to_outbuf(unsigned char ch) {
 	}
 
 	if (outbuf.char_index == 0) {
-		// we're now on a new line; clear it 's it's ready to use, and advance
+		// we're now on a new line; clear it so it's ready to use, and advance
 		// the line_index.
 		outbuf.line_index = (outbuf.line_index + 1) % outbuf.num_lines;
 		clear_line(outbuf.lines[outbuf.line_index]);
@@ -68,6 +68,13 @@ static void add_to_inbuf(unsigned char ch) {
 		panic("inbuf full");
 	
 	inbuf[inbuf_index++] = ch;
+}
+
+// take the command that's in the input buffer and process it.
+static void drain_inbuf() {
+	add_to_inbuf('\0');
+	send_to_shell(inbuf);
+	inbuf_index = 0;
 }
 
 static void handle_inchar(unsigned char ch) {
@@ -109,15 +116,77 @@ static void init_outbuf() {
 	}
 }
 
+// this is the main() of the runner process -- it will spawn the shell
+// process, read output from it, and send it to the terminal emulator via IPC.
+static int runner_main() {
+	int r;
+	int stdout_pipe[2];
+	char buf[1024];
+	const char *argv[] = {"sh", NULL};
+
+	if (pipe(stdout_pipe))
+		panic("runner pipe");
+	
+	// fix stdout
+	if (dup(stdout_pipe[1], 1) < 0)
+		panic("runner dup stdout");
+	
+	if (spawn(argv[0], argv) < 0)
+		panic("runner spawn");
+	
+	cprintf("runner is alive and kicking\n");
+	
+	while (1) {
+		r = read(stdout_pipe[0], buf, sizeof(buf) - 1);
+		if (r < 0) {
+			cprintf("runner got r=%d\n", r);
+		}
+		else {
+			buf[r] = '\0';
+			cprintf("runner got '%s'\n", buf);
+			// TODO send it via IPC
+		}
+	}
+}
+
+// spawn the runner process which spawns the shell and hands us its output via
+// IPC
+static void spawn_runner() {
+	int r;
+	int _shell_pipe[2];
+
+	if (pipe(_shell_pipe))
+		panic("spawn_shell pipe");
+	
+	r = fork();
+	if (r < 0) {
+		panic("spawn_shell fork");
+	}
+	else if (r == 0) {
+		/*
+		 * since there's no stdin/stdout for this process, calling pipe()
+		 * gives the right values, so there's no need to dup()..
+
+		if ((r = dup(_shell_pipe[0], 0)) < 0) // fix stdin
+			panic("runner dup stdin: %e", r);
+		*/
+		assert (_shell_pipe[0] == 0);
+		assert (_shell_pipe[1] == 1);
+
+		runner_main();
+		exit();
+	}
+
+	shell_pipe = _shell_pipe[1];
+}
+
 void umain(int argc, char **argv) {
 	init_graphics();
 
+	// spawn_runner();
+
 	// set the font
 	font = font_10x18;
-
-	// init the cursor
-	cursor_x = BORDER_SIZE;
-	cursor_y = BORDER_SIZE;
 
 	// init the output buffer
 	init_outbuf();

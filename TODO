@@ -3,8 +3,7 @@
 
 for the graphics subsystem:
 
-- some input character disappear when we type fast
-
+- in terminal.c, if we fork, we suddenly don't update the screen anymore?
 
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?
@@ -12,7 +11,6 @@ for the graphics subsystem:
   movements instead, so that we can support holding a mouse button down in
   paint.c
 - handle z-coordinates so that you can change which window is foregrounded
-- 
 
 
 
