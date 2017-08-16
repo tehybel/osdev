@@ -43,7 +43,7 @@ static void clear_line(char *line) {
 
 static void send_to_shell(unsigned char *line, size_t size) {
 	int r;
-	cprintf("terminal sends '%s' to shell\n", line);
+	// cprintf("terminal sends '%s' to shell\n", line);
 	r = write(shell_pipe, line, size);
 	if (r < size) {
 		// TODO handle short writes and errors better
@@ -187,7 +187,7 @@ static void spawn_runner() {
 void umain(int argc, char **argv) {
 	init_graphics();
 
-	spawn_runner();
+	// spawn_runner();
 
 	// set the font
 	font = font_10x18;
