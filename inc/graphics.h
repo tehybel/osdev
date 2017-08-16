@@ -52,8 +52,7 @@ struct graphics_event {
 		struct event_mouse_click emc;
 		struct event_key_press ekp;
 	} d;
-	int recipient;
-	struct graphics_event *next;
+	struct graphics_event *next, *prev;
 };
 
 typedef struct font {

@@ -21,4 +21,10 @@ typedef struct application {
 	struct application *next;
 } Application;
 
+struct event_list_head {
+	int pid;
+	struct graphics_event *link;
+	struct event_list_head *next;
+};
+
 #endif

@@ -24,7 +24,12 @@ struct io_event events[NUM_EVENTS];
 
 Application * applications_list = NULL;
 
-struct graphics_event *events_queue = NULL;
+// the events queue is a single-linked list containing event_list_head
+// structures; each of these contains a double-linked list of events. In other
+// words, we have a kind of associative array, from an application pid to a
+// list of events to be delivered to it. This is necessary so that we can
+// efficiently deliver events in order to each application.
+struct event_list_head *events_queue = NULL;
 
 // current foregrounded application; any key presses will go here.
 Application *foreground_application = NULL;
@@ -214,9 +219,51 @@ static Application *get_app_for_coordinate(int x, int y) {
 	return NULL;
 }
 
-static void add_event_to_queue(struct graphics_event *ev) {
-	ev->next = events_queue;
-	events_queue = ev;
+static struct event_list_head *lookup_elh(int pid) {
+	struct event_list_head *elh;
+	for (elh = events_queue; elh; elh = elh->next)
+		if (elh->pid == pid)
+			break;
+	return elh;
+}
+
+/* finds the struct event_list_head that contains the list of events for the
+ * application given by 'pid'. If no such elh exists, create it. */
+static struct event_list_head *get_elh(int pid) {
+	struct event_list_head *elh;
+	 
+	// try to look it up
+	if ((elh = lookup_elh(pid)))
+		return elh;
+	
+	// if it didn't exist, create it and add it to the queue
+	elh = calloc(1, sizeof(struct event_list_head));
+	if (!elh) panic("alloc elh");
+
+	elh->pid = pid;
+	elh->next = events_queue;
+	events_queue = elh;
+
+	return elh;
+}
+
+static void add_event_to_queue(int pid, struct graphics_event *ev) {
+	struct event_list_head *head = get_elh(pid);
+
+	if (head->link == NULL) {
+		// the list is empty, so just put 'ev' right in
+		head->link = ev;
+		ev->prev = ev->next = ev;
+		return;
+	}
+
+	// update the back's next
+	head->link->prev->next = ev;
+	ev->prev = head->link->prev;
+
+	// put ev at the back
+	head->link->prev = ev;
+	ev->next = head->link;
 }
 
 static void handle_mouse_click(int button) {
@@ -230,9 +277,8 @@ static void handle_mouse_click(int button) {
 	ev->type = EVENT_MOUSE_CLICK;
 	ev->d.emc.x = cursor_x - w->canvas->x_pos;
 	ev->d.emc.y = cursor_y - w->canvas->y_pos;
-	ev->recipient = app->pid;
 
-	add_event_to_queue(ev);
+	add_event_to_queue(app->pid, ev);
 }
 
 static void handle_key_press(char ch) {
@@ -244,9 +290,8 @@ static void handle_key_press(char ch) {
 
 	ev->type = EVENT_KEY_PRESS;
 	ev->d.ekp.ch = ch;
-	ev->recipient = app->pid;
 
-	add_event_to_queue(ev);
+	add_event_to_queue(app->pid, ev);
 }
 
 static void process_event(struct io_event *e) {
@@ -441,43 +486,46 @@ static void draw_applications() {
 }
 
 static void transmit_events() {
-	struct graphics_event *ev = events_queue, *prev = NULL, *next;
 	int r;
+	struct event_list_head *elh;
 
-	while (ev) {
-		next = ev->next;
-		
-		// try to transmit the event
-		r = try_share(ev->recipient, ev, sizeof(struct graphics_event));
+	// walk over each application in the events queue
+	for (elh = events_queue; elh; elh = elh->next) {
 
-		if (!r) {
-			// we sent the event, so remove it from the queue
-			goto remove_event;
-		}
-		else if (r == -E_IPC_NOT_RECV) {
-			// that's okay, try again later
-		}
-		else if (r == -E_BAD_ENV) {
-			cprintf("giving up on event because 0x%x is dead\n", ev->recipient);
-		}
-		else {
-			cprintf("unexpected error in transmit_events: %e\n", r);
-		}
-		
-		goto cont;
+		// for each event that this application has pending, try to send it
+		struct graphics_event *ev;
+		for (ev = elh->link; ev; ev = elh->link) {
+			r = try_share(elh->pid, ev, sizeof(*ev));
 
-remove_event:
-		if (ev == events_queue)
-			events_queue = next;
-		else if (prev) {
-			prev->next = next;
-		} 
-		free(ev);
-		ev = NULL;
+			if (r == -E_IPC_NOT_RECV) {
+				// the application wasn't listening, so there's no need to try
+				// sending it more events. Just retry later.
+				break;
+			}
+			else if (r == -E_BAD_ENV) {
+				cprintf("giving up on event because 0x%x is dead\n", elh->pid);
+				// TODO: if an application is dead, remove it from the queue.
+				break;
+			}
+			else if (r) {
+				cprintf("unexpected error in transmit_events: %e\n", r);
+				break;
+			}
 
-cont:
-		prev = ev;
-		ev = next;
+			// if we get here, the event was sent, so remove it from the list.
+			if (ev->next == ev) {
+				// ev is the only event in the queue
+				assert (ev->prev == ev);
+				elh->link = NULL;
+			}
+			else {
+				assert (ev->prev != ev);
+				ev->prev->next = ev->next;
+				ev->next->prev = ev->prev;
+				elh->link = ev->next;
+			}
+			free(ev);
+		}
 	}
 }
 
