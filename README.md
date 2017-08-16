@@ -18,7 +18,7 @@ The current status is:
 | graphics | in progress | graphical user interface                                   |
 
 
-To provide an overview, here's a summary of the different labs and work so far:
+To provide an overview, here's a summary of my work so far:
 
 - Lab 1 was about getting the kernel running. The BIOS loads a small chunk of
   code, the bootloader, which is the first kernel code that runs. It runs in
@@ -43,4 +43,4 @@ To provide an overview, here's a summary of the different labs and work so far:
   files from the file system.
 - As a more advanced feature, work is in progress on a GUI.
 
-The writeups/ directory contains detailed writeups for each branch.  
+The writeups/ directory contains detailed writeups for each lab.
