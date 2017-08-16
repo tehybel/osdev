@@ -3,8 +3,8 @@
 
 for the graphics subsystem:
 
-- in paint.c, mouse clicks which draw squares can't target the bottommost
-  pixels
+- some input character disappear when we type fast
+
 
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?

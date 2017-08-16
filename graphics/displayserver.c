@@ -199,13 +199,13 @@ static void draw_cursor() {
 static Application *get_app_for_coordinate(int x, int y) {
 	Application *app;
 	for (app = applications_list; app; app = app->next) {
-		if (x < app->window.x_pos)
+		if (x < app->window.canvas->x_pos)
 			continue;
-		if (y < app->window.y_pos)
+		if (y < app->window.canvas->y_pos)
 			continue;
-		if (x >= app->window.x_pos + app->window.width)
+		if (x >= app->window.canvas->x_pos + app->window.canvas->width)
 			continue;
-		if (y >= app->window.y_pos + app->window.height)
+		if (y >= app->window.canvas->y_pos + app->window.canvas->height)
 			continue;
 
 		return app;
