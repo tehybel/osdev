@@ -341,6 +341,7 @@ umain(int argc, char **argv)
 		{
 			die("Failed to accept client connection");
 		}
+		cprintf("got a connection: %d\n", clientsock);
 		handle_client(clientsock);
 	}
 

@@ -190,7 +190,7 @@ env_setup_vm(struct Env *env)
 	// 
 	// This means that userland programs can access kernel space. We need a
 	// way to prevent this, perhaps with segmentation (GD_UD etc.)? TODO.
-	for (i = 0; i < NPDENTRIES; i++) {
+	for (i = PDX(UTOP); i < NPDENTRIES; i++) {
 		pde_t pde  = kern_pgdir[i];
 		if (!(pde & PTE_P))
 			continue;
