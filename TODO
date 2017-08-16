@@ -3,8 +3,6 @@
 
 for the graphics subsystem:
 
-- in terminal.c, if we fork, we suddenly don't update the screen anymore?
-
 - write a terminal emulator
 - why does run-hello semi-freeze the cursor?
 - change the generated mouse events to not just be (x, y) but to include

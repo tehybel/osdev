@@ -183,7 +183,7 @@ static void spawn_runner() {
 void umain(int argc, char **argv) {
 	init_graphics();
 
-	// spawn_runner();
+	spawn_runner();
 
 	// set the font
 	font = font_10x18;

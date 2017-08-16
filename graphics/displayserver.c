@@ -406,7 +406,8 @@ static Application *spawn_application(char *progname, int x, int y, int height, 
 	// share the raw canvas memory with the child
 	for (offset = 0; offset < w->canvas->size; offset += PGSIZE) {
 		void *addr = ((void *) w->canvas->raw_pixels) + offset;
-		if ((r = sys_page_map(0, addr, app->pid, CANVAS_BASE + offset, PTE_U | PTE_P | PTE_W)))
+		if ((r = sys_page_map(0, addr, app->pid, CANVAS_BASE + offset, 
+							  PTE_U | PTE_P | PTE_W | PTE_SHARE)))
 			panic("spawn_program sys_page_map: %e", r);
 	}
 
