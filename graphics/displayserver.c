@@ -501,14 +501,15 @@ void umain(int argc, char **argv) {
 
 	while (1) {
 
-		transmit_events();
-
 		if (!process_events())
 			continue;
+
+		transmit_events();
 
 		draw_background();
 		draw_applications();
 		draw_cursor();
+
 		refresh_screen();
 	}
 
