@@ -548,9 +548,7 @@ void umain(int argc, char **argv) {
 	foreground_application = term;
 
 	while (1) {
-
-		if (!process_events())
-			continue;
+		process_events();
 
 		transmit_events();
 
@@ -559,6 +557,8 @@ void umain(int argc, char **argv) {
 		draw_cursor();
 
 		refresh_screen();
+
+		// TODO: add some kind of rate limiting so we don't eat all the CPU
 	}
 
 }
