@@ -2,7 +2,8 @@
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
 17:50-19:50, 10-11:45, 19:30-20, 11:30-13:40, 12:15-14:15, 
-11-15:25, 21:30-00:30, 10-14:15, 11-14, 11:20-13:45, TODO
+11-15:25, 21:30-00:30, 10-14:15, 11-14, 11:20-13:45, 15-TODO,
+
 
 
 
@@ -634,6 +635,9 @@ runner will then read the application's output and send it via IPC to the
 terminal emulator. But it won't "man-in-the-middle" the *input* to the
 application.
 
+
+
+..........
 
 
 

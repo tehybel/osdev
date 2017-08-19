@@ -457,16 +457,26 @@ static void handle_mouse_event() {
 	cursor = new_cursor;
 }
 
+static void add_to_console_buffer(char c) {
+	cons.buf[cons.wpos++] = c;
+	if (cons.wpos == CONSBUFSIZE)
+		cons.wpos = 0;
+}
+
+static void add_to_io_event_queue(char c) {
+	struct io_event e = {KEYBOARD_KEY, {c, 0}};
+	io_event_put(&e);
+}
+
+
 static void handle_keyboard_event() {
 	int c;
 	if ((c = get_data_from_keyboard())) {
-		// we read a full char, so stuff it into the console buffer
-		cons.buf[cons.wpos++] = c;
-		if (cons.wpos == CONSBUFSIZE)
-			cons.wpos = 0;
-
-		struct io_event e = {KEYBOARD_KEY, {c, 0}};
-		io_event_put(&e);
+		// for now, only send the char to the display server, not to the
+		// console subsystem. This means we'll only be able to use a graphical
+		// terminal emulator.
+		// add_to_console_buffer(c);
+		add_to_io_event_queue(c);
 	}
 }
 
