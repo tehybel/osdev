@@ -98,16 +98,12 @@ static void start_environments() {
 	// file system process
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
 
-#if !defined(TEST_NO_NS)
-	// Start ns.
+	// start networking server
 	ENV_CREATE(net_ns, ENV_TYPE_NS);
-#endif
 
-	// used by grading scripts (for testing)
+	// used for automated testing
 #if defined(TEST)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
-#else
-	ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif
 }
 
