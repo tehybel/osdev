@@ -60,6 +60,9 @@
 #define	K_RDCMDBYTE	0x20
 #define	K_LDCMDBYTE	0x60
 
+#define KBD_WANT_IRQ12 0x2
+#define KBD_DISABLE_MOUSE_INTERFACE 0x20
+
 #define	KC8_TRANS	0x40	/* convert to old scan codes */
 #define	KC8_MDISABLE	0x20	/* disable mouse */
 #define	KC8_KDISABLE	0x10	/* disable keyboard */

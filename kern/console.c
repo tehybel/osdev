@@ -424,7 +424,7 @@ static bool cursor_eq(struct cursor *a, struct cursor *b) {
 	);
 }
 
-static void handle_mouse_event() {
+void handle_mouse_event() {
 	struct cursor new_cursor = cursor;
 
 	if (!get_mouse_status(&new_cursor))
@@ -468,8 +468,7 @@ static void add_to_io_event_queue(char c) {
 	io_event_put(&e);
 }
 
-
-static void handle_keyboard_event() {
+void handle_keyboard_event() {
 	int c;
 	if ((c = get_data_from_keyboard())) {
 		// for now, only send the char to the display server, not to the
@@ -489,7 +488,7 @@ void drain_keyboard_and_mouse() {
 	while ((stat = inb(KBSTATP)) & KBS_DIB) {
 		if (stat & KBS_FROM_MOUSE)
 			handle_mouse_event();
-		else  
+		else
 			handle_keyboard_event();
 	}
 
@@ -547,45 +546,80 @@ cons_putc(int c)
 }
 
 // waits until the mouse is ready to handle more input
-static void wait() {
+static void wait_before_sending_to_mouse() {
 	uint8_t stat;
 	do {
 		stat = inb(KBSTATP);
 	} while (stat & KBS_IBF);
 }
 
-static void mouse_send_command(uint8_t command) {
+// waits until the mouse has sent us some data over serial
+static void wait_before_reading_from_mouse() {
 	uint8_t stat;
-
-	/* 
-	Sending a command or data byte to the mouse (to port 0x60) must be
-	preceded by sending a 0xD4 byte to port 0x64 (with appropriate waits on
-	port 0x64, bit 1, before sending each output byte). Note: this 0xD4 byte
-	does not generate any ACK, from either the keyboard or mouse. 
-	*/
-	wait();
-	outb(KBCMDP, KBC_AUXWRITE);
-	wait();
-	outb(KBDATAP, command);
-
 	do {
 		stat = inb(KBSTATP);
 	} while (!(stat & KBS_DIB));
+}
 
+static void wait_for_ack() {
+	wait_before_reading_from_mouse();
+	uint8_t stat;
 	do {
 		stat = inb(KBOUTP);
 	} while (!(stat & KBR_ACK));
 }
 
+static void mouse_send_command(uint8_t command) {
+	// address the second device
+	wait_before_sending_to_mouse();
+	outb(KBCMDP, KBC_AUXWRITE); 
+
+	// actually write the byte
+	wait_before_sending_to_mouse();
+	outb(KBDATAP, command);
+}
+
+static void enable_irq12() {
+	uint8_t status;
+
+	wait_before_sending_to_mouse();
+	outb(KBCMDP, KBC_RAMREAD);
+
+	wait_before_reading_from_mouse();
+	status = inb(KBDATAP);
+	status |= KBD_WANT_IRQ12;
+	assert (!(status & KBD_DISABLE_MOUSE_INTERFACE));
+
+	wait_before_sending_to_mouse();
+	outb(KBCMDP, KBC_RAMWRITE);
+	wait_before_sending_to_mouse();
+	outb(KBDATAP, status);
+}
 
 // initializes the PS/2 mouse
 static void mouse_init() {
 	cursor.x = cursor.y = 0;
-	mouse_send_command(KBC_ENABLE);
 
-	// TODO: we might also want to set other settings, e.g. sample rate,
-	// scaling (?) etc. See this link for inspiration:
-	// https://github.com/leafi/because/blob/master/ps2.c
+	// enable auxiliary device (mouse)
+	wait_before_sending_to_mouse();
+	outb(KBCMDP, KBC_AUXENABLE);
+
+	// tell the mouse that we want it to generate IRQ 12 when there are new
+	// events
+	enable_irq12();
+
+	// use default settings
+	mouse_send_command(KBC_SETDEFAULT);
+	wait_for_ack();
+
+	// allow the mouse to send us packets
+	mouse_send_command(KBC_ENABLE);
+	wait_for_ack();
+
+	// disable masking of IRQ 12
+	drain_keyboard_and_mouse();
+	irq_setmask_8259A(irq_mask_8259A & ~(1<<IRQ_MOUSE));
+	drain_keyboard_and_mouse();
 }
 
 void init_io() {

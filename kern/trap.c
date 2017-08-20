@@ -87,6 +87,7 @@ void trap_simerr ();
 
 void trap_irq_timer ();
 void trap_irq_kbd ();
+void trap_irq_mouse ();
 void trap_irq_serial ();
 void trap_irq_spurious ();
 void trap_irq_ide ();
@@ -135,6 +136,7 @@ init_idt(void)
 
 	SETGATE (idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_irq_timer, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_irq_kbd, 0)
+	SETGATE (idt[IRQ_OFFSET + IRQ_MOUSE], 0, GD_KT, trap_irq_mouse, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_irq_serial, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, trap_irq_spurious, 0)
 	SETGATE (idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, trap_irq_ide, 0)
@@ -219,16 +221,6 @@ print_regs(struct PushRegs *regs)
 	cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
-static void revert_v86_mode() {
-	curenv->env_tf.tf_eflags &= ~FL_VM; 
-	curenv->in_v86_mode = false;
-
-	curenv->env_tf.tf_eip = curenv->saved_eip;
-	curenv->env_tf.tf_esp = curenv->saved_esp;
-	curenv->env_tf.tf_cs = curenv->saved_cs;
-	curenv->env_tf.tf_ss = curenv->saved_ss;
-}
-
 // this function handles processor exceptions based on their type.
 static void
 trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
@@ -245,14 +237,7 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
 		cprintf("Spurious interrupt on irq 7\n");
 		print_trapframe(tf);
-		return;
-	}
-
-	// if a breakpoint was hit in virtual-8086 mode, switch back to protected
-	// mode.
-	// TODO remove this since we no longer support v86
-	if (tf->tf_trapno == T_BRKPT && curenv->in_v86_mode) {
-		revert_v86_mode();
+		irq_eoi();
 		return;
 	}
 
@@ -266,14 +251,17 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 
 	// input to qemu's graphical interface (if any) appear as input from the
 	// keyboard and must be handled here
-	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD ||
+		tf->tf_trapno == IRQ_OFFSET + IRQ_MOUSE) {
 		drain_keyboard_and_mouse();
+		irq_eoi();
 		return;
 	}
 
 	// console input appear on the serial port and must be handled here
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
 		drain_serial();
+		irq_eoi();
 		return;
 	}
 
@@ -296,8 +284,8 @@ trap_dispatch(struct Trapframe *tf, bool trapped_from_kernel)
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
 		// TODO what about multiple CPUs? Clock interrupts will happen on
 		// every CPU..
-		lapic_eoi();
 		time_tick();
+		lapic_eoi();
 		sched_yield();
 	}
 

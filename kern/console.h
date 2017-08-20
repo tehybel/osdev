@@ -22,5 +22,7 @@ int cons_getc(void);
 
 void drain_keyboard_and_mouse(void); // irq 1
 void drain_serial(void); // irq 4
+void handle_keyboard_event();
+void handle_mouse_event();
 
 #endif /* _CONSOLE_H_ */

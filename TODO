@@ -15,6 +15,7 @@ for the graphics subsystem:
 
 other stuff:
 
+- we may not be sending an EOI to the LAPIC on every interrupt
 - make the project run with higher optimization levels
 
 - improve unit testing framework to support i/o
