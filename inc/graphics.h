@@ -36,6 +36,10 @@ Canvas canvas;
 enum event_types {
 	EVENT_MOUSE_CLICK = 0,
 	EVENT_KEY_PRESS,
+
+	// below are custom types which aren't used directly by the display
+	// server
+	EVENT_RAW_DATA,
 };
 
 struct event_mouse_click {
@@ -46,13 +50,19 @@ struct event_key_press {
 	unsigned char ch;
 };
 
+struct event_raw_data {
+	size_t size;
+	uint8_t data[0];
+};
+
 struct graphics_event {
 	enum event_types type;
+	struct graphics_event *next, *prev;
 	union {
 		struct event_mouse_click emc;
 		struct event_key_press ekp;
+		struct event_raw_data erd;
 	} d;
-	struct graphics_event *next, *prev;
 };
 
 typedef struct font {

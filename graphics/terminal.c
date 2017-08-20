@@ -11,7 +11,7 @@ Font *font;
 unsigned char inbuf[INBUF_SIZE];
 size_t inbuf_index = 0;
 
-int shell_pipe = -1;
+int shell_fd = -1;
 
 // the output buffer is a circular list of lines
 struct outbuf {
@@ -44,7 +44,7 @@ static void clear_line(char *line) {
 static void send_to_shell(unsigned char *line, size_t size) {
 	int r;
 	// cprintf("terminal sends '%s' to shell\n", line);
-	r = write(shell_pipe, line, size);
+	r = write(shell_fd, line, size);
 	if (r < size) {
 		// TODO handle short writes and errors better
 		cprintf("send_to_shell: r is only %d\n", r);
@@ -93,13 +93,32 @@ static void handle_inchar(unsigned char ch) {
 	draw();
 }
 
+// handle raw output coming from a child process
+static void handle_raw_data(uint8_t *data, size_t size) {
+	size_t i;
+	for (i = 0; i < size; i++)
+		add_to_outbuf(data[i]);
+}
+
 static void process_event(struct graphics_event *ev) {
 
-	// ignore mouse events for now.
-	if (ev->type != EVENT_KEY_PRESS)
-		return;
+	switch (ev->type) {
+	case EVENT_KEY_PRESS:
+		handle_inchar(ev->d.ekp.ch);
+		break;
 	
-	handle_inchar(ev->d.ekp.ch);
+	case EVENT_MOUSE_CLICK:
+		// do nothing for now
+		break;
+	
+	case EVENT_RAW_DATA:
+		handle_raw_data(ev->d.erd.data, ev->d.erd.size);
+		break;
+	
+	default:
+		cprintf("unhandled ev->type: %d\n", ev->type);
+		break;
+	}
 }
 
 static void init_outbuf() {
@@ -125,7 +144,7 @@ static void init_outbuf() {
 static int runner_main() {
 	int r;
 	int stdout_pipe[2];
-	char buf[1024];
+	struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
 	const char *argv[] = {"sh", NULL};
 
 	if (pipe(stdout_pipe))
@@ -138,18 +157,20 @@ static int runner_main() {
 	if (spawn(argv[0], argv) < 0)
 		panic("runner spawn");
 	
-	cprintf("runner is alive and kicking\n");
+	if (sys_page_alloc(0, SHARE_PAGE, PTE_P | PTE_U | PTE_W))
+		panic("runner alloc");
+	
+	ev->type = EVENT_RAW_DATA;
+	ev->next = ev->prev = NULL;
 	
 	while (1) {
-		r = read(stdout_pipe[0], buf, sizeof(buf) - 1);
-		if (r < 0) {
+		r = read(stdout_pipe[0], ev->d.erd.data, 
+				 PGSIZE - sizeof(struct graphics_event));
+
+		if (r <= 0)
 			cprintf("runner got r=%d -> %e\n", r, r);
-		}
-		else {
-			buf[r] = '\0';
-			cprintf("runner got '%s'\n", buf);
-			// TODO send it via IPC
-		}
+		else
+			ipc_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U);
 	}
 }
 
@@ -181,13 +202,13 @@ static void spawn_runner() {
 		exit();
 	}
 
-	shell_pipe = _shell_pipe[1];
+	shell_fd = _shell_pipe[1];
 }
 
 void umain(int argc, char **argv) {
 	init_graphics();
 
-	// spawn_runner();
+	spawn_runner();
 
 	// set the font
 	font = font_10x18;
