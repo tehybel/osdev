@@ -450,12 +450,18 @@ sys_time_msec(void)
 static int sys_transmit(unsigned char *data, size_t length) {
 	user_mem_assert(curenv, data, length, 0);
 
+	if (!e1000_initialized)
+		return -E_NOT_SUPP;
+
 	// for now, always use the e1000 network card and driver
 	return e1000_transmit(data, length);
 }
 
 static int sys_receive(unsigned char *buf, size_t bufsize) {
 	user_mem_assert(curenv, buf, bufsize, 0);
+
+	if (!e1000_initialized)
+		return -E_NOT_SUPP;
 
 	// for now, always use the e1000 network card and driver
 	return e1000_receive(buf, bufsize);

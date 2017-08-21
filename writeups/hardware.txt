@@ -1,5 +1,5 @@
 
-Time: 17:20-TODO,
+Time: 17:20-19:20, TODO
 
 
 
@@ -19,5 +19,14 @@ http://wiki.osdev.org/Disk_Images
 We can create a VMDK with:
 
 	VBoxManage internalcommands createrawvmdk -filename /tmp/test.vmdk -rawdisk /home/imm/osdev/obj/kern/kernel.img
+
+
+I had to make some minor changes to make it work in virtualbox. E.g. we must
+detect when there's no e1000 and no secondary disk.
+
+I also had to change some settings on the virtualbox machine. E.g. I had to
+enable serial out (writing it to a file). I also had to attach the second
+disk containing the file system. I also enabled LAPIC emulation; otherwise no
+clock signals are generated and the scheduler is never called.
 
 

@@ -104,10 +104,14 @@ fs_init(void)
 	static_assert(sizeof(struct File) == 256);
 
 	// Find a JOS disk.  Use the second IDE disk (number 1) if available
-	if (ide_probe_disk1())
+	if (ide_probe_disk1()) {
+		cprintf("FS server will use the second disk\n");
 		ide_set_disk(1);
-	else
+	}
+	else {
+		cprintf("FS server cannot use the second disk; assuming disk 0 is OK\n");
 		ide_set_disk(0);
+	}
 	bc_init();
 
 	// Set "super" to point to the super block.

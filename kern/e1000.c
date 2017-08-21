@@ -305,6 +305,8 @@ int e1000_attach(struct pci_func *pcif) {
 	e1000_tx_init();
 	e1000_rx_init();
 
+	e1000_initialized = 1;
+
 	return 0;
 }
 

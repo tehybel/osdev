@@ -1,0 +1,24 @@
+# Disk DescriptorFile
+version=1
+CID=c783ed80
+parentCID=ffffffff
+createType="fullDevice"
+
+# Extent description
+RW 10000 FLAT "/home/imm/osdev/obj/kern/kernel.img" 0
+
+# The disk Data Base 
+#DDB
+
+ddb.virtualHWVersion = "4"
+ddb.adapterType="ide"
+ddb.geometry.cylinders="9"
+ddb.geometry.heads="16"
+ddb.geometry.sectors="63"
+ddb.uuid.image="b93ca30e-c414-4f7f-9ba8-6b2e2b66b334"
+ddb.uuid.parent="00000000-0000-0000-0000-000000000000"
+ddb.uuid.modification="00000000-0000-0000-0000-000000000000"
+ddb.uuid.parentmodification="00000000-0000-0000-0000-000000000000"
+ddb.geometry.biosCylinders="9"
+ddb.geometry.biosHeads="16"
+ddb.geometry.biosSectors="63"

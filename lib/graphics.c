@@ -12,7 +12,8 @@ void init_fonts() {
 void init_graphics() {
 	// receive the canvas from the display server
 	Canvas *tmp = CANVAS_BASE - PGSIZE;
-	ipc_recv(NULL, tmp, NULL);
+	if (ipc_recv(NULL, tmp, NULL))
+		panic("ipc_recv failure in init_graphics");
 
 	// immediately move the canvas into the global variable, so that the
 	// IPC-shared page will never get messed with by others

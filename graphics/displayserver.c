@@ -54,7 +54,7 @@ static void dealloc_share_page() {
 static void share(int pid, void *data, size_t size) {
 	alloc_share_page();
 	memcpy(D_SHARE_PAGE, data, size);
-	ipc_send(pid, 0, D_SHARE_PAGE, PTE_P | PTE_U | PTE_W);
+	ipc_send(pid, 0, D_SHARE_PAGE, PTE_P | PTE_U);
 	dealloc_share_page();
 }
 
@@ -269,7 +269,9 @@ static void add_event_to_queue(int pid, struct graphics_event *ev) {
 static void handle_mouse_click(int button) {
 	Application *app = get_app_for_coordinate(cursor_x, cursor_y);
 	Window *w = &app->window;
-	if (!w) return;
+	if (!w) {
+		return;
+	}
 
 	struct graphics_event *ev = calloc(1, sizeof(struct graphics_event));
 	if (!ev) panic("malloc event");
@@ -533,7 +535,7 @@ static void transmit_events() {
 
 void umain(int argc, char **argv) {
 
-	cprintf("graphics environment started!\n");
+	cprintf("display server (0x%x) started!\n", thisenv->env_id);
 	binaryname = "displayserver";
 
 	init_lfb();

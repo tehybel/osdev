@@ -58,6 +58,11 @@ void input(envid_t ns_envid) {
 			sys_yield();
 			continue;
 		}
+		else if (r == -E_NOT_SUPP) {
+			// no network card, so just give up
+			cprintf("warning: no network card!!\n");
+			return;
+		}
 		else if (r == -E_NO_MEM) {
 			cprintf("warning: input environment got a too-large packet\n");
 			continue;

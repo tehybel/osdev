@@ -104,8 +104,11 @@ static void start_environments() {
 #if defined(TEST)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #endif
+	
+	if (!have_graphics) {
+		ENV_CREATE(user_icode, ENV_TYPE_USER);
+	}
 
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core

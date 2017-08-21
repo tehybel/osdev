@@ -28,6 +28,8 @@ struct rxdesc {
 	uint16_t special;
 };
 
+int e1000_initialized;
+
 
 // "The maximum size of an Ethernet packet is 1518 bytes, which bounds how
 // big these buffers need to be"

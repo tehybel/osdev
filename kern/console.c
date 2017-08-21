@@ -471,11 +471,10 @@ static void add_to_io_event_queue(char c) {
 void handle_keyboard_event() {
 	int c;
 	if ((c = get_data_from_keyboard())) {
-		// for now, only send the char to the display server, not to the
-		// console subsystem. This means we'll only be able to use a graphical
-		// terminal emulator.
-		// add_to_console_buffer(c);
-		add_to_io_event_queue(c);
+		if (have_graphics)
+			add_to_io_event_queue(c);
+		else
+			add_to_console_buffer(c);
 	}
 }
 

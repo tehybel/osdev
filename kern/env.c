@@ -599,6 +599,7 @@ void
 env_run(struct Env *new)
 {
 	struct Env *old = curenv;
+	// cprintf("switching to 0x%x\n", new->env_id);
 
 	// make sure interrupts are enabled in user mode
 	assert (!old || old->env_tf.tf_eflags & FL_IF);
