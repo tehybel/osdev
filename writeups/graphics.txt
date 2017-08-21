@@ -8,7 +8,7 @@ Total: ~43 hours of programming.
 
 
 
-In this "lab" the goal was to get a primitive graphics stack working. Now that
+In this lab the goal was to get a primitive graphics stack working. Now that
 the lab is completed, we have a working graphical user interface which we can
 interact with using the mouse and keyboard. We wrote a simple paint program
 and terminal emulator to interact with.

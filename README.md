@@ -15,7 +15,9 @@ The current status is:
 | lab4     | done        | preemptive multitasking, COW fork(), IPC                   |
 | lab5     | done        | file system and shell                                      |
 | lab6     | done        | networking                                                 |
-| graphics | in progress | graphical user interface                                   |
+| graphics | done        | graphical user interface                                   |
+| hardware | in progress | running the OS on real hardware                            |
+| captor   | not started | capabilities and Tor                                       |
 
 
 To provide an overview, here's a summary of my work so far:
