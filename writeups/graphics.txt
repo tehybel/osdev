@@ -1,9 +1,242 @@
 
 
 Time: 13-15, 13-15:15, 21:30-00, 11:30-14:30, 12-12:30, 15:20-17:40,
-17:50-19:50, 10-11:45, 19:30-20, 11:30-13:40, 12:15-14:15, 
-11-15:25, 21:30-00:30, 10-14:15, 11-14, 11:20-13:45, 15-15:30,
-13:45-17, 14-TODO, 
+17:50-19:50, 10-11:45, 19:30-20, 11:30-13:40, 12:15-14:15, 11-15:25,
+21:30-00:30, 10-14:15, 11-14, 11:20-13:45, 15-15:30, 13:45-17, 14-15
+
+Total: ~43 hours of programming.
+
+
+
+In this "lab" the goal was to get a primitive graphics stack working. Now that
+the lab is completed, we have a working graphical user interface which we can
+interact with using the mouse and keyboard. We wrote a simple paint program
+and terminal emulator to interact with.
+
+
+To get there, a lot of work needed to be done. Here's the overview:
+- To draw pixels, we needed to query the BIOS to set up a so-called Linear
+  Frame Buffer (LFB) representing the screen. Values are written into the
+  buffer to draw pixels.
+- It is impossible to query the BIOS in 32-bit protected mode, so we first
+  tried to use virtual-8086 mode, but this turned out the be unsupported by
+  QEMU.
+- Instead we wrote assembly code which switches back to 16-bit real mode,
+  queries the BIOS to determine a good graphics mode, maps the LFB, and
+  reverts to protected mode.
+- We researched how graphics stacks work and decided on a design with a
+  central display server.
+- We wrote the display server; it is responsible for rendering the windows of
+  other applications by writing into the LFB.
+- We wrote a user-mode graphics library to render fonts, draw squares, etc.
+- We wrote a PS/2 mouse driver.
+- We wrote a simple paint application and a terminal emulator.
+
+
+
+
+Below I describe this journey in more detail.
+
+
+The first primitive that we needed was the ability to draw a single pixel at a
+time.
+
+This is achieved using what's called the Linear Frame Buffer (LFB). It's
+essentially a big buffer which holds 32-bit values. Each such value
+corresponds to a pixel. So once you have mapped the LFB into memory somewhere,
+you simply write a value to an offset in the buffer to change the color of a
+given pixel.
+
+Thus the first challenge was to get the LFB mapped. This can only be done by
+issuing an interrupt (int 0x10) to the BIOS.
+
+Unfortunately BIOS interrupts can only be used from 16-bit real mode, while
+we're in 32-bit protected mode.
+
+There are two ways around this: (1) you can switch to "virtual 8086 mode" (v86
+mode), a processor mode meant for emulating old 16-bit software, or (2) you
+can manually switch back to real mode, do the work, then switch to protected
+mode again.
+
+After some research I determined that the first option seemed more appealing.
+I thought that we just needed to change the EFLAGS register and then a process
+would be running in v86 mode. Then we could issue int 0x10 and move on.
+
+In practice, v86 mode turned out to be very difficult to make work. First we
+needed syscalls for switching modes. Then it turned out that interrupts in v86
+mode are handled in a complicated manner. I found a section in the Intel
+manual:
+
+	When the processor receives a software interrupt (an interrupt generated
+	with the INT n instruction) while in virtual-8086 mode, it can use any of
+	six different methods to handle the interrupt.
+	
+	The method selected depends on the settings of the VME flag in control
+	register CR4, the IOPL field in the EFLAGS register, and the software
+	inter- rupt redirection bit map in the TSS.
+
+According to table 20-2, we need to set VME=1, IOPL=3, bitmap_bit=0. This will
+result in method 5, "Interrupt redirected to 8086 program interrupt handler".
+
+After all this work I suddenly found out that QEMU does not support emulation
+of the VME bit. In other words, this method *will not work* on QEMU.
+
+I could move to Bochs.. but instead I backtracked, putting aside virtual-8086
+mode for now.
+
+We have another option, namely switching back to 16-bit real mode. There are
+many little details to get right when doing this. For example we must move our
+code to a low physical address so that switching off paging doesn't break
+everything. But in the end this option worked.
+
+
+At this point we can issue int 0x10 to the BIOS. By setting the value of the
+AX register, we can call different BIOS functions related to graphics. 
+
+We now needed to write assembly code which queries the BIOS for all the
+possible graphics modes which are supported (height, width, bits per pixel,
+etc.) and choose a fitting one. Once a mode has been decided upon, we ask the
+BIOS to use it. The BIOS then hands us a physical address where the LFB now
+resides. Then we return to 32-bit protected mode and carry on as usual.
+
+I then wrote a routine, draw_pixel(x, y, color), which writes to the LFB to
+draw a pixel.
+
+
+
+
+At this point we can draw pixels. To continue, I had to determine how a
+graphics stack works.
+
+Our design will work as follows. There is a central server, called the display
+server. It is a privileged process responsible for writing to the LFB, which is
+mapped into the process using paging. 
+
+The display server is responsible for spawning any other graphics-enabled
+application. 
+
+When an application is spawned, it is represented inside a window. The window
+has a title and border as one would expect, though buttons for maximizing and
+closing the window are not yet enabled. The central part of a window is its
+canvas. It is the responsibility of each graphics-enabled application to
+render pixels into its own canvas. 
+
+The canvas is implemented using shared memory, such that the display server
+can easily read and render the canvas of each application.
+
+The display server is also responsible for periodically draining mouse and
+keyboard events from the kernel and forwarding them to the targeted
+application.
+
+
+All in all, this means that the kernel now spawns a special display server
+process, which in turn spawns a "paint" and "terminal" application, giving
+each some shared memory to represent their canvas. These applications then
+draw their canvases and enter an event loop, waiting for events from the
+display server.
+
+
+Now the following is what happens when you press the "A" key on your keyboard.
+First the hardware generates an interrupt. Some kernel code runs that will use
+PIO to grab the pressed key ("A") from the hardware. The key event is put into
+a queue. Eventually the display server uses a syscall to drain this queue. It
+sees that "A" was pressed and that, say, the terminal application was in the
+foreground. It therefore sends the event to the terminal application which is
+hanging on its event loop. When the event arrives, the terminal application
+processes it; this involves rendering the character on the screen and putting
+it into a buffer. There the character will resideuntil a newline is received,
+at which point the whole line is sent to the "sh" process.
+
+
+
+
+
+Rendering fonts is based on a static font which was borrowed from the Linux
+kernel. Each letter is 18 pixels tall and 10 pixels wide. The font simply
+consists of a mapping from character to a bitmap. For instance, the '?'
+character maps to this:
+
+	0x00, 0x00, /* 0000000000 */
+	0x0e, 0x00, /* 0000111000 */
+	0x1f, 0x00, /* 0001111100 */
+	0x3b, 0x80, /* 0011101110 */
+	0x21, 0x80, /* 0010000110 */
+	0x01, 0x80, /* 0000000110 */
+	0x03, 0x00, /* 0000001100 */
+	0x06, 0x00, /* 0000011000 */
+	0x06, 0x00, /* 0000011000 */
+	0x0c, 0x00, /* 0000110000 */
+	0x0c, 0x00, /* 0000110000 */
+	0x00, 0x00, /* 0000000000 */
+	0x00, 0x00, /* 0000000000 */
+	0x0c, 0x00, /* 0000110000 */
+	0x0c, 0x00, /* 0000110000 */
+	0x00, 0x00, /* 0000000000 */
+	0x00, 0x00, /* 0000000000 */
+	0x00, 0x00, /* 0000000000 */
+
+We use this font data to decide which pixels to assign background and
+foreground colors.
+
+Functions for rendering fonts, drawing pixels, squares, and so on, are
+included in a user-mode graphics library.
+
+
+We also realized that we were missing a mouse driver. We wrote one for PS/2
+mice. This involved using the inb and outb instructions to send characters to
+certain ports. This let us ask the hardware to initialize the mouse and to
+generate interrupts when new mouse data is available. We also needed functions
+for reading and parsing the packets which the mouse sends; these contains
+information about clicks, movements, etc.
+
+
+
+
+
+All in all, this lab was much harder and more time-consuming than previous
+labs.
+
+One reason is that I had to write far more code than in previous labs.
+Previous labs were part of the MIT course. Therefore they were optimized for
+learning; code that was tedious to write, but not conceptually interesting,
+was given to us for free. That was not the case for this lab.
+
+Another reason is that for the MIT course labs, there is a single lab page
+which describes what needs to be done. The page effectively provides a
+roadmap, and even links to relevant manuals. The current lab had no such
+roadmap; I had to determine the design of the display server on my own,
+drawing inspiration from e.g. the X window system. This design/understanding
+phase took a while.
+
+
+
+
+
+
+Below are some links I found useful:
+
+	https://web.archive.org/web/20150725135958/http://web.mit.edu/amdragon/www/pubs/sqrtx-6.828.html
+	http://wiki.osdev.org/Graphics_stack
+	http://wiki.osdev.org/VESA_Video_Modes 
+	http://wiki.osdev.org/User:Omarrx024/VESA_Tutorial
+	http://wiki.osdev.org/VGA_Hardware
+	http://wiki.osdev.org/How_do_I_set_a_graphics_mode
+	http://wiki.osdev.org/GUI
+	https://en.wikipedia.org/wiki/VESA_BIOS_Extensions
+	https://wiki.gentoo.org/wiki/QEMU/Options#Graphics_card
+
+
+
+
+
+
+
+------------- old notes below -------------
+
+/* these are some notes I took while working through this lab. They're just
+ * meant for myself and are completely unpolished. */
+
+
 
 
 
