@@ -24,4 +24,5 @@ trace-*
 .cproject
 .project
 .settings/
+__pycache__/
 
