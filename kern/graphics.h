@@ -12,6 +12,7 @@
 #ifndef __ASSEMBLER__
 
 void init_graphics();
+bool graphics_enabled();
 
 
 struct vbe_mode_info {

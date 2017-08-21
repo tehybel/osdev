@@ -28,7 +28,17 @@ static void print_mode_info(struct vbe_mode_info *m) {
 
 }
 
+bool graphics_enabled() {
+	return 0;
+}
+
 void init_graphics() {
+	
+	if (!graphics_enabled()) {
+		cprintf("Will not initialize graphics.\n");
+		have_graphics = 0;
+		return;
+	}
 	
 	// since we're switching to real mode, we need to do so from code which
 	// resides at a place which is 1:1 mapped, which should currently be true

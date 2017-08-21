@@ -627,7 +627,9 @@ void init_io() {
 	cga_init();
 	kbd_init();
 	serial_init();
-	mouse_init();
+
+	if (graphics_enabled())
+		mouse_init();
 
 	if (!serial_exists)
 		cprintf("Serial port does not exist!\n");

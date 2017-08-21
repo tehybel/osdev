@@ -1,8 +1,23 @@
 
-Time: TODO.
+Time: 17:20-TODO,
 
 
 
 The goal of this "lab" is the get the OS running on real hardware.
+
+
+
+-------------------------------------
+
+Unpolished notes:
+
+First we want virtualbox to work.
+
+http://wiki.osdev.org/Disk_Images
+
+
+We can create a VMDK with:
+
+	VBoxManage internalcommands createrawvmdk -filename /tmp/test.vmdk -rawdisk /home/imm/osdev/obj/kern/kernel.img
 
 

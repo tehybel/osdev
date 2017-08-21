@@ -24,7 +24,6 @@ static void boot_aps(void);
 static void start_environments();
 static void enable_v86();
 
-
 void i386_init(void) {
 	extern char edata[], end[];
 
@@ -105,6 +104,8 @@ static void start_environments() {
 #if defined(TEST)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #endif
+
+	ENV_CREATE(user_hello, ENV_TYPE_USER);
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core
