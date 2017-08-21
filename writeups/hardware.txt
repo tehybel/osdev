@@ -1,0 +1,8 @@
+
+Time: TODO.
+
+
+
+The goal of this "lab" is the get the OS running on real hardware.
+
+
