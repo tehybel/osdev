@@ -98,10 +98,11 @@ static void handle_raw_data(uint8_t *data, size_t size) {
 	size_t i;
 	for (i = 0; i < size; i++)
 		add_to_outbuf(data[i]);
+
+	draw();
 }
 
 static void process_event(struct graphics_event *ev) {
-
 	switch (ev->type) {
 	case EVENT_KEY_PRESS:
 		handle_inchar(ev->d.ekp.ch);
@@ -144,8 +145,8 @@ static void init_outbuf() {
 static int runner_main() {
 	int r;
 	int stdout_pipe[2];
-	struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
 	const char *argv[] = {"sh", NULL};
+	envid_t displayserv_pid = thisenv->env_parent_id;
 
 	if (pipe(stdout_pipe))
 		panic("runner pipe");
@@ -157,20 +158,30 @@ static int runner_main() {
 	if (spawn(argv[0], argv) < 0)
 		panic("runner spawn");
 	
-	if (sys_page_alloc(0, SHARE_PAGE, PTE_P | PTE_U | PTE_W))
-		panic("runner alloc");
-	
-	ev->type = EVENT_RAW_DATA;
-	ev->next = ev->prev = NULL;
-	
 	while (1) {
+		// we have to map the SHARE_PAGE once per loop, because the ipc_send
+		// will *share* the page with the display server, and so we should not
+		// modify the same physical page again after sending it.
+		if (sys_page_alloc(0, SHARE_PAGE, PTE_P | PTE_U | PTE_W))
+			panic("runner alloc");
+
+		struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
+
+		ev->type = EVENT_RAW_DATA;
+		ev->next = ev->prev = NULL;
+
 		r = read(stdout_pipe[0], ev->d.erd.data, 
 				 PGSIZE - sizeof(struct graphics_event));
 
-		if (r <= 0)
+		if (r <= 0) {
 			cprintf("runner got r=%d -> %e\n", r, r);
-		else
-			ipc_send(pid, 0, SHARE_PAGE, PTE_P | PTE_U);
+		} else {
+			ev->d.erd.size = r;
+			ipc_send(displayserv_pid, 0, SHARE_PAGE, PTE_P | PTE_U);
+		}
+
+		if (sys_page_unmap(0, SHARE_PAGE))
+			panic("runner unmap");
 	}
 }
 

@@ -352,8 +352,9 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *src_va, unsigned perm)
 	if ((result = envid2env(envid, &dst_env, 0)))
 		return result;
 	
-	if (!dst_env->env_ipc_recving)
+	if (!dst_env->env_ipc_recving) {
 		return -E_IPC_NOT_RECV;
+	}
 	
 	// if curenv wants to send a page of data, do additional checks
 	if (TRANSMITTING(src_va)) {

@@ -44,6 +44,7 @@ void event_loop(void (*process_event)(struct graphics_event *)) {
 		ipc_recv(NULL, SHARE_PAGE, NULL);
 		struct graphics_event *ev = (struct graphics_event *) SHARE_PAGE;
 		process_event(ev);
+		sys_page_unmap(0, SHARE_PAGE);
 	}
 }
 
