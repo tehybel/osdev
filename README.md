@@ -43,6 +43,9 @@ To provide an overview, here's a summary of my work so far:
 - In lab 6 we connected the OS to the internet by implementing a driver for
   the e1000 network card. We also wrote a small web server which can serve
   files from the file system.
-- As a more advanced feature, work is in progress on a GUI.
+- In the graphics lab we implemented OS support for a graphical user
+  interface. We implemented a central display server responsible for rendering
+  applications. We wrote a user-mode graphics library and a PS/2 mouse driver.
+  We also wrote a graphical paint application and a terminal emulator.
 
 The writeups/ directory contains detailed writeups for each lab.
