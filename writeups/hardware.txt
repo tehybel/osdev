@@ -1,5 +1,5 @@
 
-Time: 17:20-19:20, TODO
+Time: 17:20-19:20, 13-17, TODO
 
 
 
@@ -28,5 +28,92 @@ I also had to change some settings on the virtualbox machine. E.g. I had to
 enable serial out (writing it to a file). I also had to attach the second
 disk containing the file system. I also enabled LAPIC emulation; otherwise no
 clock signals are generated and the scheduler is never called.
+
+
+.............
+
+I tried dd'ing the disk image to a USB drive and putting it into my netbook.
+However it refuses to boot from it.
+
+http://wiki.osdev.org/Problems_Booting_From_USB_Flash
+
+
+This thread has 512 bytes of code with and without BIOS Parameter Block (BPB).
+
+http://f.osdev.org/viewtopic.php?f=1&t=19366
+
+With a BPB, the machine boots from USB. 
+Without BPB.. it also works.
+
+That sample code places the bytes "0xaa55" at offset 510. If I change that to
+another value, the system refuses to boot.
+
+Apparently that magic value signals that the disk is bootable. More info here:
+
+	https://en.wikipedia.org/wiki/Master_boot_record
+
+So we'll just have to write those bytes in our OS boot.S file.
+
+.....
+
+It turns out that our Makefile already does this for us. So that's not the
+problem.
+
+
+I've noticed that the image that boots, found in the forum topic above, has
+lots of 0s in the first sector. If we turn those into 1s, the machine won't
+boot anymore. So it seems that there are further requirements on the layout of
+the first disk block....
+
+Indeed, it keeps working until we set the 16 bytes at +0x1be to 0x1 instead of
+0x0. At that offset is the first partition entry of the MBR, according to the
+wiki link above.
+
+There's just one problem: those bytes are already 0 in our kernel image, and
+it doesn't boot...
+
+Aha. If we put a proper BPB in the first block, the BIOS cooperates and boots
+from the disk. So it's probably using some sort of heuristic to determine
+whether it's bootable or not.
+
+
+
+Now I got a little further. But I just realized that our boot loader, which
+fits into the first 512 bytes, usually loads the kernel from the main disk via
+ATA PIO. Now, though, the kernel is on a USB. So we now have to write a USB
+driver that'll fit in those 512 bytes.
+
+Alternatively we can boot an arch iso and use it to dd our OS from another USB
+to the main hard drive. I'll go with that for now.
+
+...
+
+Okay. My netbook is hanging. I've got no output and no clue what it's doing...
+
+...
+
+Now I've got output working by writing directly into the video memory, as seen
+here:
+
+	http://wiki.osdev.org/Printing_To_Screen
+
+So I can start actually solving the problem. The waitdisk() function is
+hanging.
+
+
+Oh. It turns out there are different kinds of hardware controllers. Our OS
+assumes that it's on an IDE (aka. ATA) controller. And that was the case in
+QEMU and VirtualBox. But what about my netbook?
+
+	http://www.packardbell.com/pb/en/IL/content/model/LU.BUN0D.038
+
+It seems to be SATA. That's *probably* okay.
+
+
+All in all I now know that the problem lies in reading data from the (S)ATA
+hard drive.
+
+
+
 
 

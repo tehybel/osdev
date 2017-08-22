@@ -33,6 +33,8 @@ void i386_init(void) {
 	// initializes keyboard-, mouse-, and serial-i/o
 	init_io();
 
+	cprintf("kernel is sort of up\n");
+
 	init_graphics();
 
 	// initialize the physical page management system 

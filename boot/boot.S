@@ -1,5 +1,46 @@
 #include <inc/mmu.h>
 
+
+# the following is a BIOS Parameter Block; some BIOSes check for it and will
+# refuse to boot from the disk if it's not there.
+
+.code16
+.intel_syntax noprefix
+.text
+.org 0x0
+
+  jmp short start                 # jump to beginning of code
+  nop
+
+bootsector:
+ iOEM:          .ascii "MyOS    "    # OEM String
+ iSectSize:     .word  0x200         # bytes per sector
+ iClustSize:    .byte  1             # sectors per cluster
+ iResSect:      .word  1             # #of reserved sectors
+ iFatCnt:       .byte  2             # #of FAT copies
+ iRootSize:     .word  224           # size of root directory
+ iTotalSect:    .word  2880          # total # of sectors if over 32 MB
+ iMedia:        .byte  0xF0          # media Descriptor
+ iFatSize:      .word  9             # size of each FAT
+ iTrackSect:    .word  9             # sectors per track
+ iHeadCnt:      .word  2             # number of read-write heads
+ iHiddenSect:   .int   0             # number of hidden sectors
+ iSect32:       .int   0             # # sectors for over 32 MB
+ iBootDrive:    .byte  0             # holds drive that the boot sector came from
+ iReserved:     .byte  0             # reserved, empty
+ iBootSign:     .byte  0x29          # extended boot sector signature
+ iVolID:        .ascii "seri"        # disk serial
+ acVolumeLabel: .ascii "MYVOLUME   " # volume label
+ acFSType:      .ascii "FAT16   "    # file system type
+
+
+# end BPB.
+
+
+
+
+.att_syntax prefix
+
 # Start the CPU: switch to 32-bit protected mode, jump into C.
 # The BIOS loads this code from the first sector of the hard disk into
 # memory at physical address 0x7c00 and starts executing in real mode
@@ -40,6 +81,10 @@ seta20.2:
 
   movb    $0xdf,%al               # 0xdf -> port 0x60
   outb    %al,$0x60
+
+  # print 'A' to the screen
+  mov $0x0e41, %ax
+  int $0x10
 
   # Switch from real to protected mode, using a bootstrap GDT
   # and segment translation that makes virtual addresses 
@@ -82,4 +127,5 @@ gdt:
 gdtdesc:
   .word   0x17                            # sizeof(gdt) - 1
   .long   gdt                             # address gdt
+
 
