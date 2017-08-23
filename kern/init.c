@@ -41,13 +41,13 @@ void i386_init(void) {
 	// also initialize the page table to support proper virtual memory
 	init_memory();
 
+	init_multiprocessing();
+
 	// user environment initialization
 	init_environments();
 
 	// set up the IDT to handle exceptions and other interrupts
 	init_idt();
-
-	init_multiprocessing();
 
 	// set up the local and global interrupt controllers
 	init_lapic();

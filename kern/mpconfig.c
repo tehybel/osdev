@@ -80,21 +80,41 @@ sum(void *addr, int len)
 	return sum;
 }
 
+static void print_mp(struct mp *mp) {
+	cprintf("sig: %c %c %c %c\n", mp->signature[0], mp->signature[1],
+			mp->signature[2], mp->signature[3]); 
+	cprintf("physaddr: 0x%x\n", mp->physaddr);
+	cprintf("length: %d\n", mp->length);
+	cprintf("specrev: %d\n", mp->specrev);
+	cprintf("checksum: %d\n", mp->checksum);
+	cprintf("type: %d\n", mp->type);
+	cprintf("imcrp: %d\n", mp->imcrp);
+	cprintf("reserved: %d\n", mp->reserved[0]);
+	cprintf("reserved: %d\n", mp->reserved[1]);
+	cprintf("reserved: %d\n", mp->reserved[2]);
+}
+
 // Look for an MP structure in the len bytes at physical address addr.
 static struct mp *
 mpsearch1(physaddr_t a, int len)
 {
 	struct mp *mp = KADDR(a), *end = KADDR(a + len);
 
-	for (; mp < end; mp++)
+	for (; mp < end; mp++) {
 		if (memcmp(mp->signature, "_MP_", 4) == 0) {
-			cprintf("found the _MP_ signature!\n");
-			if ( sum(mp, sizeof(*mp)) == 0) {
+			cprintf("found a _MP_ signature at 0x%x\n", mp);
+			print_mp(mp);
+			uint8_t checksum = sum(mp, sizeof(*mp));
+			if (checksum == 0) {
 				cprintf("the sum matches, too\n");
 				return mp;
+			} else {
+				cprintf("... but the sum is wrong: %d\n", checksum);
+				cprintf("let's just try it anyway......\n");
+				return mp;
 			}
-			cprintf("... but the sum is wrong.\n");
 		}
+	}
 	
 	cprintf("no _MP_ signature found\n");
 	return NULL;
