@@ -1,5 +1,5 @@
 
-Time: 17:20-19:20, 13-17, TODO
+Time: 17:20-19:20, 13-17, 11:20-TODO,
 
 
 
@@ -112,6 +112,126 @@ It seems to be SATA. That's *probably* okay.
 
 All in all I now know that the problem lies in reading data from the (S)ATA
 hard drive.
+
+.....
+
+All my tests show that we have a "floating bus", i.e., that there are no valid
+drives to read from. So what do we do?
+
+
+Aha. Yesterday I assumed that SATA and ATA were compatible, but I just
+tested that. VirtualBox can emulate a SATA interface instead of IDE/ATA.
+
+When I do that, I get exactly the same behavior as on my netbook. The
+waitdisk() function is timing out and the bus is floating.
+
+
+However there's a BIOS setting called "SATA Mode" which I tried switching from
+AHCI to IDE. That didn't help, though..
+
+
+I did some more searching. Here's a useful link:
+
+	http://f.osdev.org/viewtopic.php?f=1&t=24355
+
+It seems that while SATA is backwards compatible with ATA, that's only the
+case when using a PCI-based driver. If we use PIO, SATA simply isn't connected
+to the ports that ATA is.
+
+So we can keep our driver, but we must add PCI support.
+
+
+I also just realized that VirtualBox only supports SATA in AHCI mode. So we
+can't use that for testing...
+
+......
+
+The purpose of the PCI part of the driver is simply to determine at which
+ports to communicate with the ATA interface.
+
+However PCI code simply won't fit in those first 512 bytes. We'd have to add
+another stage of loading somehow..
+
+But there's a way to cheat. I booted into a live CD and ran "lspci -v". It
+told me this:
+
+	PCI interface: SATA controller (IDE mode)
+	IRQ 17
+	I/O ports at
+		60b8
+		60cc
+		60b0
+		60c8
+		60a0
+	Memory at 52000000
+	Kernel driver in use: ata_piix
+	Kernel modules: ata_piix, pata_acpi, ata_generic
+
+Perhaps we can just hardcode those io ports.
+
+Indeed, that works! Now we've got the boot loader running and we get into the
+kernel!
+
+However now the initialization process gets stuck at some point.
+
+
+
+Well, now there's a new problem: we're loading data not from our USB, but from
+the hard drive. So we'll have to go through a live disk to dd the new kernel
+onto the disk each time. And that's awfully slow...
+
+That seems like the best option for now, though. Alternatively we could write
+a USB driver.
+
+Okay. It's slow and painful but it kind of works.
+
+
+Next problem: the system either doesn't have a LAPIC, or it's not getting
+enabled properly. This means that we're not generating any timer IRQs. So the
+scheduler isn't working properly.
+
+
+
+
+The major problem right now is that development is too slow. That's caused by
+having to boot into a live CD to dd my kernel image onto the hard drive.
+
+It would be much nicer if we could load the kernel straight from the USB.
+Apparently writing a USB driver is time-consuming. But we can instead ask the
+BIOS to read from USB for us, according to this thread:
+
+	http://forum.osdev.org/viewtopic.php?f=1&t=26697
+
+Here's info about this:
+
+	http://wiki.osdev.org/ATA_in_x86_RealMode_(BIOS)
+
+But that's also messy -- we need to drop back to real mode, and apparently
+there's a size limit for how much can be read from a USB this way, since it's
+performing floppy emulation, giving a max size of ~1.4 Mb. That's not enough
+for us...
+
+
+
+Maybe we just have to live with slow development. That's the major problem on
+real hardware.
+
+So back to the missing LAPIC.
+
+
+Fortunately we can emulate the same issue using virtualbox.
+
+.......
+
+Actually no. What VirtualBox does when I change that setting is to completely
+disable the APIC, so that we only have a PIC. But that's surely not the case
+for my netbook, since it's less than 20 years old...
+
+So I'll have to figure out in more detail what's happening on my netbook.
+
+
+
+
 
 
 

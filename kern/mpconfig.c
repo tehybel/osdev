@@ -87,9 +87,16 @@ mpsearch1(physaddr_t a, int len)
 	struct mp *mp = KADDR(a), *end = KADDR(a + len);
 
 	for (; mp < end; mp++)
-		if (memcmp(mp->signature, "_MP_", 4) == 0 &&
-		    sum(mp, sizeof(*mp)) == 0)
-			return mp;
+		if (memcmp(mp->signature, "_MP_", 4) == 0) {
+			cprintf("found the _MP_ signature!\n");
+			if ( sum(mp, sizeof(*mp)) == 0) {
+				cprintf("the sum matches, too\n");
+				return mp;
+			}
+			cprintf("... but the sum is wrong.\n");
+		}
+	
+	cprintf("no _MP_ signature found\n");
 	return NULL;
 }
 
@@ -97,7 +104,7 @@ mpsearch1(physaddr_t a, int len)
 // [MP 4] is in one of the following three locations:
 // 1) in the first KB of the EBDA;
 // 2) if there is no EBDA, in the last KB of system base memory;
-// 3) in the BIOS ROM between 0xE0000 and 0xFFFFF.
+// 3) in the BIOS ROM between 0xF0000 and 0xFFFFF.
 static struct mp *
 mpsearch(void)
 {
@@ -114,16 +121,25 @@ mpsearch(void)
 	// starting at byte 0x0E of the BDA.  0 if not present.
 	if ((p = *(uint16_t *) (bda + 0x0E))) {
 		p <<= 4;	// Translate from segment to PA
+		cprintf("found the address of the EBDA: 0x%x\n", p);
 		if ((mp = mpsearch1(p, 1024)))
 			return mp;
 	} else {
 		// The size of base memory, in KB is in the two bytes
 		// starting at 0x13 of the BDA.
 		p = *(uint16_t *) (bda + 0x13) * 1024;
+		cprintf("the EBDA wasn't present!\n");
+		cprintf("instead we look in the last KB of base memory\n");
+		cprintf("we have 0x%x bytes of base memory.\n", p);
 		if ((mp = mpsearch1(p - 1024, 1024)))
 			return mp;
 	}
-	return mpsearch1(0xF0000, 0x10000);
+	cprintf("falling back to looking in the BIOS ROM around 0xf0000...\n");
+	if ((mp = mpsearch1(0xF0000, 0x10000)))
+		return mp;
+	
+	cprintf("this is bad. We'll try an exhaustive search instead...\n");
+	return mpsearch1(0, 0x1000000);
 }
 
 // Search for an MP configuration table.  For now, don't accept the
@@ -135,8 +151,10 @@ mpconfig(struct mp **pmp)
 	struct mpconf *conf;
 	struct mp *mp;
 
-	if ((mp = mpsearch()) == 0)
+	if ((mp = mpsearch()) == 0) {
+		cprintf("warning: mpsearch failed\n");
 		return NULL;
+	}
 	if (mp->physaddr == 0 || mp->type != 0) {
 		cprintf("SMP: Default configurations not implemented\n");
 		return NULL;
@@ -175,8 +193,10 @@ init_multiprocessing(void)
 	unsigned int i;
 
 	bootcpu = &cpus[0];
-	if ((conf = mpconfig(&mp)) == 0)
+	if ((conf = mpconfig(&mp)) == 0) {
+		cprintf("warning: mpconfig failed\n");
 		return;
+	}
 	ismp = 1;
 	lapicaddr = conf->lapicaddr;
 

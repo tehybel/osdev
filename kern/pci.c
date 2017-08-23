@@ -6,7 +6,7 @@
 #include <kern/e1000.h>
 
 // Flag to do "lspci" at bootup
-static int pci_show_devs = 1;
+static int pci_show_devs = 0;
 static int pci_show_addrs = 0;
 
 // PCI "configuration mechanism one"

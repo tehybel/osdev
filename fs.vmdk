@@ -1,0 +1,24 @@
+# Disk DescriptorFile
+version=1
+CID=2aeb5fd0
+parentCID=ffffffff
+createType="fullDevice"
+
+# Extent description
+RW 8192 FLAT "/home/imm/osdev/obj/fs/fs.img" 0
+
+# The disk Data Base 
+#DDB
+
+ddb.virtualHWVersion = "4"
+ddb.adapterType="ide"
+ddb.geometry.cylinders="8"
+ddb.geometry.heads="16"
+ddb.geometry.sectors="63"
+ddb.uuid.image="51546629-daa2-41a3-bc8e-d07ca0db5eaf"
+ddb.uuid.parent="00000000-0000-0000-0000-000000000000"
+ddb.uuid.modification="c41cc521-8307-49be-b422-3211a95a53ae"
+ddb.uuid.parentmodification="00000000-0000-0000-0000-000000000000"
+ddb.geometry.biosCylinders="8"
+ddb.geometry.biosHeads="16"
+ddb.geometry.biosSectors="63"

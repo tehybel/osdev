@@ -39,17 +39,27 @@ void readseg(uint32_t, uint32_t, uint32_t);
 /* write directly into video memory to print characters to the screen.
  * NOTE: You cannot print strings, because only .text is included in the raw
  * image, not the .rodata section. */
-#define PRINT(c) do{*(int *) 0xB8000 = 0x07410700 | c;} while(0)
+#define PRINT(c, i) do{*(int *) (0xB8000 + ((i)<<2)) = 0x07410700 | c;} while(0)
+
+
+/* This is the base address at which we find the 8 ports needed to talk to the
+ * ATA interface. It's 0x1f0 for the primary disk in (P)ATA. However it will
+ * be different for SATA and really should be found via PCI..
+ */ 
+
+// ATA base:
+// #define IO_BASE 0x1f0
+
+// SATA base for my netbook (found with "lspci -v" on Linux):
+#define IO_BASE 0x60b8
 
 void
 bootmain(void)
 {
 	struct Proghdr *ph, *eph;
 
-
 	// read 1st page off disk
 	readseg((uint32_t) ELFHDR, SECTSIZE*8, 0);
-
 
 	// is this a valid ELF?
 	if (ELFHDR->e_magic != ELF_MAGIC)
@@ -100,34 +110,67 @@ readseg(uint32_t pa, uint32_t count, uint32_t offset)
 	}
 }
 
+#define DELAY() inb(0x84)
+
 #define ATA_BUSY (1<<7)
 #define ATA_READY (1<<6)
+
+#define MAX_TIMEOUTS 10
 
 void
 waitdisk(void)
 {
-	// wait for disk reaady
-	while ((inb(0x1F7) & (ATA_BUSY | ATA_READY)) != ATA_READY)
-		/* do nothing */;
+	uint8_t status;
+
+	while (1) {
+		status = inb(IO_BASE + 7);
+		if (status == 0xff) {
+			PRINT('F', 15); 
+		}
+
+		else if ((status & ATA_BUSY) == 0 && (status & ATA_READY)) {
+			// drive is ready
+			return;
+		}
+	}
+
+	/*
+	// drive is probably floating, but make 100% sure
+	PRINT('0', 11);
+
+	outb(0x1f4, 0x55);
+	outb(0x1f5, 0xAA);
+	uint8_t byte0 = inb(0x1f4);
+	outb(0x80, 0x55);
+	uint8_t byte1 = inb(0x1f5);
+	if (byte0 != 0x55 || byte1 != 0xAA) {
+		// definitely a floating bus.
+		PRINT('1', 12);
+	} else {
+		PRINT('2', 13);
+	}
+	*/
 }
 
 void
 readsect(void *dst, uint32_t offset)
 {
 	// wait for disk to be ready
+	PRINT('A', 0);
 	waitdisk();
+	PRINT('B', 1);
 
-	outb(0x1F2, 1);		// count = 1
-	outb(0x1F3, offset);
-	outb(0x1F4, offset >> 8);
-	outb(0x1F5, offset >> 16);
-	outb(0x1F6, (offset >> 24) | 0xE0);
-	outb(0x1F7, 0x20);	// cmd 0x20 - read sectors
+	outb(IO_BASE + 2, 1);		// count = 1
+	outb(IO_BASE + 3, offset);
+	outb(IO_BASE + 4, offset >> 8);
+	outb(IO_BASE + 5, offset >> 16);
+	outb(IO_BASE + 6, (offset >> 24) | 0xE0);
+	outb(IO_BASE + 7, 0x20);	// cmd 0x20 - read sectors
 
 	// wait for disk to be ready
 	waitdisk();
 
 	// read a sector
-	insl(0x1F0, dst, SECTSIZE/4);
+	insl(IO_BASE + 0, dst, SECTSIZE/4);
 }
 
