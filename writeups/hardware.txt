@@ -1,5 +1,5 @@
 
-Time: 17:20-19:20, 13-17, 11:20-14:50,
+Time: 17:20-19:20, 13-17, 11:20-14:50, 12-TODO
 
 
 
@@ -228,6 +228,43 @@ disable the APIC, so that we only have a PIC. But that's surely not the case
 for my netbook, since it's less than 20 years old...
 
 So I'll have to figure out in more detail what's happening on my netbook.
+
+
+
+
+
+...........
+
+Currently I'm getting "no _MP_ signature found"; the problem lies in the
+initialization of multiprocessing.
+
+That's a problem because we need that multiprocessing config structure; it
+points us to the physical address of the LAPIC, which we need to generate
+clock signals. Those are used for context switching.
+
+
+Actually that's just one of our problems. The other is that I constantly have
+to boot into a live CD and copy the OS onto the hard drive... That makes
+development extremely slow and tedious. Especially since my netbook is already
+slow to boot Linux.
+
+
+
+If we can solve the latter problem, the whole process will be far smoother.
+
+A lot of our problems stem from the bootloader. It's custom written, rather
+than relying on, say, GRUB to do the work. The current problem is that we only
+support a certain type of drive -- we don't support loading the second stage
+from USB. So I can't just boot from USB, I have to first move the files onto
+the hard drive. And that's slow.
+
+
+I guess switching to GRUB might make sense. Then the kernel should be able to
+run from USB rather than the hard drive.
+
+
+
+
 
 
 
