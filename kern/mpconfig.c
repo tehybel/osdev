@@ -272,22 +272,30 @@ bool init_mp_via_mpconfig() {
 	return 1;
 }
 
-uint32_t search_for_rsdp(uint32_t base, size_t length) {
+struct RSDP_descriptor *search_for_rsdp(uint32_t base, size_t length) {
 	uint32_t ptr;
 	for (ptr = base; ptr < base + length; ptr += 0x10) {
-		if (!memcmp((void *) ptr, "RSD PTR ", 8))
-			return ptr;
+		if (!memcmp((void *) ptr, "RSD PTR ", 8)) {
+			cprintf("Found \"RSD PTR \"\n");
+			if (sum((void *) ptr, sizeof(struct RSDP_descriptor)) == 0) {
+				cprintf("and the checksum matches\n");
+				return (struct RSDP_descriptor *) ptr;
+			} else {
+				cprintf("but the checksum is wrong\n");
+			}
+		}
 	}
-	return 0;
+	return NULL;
 }
 
 // based on http://wiki.osdev.org/RSDP
-uint32_t find_rsdp() {
+struct RSDP_descriptor *find_rsdp() {
 	// The RSDP is either located within the first 1 KB of the EBDA (Extended
 	// BIOS Data Area), or in the memory region from 0x000E0000 to 0x000FFFFF
 	// (the main BIOS area below 1 MB).
 
-	uint32_t ptr, result;
+	struct RSDP_descriptor *result;
+	uint32_t ptr;
 	uint8_t *bda = (uint8_t *) KADDR(0x40 << 4);
 
 	if ((ptr = *(uint16_t *) (bda + 0x0E))) {
@@ -303,14 +311,14 @@ uint32_t find_rsdp() {
 bool init_mp_via_acpi() {
 
 	// first we must find the RSDP (Root System Description Pointer)
-	uint32_t rsdp = find_rsdp();
+	struct RSDP_descriptor *rsdp = find_rsdp();
 
-	if (rsdp == 0) {
+	if (rsdp == NULL) {
 		cprintf("could not find RSDP\n");
 		return 0;
 	}
 
-	cprintf("rsdp: 0x%x\n", rsdp);
+	cprintf("rsdp: 0x%x (OEM: '%s')\n", rsdp, rsdp->OEMID);
 
 
 	// not fully implemented yet
