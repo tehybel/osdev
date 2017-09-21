@@ -69,6 +69,15 @@ struct mpproc {         // processor table entry [MP 4.3.1]
 #define MPIOINTR  0x03  // One per bus interrupt source
 #define MPLINTR   0x04  // One per system interrupt source
 
+
+struct RSDP_descriptor {
+	char Signature[8];
+	uint8_t Checksum;
+	char OEMID[6];
+	uint8_t Revision;
+	uint32_t RsdtAddress;
+} __attribute__ ((packed));
+
 static uint8_t
 sum(void *addr, int len)
 {
@@ -205,9 +214,11 @@ bool init_mp_via_mpconfig() {
 	uint8_t *p;
 	unsigned int i;
 
+	// for now, simulate failure of this approach
+	return 0;
+
 	bootcpu = &cpus[0];
 	if ((conf = mpconfig(&mp)) == 0) {
-		cprintf("warning: mpconfig failed\n");
 		return 0;
 	}
 	ismp = 1;
@@ -261,8 +272,48 @@ bool init_mp_via_mpconfig() {
 	return 1;
 }
 
+uint32_t search_for_rsdp(uint32_t base, size_t length) {
+	uint32_t ptr;
+	for (ptr = base; ptr < base + length; ptr += 0x10) {
+		if (!memcmp((void *) ptr, "RSD PTR ", 8))
+			return ptr;
+	}
+	return 0;
+}
+
+// based on http://wiki.osdev.org/RSDP
+uint32_t find_rsdp() {
+	// The RSDP is either located within the first 1 KB of the EBDA (Extended
+	// BIOS Data Area), or in the memory region from 0x000E0000 to 0x000FFFFF
+	// (the main BIOS area below 1 MB).
+
+	uint32_t ptr, result;
+	uint8_t *bda = (uint8_t *) KADDR(0x40 << 4);
+
+	if ((ptr = *(uint16_t *) (bda + 0x0E))) {
+		// the EBDA ptr is valid, so search there
+		if ((result = search_for_rsdp((uint32_t) KADDR(ptr), 1024)))
+			return result;
+	}
+
+	// if we got nothing so far, look in the main BIOS area
+	return search_for_rsdp((uint32_t) KADDR(0xe0000), 0x20000);
+}
+
 bool init_mp_via_acpi() {
-	// not implemented yet
+
+	// first we must find the RSDP (Root System Description Pointer)
+	uint32_t rsdp = find_rsdp();
+
+	if (rsdp == 0) {
+		cprintf("could not find RSDP\n");
+		return 0;
+	}
+
+	cprintf("rsdp: 0x%x\n", rsdp);
+
+
+	// not fully implemented yet
 	return 0;
 }
 
@@ -273,11 +324,15 @@ void init_multiprocessing() {
 	// prefer to use the MP table provided by most BIOSes
 	if (init_mp_via_mpconfig())
 		return;
+
+	cprintf("warning: mpconfig failed\n");
 	
 	// if that fails (which it does on my netbook) then try to find the same
 	// information via ACPI
 	if (init_mp_via_acpi())
 		return;
 	
-	cprintf("Warning: could not initialize multiprocessing!\n");
+	cprintf("warning: mp via ACPI failed\n");
+
+	cprintf("warning: could not initialize multiprocessing!\n");
 }
