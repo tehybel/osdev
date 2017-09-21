@@ -198,12 +198,7 @@ mpconfig(struct mp **pmp)
 	return conf;
 }
 
-// mp_init retrieves information about the system related to multiprocessing,
-// such as the total number of CPUs, by reading 'conf' which is a table filled
-// out by the BIOS.
-void
-init_multiprocessing(void)
-{
+bool init_mp_via_mpconfig() {
 	struct mp *mp;
 	struct mpconf *conf;
 	struct mpproc *proc;
@@ -213,7 +208,7 @@ init_multiprocessing(void)
 	bootcpu = &cpus[0];
 	if ((conf = mpconfig(&mp)) == 0) {
 		cprintf("warning: mpconfig failed\n");
-		return;
+		return 0;
 	}
 	ismp = 1;
 	lapicaddr = conf->lapicaddr;
@@ -251,7 +246,7 @@ init_multiprocessing(void)
 		ncpu = 1;
 		lapicaddr = 0;
 		cprintf("SMP: configuration not found, SMP disabled\n");
-		return;
+		return 1;
 	}
 	cprintf("SMP: CPU %d found %d CPU(s)\n", bootcpu->cpu_id,  ncpu);
 
@@ -262,4 +257,27 @@ init_multiprocessing(void)
 		outb(0x22, 0x70);   // Select IMCR
 		outb(0x23, inb(0x23) | 1);  // Mask external interrupts.
 	}
+
+	return 1;
+}
+
+bool init_mp_via_acpi() {
+	// not implemented yet
+	return 0;
+}
+
+// mp_init retrieves information about the system related to multiprocessing,
+// such as the total number of CPUs, by reading 'conf' which is a table filled
+// out by the BIOS.
+void init_multiprocessing() {
+	// prefer to use the MP table provided by most BIOSes
+	if (init_mp_via_mpconfig())
+		return;
+	
+	// if that fails (which it does on my netbook) then try to find the same
+	// information via ACPI
+	if (init_mp_via_acpi())
+		return;
+	
+	cprintf("Warning: could not initialize multiprocessing!\n");
 }

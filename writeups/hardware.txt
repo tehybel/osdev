@@ -276,6 +276,35 @@ Now development is much nicer. I can just swap a USB stick back and forth.
 
 
 
+......
+
+Now we can tackle the next problem: the kernel doesn't find an _MP_ signature.
+Therefore we don't know where the LAPIC is. Therefore scheduling is broken.
+
+
+According to this site:
+
+	http://wiki.osdev.org/Symmetric_Multiprocessing#Finding_information_using_MP_Table
+
+Then using the MP config is a somewhat old method; nowadays one should use
+ACPI tables instead. More info here:
+
+	http://wiki.osdev.org/MADT
+
+The MADT is a table which has the info we need. How do we find the MADT? From
+the RSDT. How do we find that? From the RSDP. And that can be found in the
+EBDA:
+
+	http://wiki.osdev.org/RSDP
+
+Example code:
+
+	https://github.com/pdoane/osdev/blob/master/acpi/acpi.c
+
+
+
+
+
 
 
 
