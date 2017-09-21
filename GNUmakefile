@@ -367,6 +367,7 @@ usb: all
 	grub-mkrescue -o myos.iso isodir
 	sudo dd if=myos.iso of=/dev/sdb bs=512
 	sudo bash -c "echo 1 > /sys/block/sdb/device/delete"
+	sudo rm /dev/sdb
 
 
 # This magic automatically generates makefile dependencies

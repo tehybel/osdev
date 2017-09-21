@@ -67,6 +67,8 @@ void i386_init(void) {
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	drain_keyboard_and_mouse();
 
+	cprintf("We got through the boot process! Now we'll yield and run the first process.\n");
+
 	// Schedule and run the first user environment!
 	sched_yield();
 

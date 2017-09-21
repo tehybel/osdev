@@ -25,4 +25,5 @@ trace-*
 .project
 .settings/
 __pycache__/
-
+isodir/boot/myos.bin
+myos.iso

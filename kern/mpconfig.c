@@ -103,15 +103,13 @@ mpsearch1(physaddr_t a, int len)
 	for (; mp < end; mp++) {
 		if (memcmp(mp->signature, "_MP_", 4) == 0) {
 			cprintf("found a _MP_ signature at 0x%x\n", mp);
-			print_mp(mp);
 			uint8_t checksum = sum(mp, sizeof(*mp));
 			if (checksum == 0) {
 				cprintf("the sum matches, too\n");
+				print_mp(mp);
 				return mp;
 			} else {
 				cprintf("... but the sum is wrong: %d\n", checksum);
-				cprintf("let's just try it anyway......\n");
-				return mp;
 			}
 		}
 	}
