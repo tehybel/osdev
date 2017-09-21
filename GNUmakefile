@@ -362,6 +362,13 @@ telnet-80:
 telnet-7:
 	telnet localhost $(PORT7)
 
+usb: all
+	cp obj/kern/rawkernel isodir/boot/myos.bin
+	grub-mkrescue -o myos.iso isodir
+	sudo dd if=myos.iso of=/dev/sdb bs=512
+	sudo bash -c "echo 1 > /sys/block/sdb/device/delete"
+
+
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,
 # and keeps those dependencies up-to-date every time we recompile.

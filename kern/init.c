@@ -25,15 +25,13 @@ static void start_environments();
 static void enable_v86();
 
 void i386_init(void) {
-	extern char edata[], end[];
 
 	// clear out the .bss
-	memset(edata, 0, end - edata);
+	// extern char edata[], end[];
+	// memset(edata, 0, end - edata);
 
 	// initializes keyboard-, mouse-, and serial-i/o
 	init_io();
-
-	cprintf("kernel is sort of up\n");
 
 	init_graphics();
 

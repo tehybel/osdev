@@ -263,6 +263,20 @@ I guess switching to GRUB might make sense. Then the kernel should be able to
 run from USB rather than the hard drive.
 
 
+.....
+
+It turns out that GRUB is meant to solve exactly the problem I was having,
+namely that of booting from any device, including CD-ROM, USB, hard drives,
+ethernet, etc.
+
+So I changed the kernel to use GRUB rather than our custom bootloader. For us,
+the main difference is that GRUB supports loading from USB.
+
+Now development is much nicer. I can just swap a USB stick back and forth.
+
+
+
+
 
 
 
