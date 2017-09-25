@@ -302,16 +302,13 @@ Example code:
 	https://github.com/pdoane/osdev/blob/master/acpi/acpi.c
 
 
+........
 
-
-
-
-
-
-
-
-
-
+I had a "fun" bug: I forgot to invalidate the TLB entry after modifying the
+page table. This gave no problems in QEMU -- apparently it doesn't emulate the
+TLB faithfully. But on real hardware, the old TLB entry was repeatedly used,
+so that dereferencing a virtual address always led to the same physical
+address, despite me having changed the page tables.
 
 
 

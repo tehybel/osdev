@@ -101,6 +101,7 @@ struct MADT {
 	struct SDT_header h;
 	uint32_t lapic_addr;
 	uint32_t flags;
+	uint8_t apic_headers[256]; // variable-length
 };
 
 struct APIC_header {
@@ -234,6 +235,7 @@ mpconfig(struct mp **pmp)
 }
 
 bool init_mp_via_mpconfig() {
+	return 0; // simulate failures for now
 	struct mp *mp;
 	struct mpconf *conf;
 	struct mpproc *proc;
@@ -295,17 +297,33 @@ bool init_mp_via_mpconfig() {
 	return 1;
 }
 
+static void phys_memcpy(void *dst_va, physaddr_t src_pa, size_t count) {
+	// make sure that the physical address is mapped to a virtual one before
+	// copying
+	// we really should find an empty va here by walking over the pgdir.. TODO
+	void *tmp = (void *) 0x20000000;
+
+	size_t offset = PGOFF(src_pa);
+
+	assert (offset <= PGOFF(src_pa + count));
+	// otherwise we must map in two pages, not just one
+
+	pte_t *pte = pgdir_walk(kern_pgdir, tmp, 1);
+
+	*pte = src_pa | PTE_P;
+	invlpg(tmp);
+	memcpy(dst_va, tmp + offset, count);
+	*pte = 0;
+	invlpg(tmp);
+}
+
 struct RSDP_descriptor *search_for_rsdp(uint32_t base, size_t length) {
 	uint32_t ptr;
 	for (ptr = base; ptr < base + length; ptr += 0x10) {
 		if (!memcmp((void *) ptr, "RSD PTR ", 8)) {
-			cprintf("Found \"RSD PTR \"\n");
 			if (sum((void *) ptr, sizeof(struct RSDP_descriptor)) == 0) {
-				cprintf("and the checksum matches\n");
 				return (struct RSDP_descriptor *) ptr;
-			} else {
-				cprintf("but the checksum is wrong\n");
-			}
+			} 
 		}
 	}
 	return NULL;
@@ -331,23 +349,28 @@ struct RSDP_descriptor *find_rsdp() {
 	return search_for_rsdp((uint32_t) KADDR(0xe0000), 0x20000);
 }
 
-static void *find_table(struct RSDT *rsdt, char *signature) {
+physaddr_t find_table(struct RSDT *rsdt, char *signature) {
 	int i;
 	size_t num_entries = (rsdt->h.length - sizeof(rsdt->h)) / sizeof(void *);
 	for (i = 0; i < num_entries; i++) {
-		struct SDT_header *header = KADDR(rsdt->sdt_ptrs[i]);
-		if (!strncmp(header->signature, signature, 4))
-			return (void *) header;
+		physaddr_t sdt_ptr = rsdt->sdt_ptrs[i];
+		struct SDT_header header;
+		phys_memcpy(&header, sdt_ptr, sizeof(header));
+		if (!strncmp(header.signature, signature, 4))
+			return sdt_ptr;
 	}
-	return NULL;
+	return 0;
 }
 
-static void parse_madt(struct MADT *madt) {
-	lapicaddr = madt->lapic_addr;
-	cprintf("lapicaddr: 0x%x\n", lapicaddr);
+static void parse_madt(physaddr_t madt_pa) {
+	struct MADT madt;
+	phys_memcpy(&madt, madt_pa, sizeof(madt));
+	assert (madt.h.length <= sizeof(struct MADT));
 
-	uint8_t *ptr = (uint8_t *) madt + sizeof(*madt);
-	uint8_t *end = (uint8_t *) madt + madt->h.length;
+	lapicaddr = madt.lapic_addr;
+
+	uint8_t *ptr = (void *) &madt.apic_headers;
+	uint8_t *end = (uint8_t *) &madt + madt.h.length;
 	while (ptr < end) {
 		struct APIC_header *header = (void *) ptr;
 		switch (header->type) {
@@ -388,13 +411,17 @@ bool init_mp_via_acpi() {
 	}
 
 	// find the RSDT (Root System Description Table) from the RSDP
-	struct RSDT *rsdt = KADDR(rsdp->rsdt_address);
+	// we cannot just use KADDR() here because the RSDT can reside at places
+	// which aren't in our page table
+	struct RSDT rsdt;
+	phys_memcpy(&rsdt, rsdp->rsdt_address, sizeof(rsdt)); // get length
+	phys_memcpy(&rsdt, rsdp->rsdt_address, rsdt.h.length); // then copy all of it
 
 	// the RSDT basically points to a bunch of other tables; one of these is
 	// the MADT (Multiple APIC Description Table) which lets us find the
 	// LAPIC, so find the MADT.
-	void *madt = find_table(rsdt, "APIC");
-	if (madt == NULL) {
+	physaddr_t madt = find_table(&rsdt, "APIC");
+	if (madt == 0) {
 		cprintf("could not find the MADT\n");
 		return 0;
 	} 
