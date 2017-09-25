@@ -26,6 +26,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "bt", "Display a backtrace", mon_backtrace },
+	{ "dumpstack", "displays the setack", mon_dumpstack },
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -84,6 +85,14 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int mon_dumpstack(int argc, char **argv, struct Trapframe *tf)
+{
+	int i;
+	for (i = 0; i < 20; i++) {
+		cprintf("stack[%d]: 0x%x\n", i, ((uint32_t *)&i)[i]);
+	}
+	return 0;
+}
 
 
 /***** Kernel monitor command interpreter *****/

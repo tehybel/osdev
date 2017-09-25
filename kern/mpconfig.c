@@ -9,6 +9,7 @@
 #include <inc/env.h>
 #include <kern/cpu.h>
 #include <kern/pmap.h>
+#include <kern/monitor.h>
 
 struct CpuInfo cpus[NCPU];
 struct CpuInfo *bootcpu;
@@ -94,7 +95,7 @@ struct SDT_header {
 
 struct RSDT {
 	struct SDT_header h;
-	uint32_t sdt_ptrs[0];
+	uint32_t sdt_ptrs[32];
 };
 
 struct MADT {
@@ -415,6 +416,7 @@ bool init_mp_via_acpi() {
 	// which aren't in our page table
 	struct RSDT rsdt;
 	phys_memcpy(&rsdt, rsdp->rsdt_address, sizeof(rsdt)); // get length
+	assert (rsdt.h.length <= sizeof(rsdt));
 	phys_memcpy(&rsdt, rsdp->rsdt_address, rsdt.h.length); // then copy all of it
 
 	// the RSDT basically points to a bunch of other tables; one of these is
@@ -444,10 +446,10 @@ void init_multiprocessing() {
 	
 	// if that fails (which it does on my netbook) then try to find the same
 	// information via ACPI
-	if (init_mp_via_acpi())
+	if (init_mp_via_acpi()) {
 		return;
+	}
 	
 	cprintf("warning: mp via ACPI failed\n");
-
 	cprintf("warning: could not initialize multiprocessing!\n");
 }
