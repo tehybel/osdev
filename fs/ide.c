@@ -19,11 +19,19 @@ ide_wait_ready(bool check_error)
 {
 	int r;
 
-	while (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
-		/* do nothing */;
+	while (1) {
+		r = inb(0x1F7);
+
+		if (r == 0xff) 
+			panic("floating bus (no IDE drives)\n");
+
+ 		if ((r & (IDE_BSY|IDE_DRDY)) == IDE_DRDY)
+			break;
+	}
 
 	if (check_error && (r & (IDE_DF|IDE_ERR)) != 0)
 		return -1;
+
 	return 0;
 }
 
@@ -32,8 +40,10 @@ ide_probe_disk1(void)
 {
 	int r, x;
 
+	cprintf("waiting for IDE 0 to be ready..\n");
 	// wait for Device 0 to be ready
 	ide_wait_ready(0);
+	cprintf("it's ready!\n");
 
 	// switch to Device 1
 	outb(0x1F6, 0xE0 | (1<<4));

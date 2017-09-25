@@ -101,6 +101,8 @@ check_bitmap(void)
 void
 fs_init(void)
 {
+	cprintf("fs_init running..\n");
+
 	static_assert(sizeof(struct File) == 256);
 
 	// Find a JOS disk.  Use the second IDE disk (number 1) if available
@@ -112,6 +114,7 @@ fs_init(void)
 		cprintf("FS server cannot use the second disk; assuming disk 0 is OK\n");
 		ide_set_disk(0);
 	}
+	cprintf("done probing disk.\n");
 	bc_init();
 
 	// Set "super" to point to the super block.

@@ -312,5 +312,13 @@ address, despite me having changed the page tables.
 
 
 
+Now SMP initialization works, via the AHCI interface. Great.
+
+Unfortunately the OS is failing to read from the IDE drive now. And I have no
+clue why.
+
+Apparently we're getting a "floating bus" error again...
+
+
 
 
