@@ -71,16 +71,47 @@ struct mpproc {         // processor table entry [MP 4.3.1]
 
 
 struct RSDP_descriptor {
-	char Signature[8];
+	char signature[8];
 	uint8_t Checksum;
 	char OEMID[6];
 	uint8_t Revision;
-	uint32_t RsdtAddress;
+	uint32_t rsdt_address;
 } __attribute__ ((packed));
 
+
+// standard ACPI table header
+struct SDT_header {
+	char signature[4];
+	uint32_t length;
+	uint8_t revision;
+	uint8_t checksum;
+	char OEM_id[6];
+	char OEM_table_id[8];
+	uint32_t OEM_revision;
+	uint32_t creator_id;
+	uint32_t creator_revision;
+};
+
+struct RSDT {
+	struct SDT_header h;
+	uint32_t sdt_ptrs[0];
+};
+
+struct MADT {
+	struct SDT_header h;
+	uint32_t lapic_addr;
+	uint32_t flags;
+};
+
+struct APIC_header {
+	uint8_t type;
+	uint8_t length;
+};
+
+
+
 static uint8_t
-sum(void *addr, int len)
-{
+sum(void *addr, int len) {
 	int i, sum;
 
 	sum = 0;
@@ -111,19 +142,14 @@ mpsearch1(physaddr_t a, int len)
 
 	for (; mp < end; mp++) {
 		if (memcmp(mp->signature, "_MP_", 4) == 0) {
-			cprintf("found a _MP_ signature at 0x%x\n", mp);
 			uint8_t checksum = sum(mp, sizeof(*mp));
 			if (checksum == 0) {
-				cprintf("the sum matches, too\n");
 				print_mp(mp);
 				return mp;
-			} else {
-				cprintf("... but the sum is wrong: %d\n", checksum);
-			}
+			} 
 		}
 	}
 	
-	cprintf("no _MP_ signature found\n");
 	return NULL;
 }
 
@@ -213,9 +239,6 @@ bool init_mp_via_mpconfig() {
 	struct mpproc *proc;
 	uint8_t *p;
 	unsigned int i;
-
-	// for now, simulate failure of this approach
-	return 0;
 
 	bootcpu = &cpus[0];
 	if ((conf = mpconfig(&mp)) == 0) {
@@ -308,21 +331,78 @@ struct RSDP_descriptor *find_rsdp() {
 	return search_for_rsdp((uint32_t) KADDR(0xe0000), 0x20000);
 }
 
+static void *find_table(struct RSDT *rsdt, char *signature) {
+	int i;
+	size_t num_entries = (rsdt->h.length - sizeof(rsdt->h)) / sizeof(void *);
+	for (i = 0; i < num_entries; i++) {
+		struct SDT_header *header = KADDR(rsdt->sdt_ptrs[i]);
+		if (!strncmp(header->signature, signature, 4))
+			return (void *) header;
+	}
+	return NULL;
+}
+
+static void parse_madt(struct MADT *madt) {
+	lapicaddr = madt->lapic_addr;
+	cprintf("lapicaddr: 0x%x\n", lapicaddr);
+
+	uint8_t *ptr = (uint8_t *) madt + sizeof(*madt);
+	uint8_t *end = (uint8_t *) madt + madt->h.length;
+	while (ptr < end) {
+		struct APIC_header *header = (void *) ptr;
+		switch (header->type) {
+
+		case 0: // Processor Local APIC
+			if (ncpu < NCPU) {
+				cpus[ncpu].cpu_id = ncpu;
+				ncpu++;
+			}
+			else {
+				cprintf("SMP: too many CPUs!\n");
+			}
+
+			break;
+
+		default:
+			// cprintf("unhandled APIC_header type: 0x%x\n", header->type);
+			break;
+		}
+		ptr += header->length;
+	}
+
+	// according to the ACPI spec, "platform firmware should list the boot
+	// processor as the first processor entry in the MADT"
+	bootcpu = &cpus[0];
+	bootcpu->cpu_status = CPU_STARTED;
+
+	cprintf("Discovered %d CPUs via the MADT\n", ncpu);
+}
+
 bool init_mp_via_acpi() {
 
 	// first we must find the RSDP (Root System Description Pointer)
 	struct RSDP_descriptor *rsdp = find_rsdp();
-
 	if (rsdp == NULL) {
 		cprintf("could not find RSDP\n");
 		return 0;
 	}
 
-	cprintf("rsdp: 0x%x (OEM: '%s')\n", rsdp, rsdp->OEMID);
+	// find the RSDT (Root System Description Table) from the RSDP
+	struct RSDT *rsdt = KADDR(rsdp->rsdt_address);
 
+	// the RSDT basically points to a bunch of other tables; one of these is
+	// the MADT (Multiple APIC Description Table) which lets us find the
+	// LAPIC, so find the MADT.
+	void *madt = find_table(rsdt, "APIC");
+	if (madt == NULL) {
+		cprintf("could not find the MADT\n");
+		return 0;
+	} 
 
-	// not fully implemented yet
-	return 0;
+	// figure out the address of the LAPIC and enumerate the CPUs
+	parse_madt(madt);
+
+	return 1;
 }
 
 // mp_init retrieves information about the system related to multiprocessing,

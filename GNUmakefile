@@ -365,10 +365,14 @@ telnet-7:
 usb: all
 	cp obj/kern/rawkernel isodir/boot/myos.bin
 	grub-mkrescue -o myos.iso isodir
+
+write-usb: usb
 	sudo dd if=myos.iso of=/dev/sdb bs=512
 	sudo bash -c "echo 1 > /sys/block/sdb/device/delete"
 	sudo rm /dev/sdb
 
+run-usb: usb
+	qemu-system-i386 -cdrom ./myos.iso -serial mon:stdio -gdb tcp::26000 -drive file=obj/fs/fs.img,index=1,media=disk,format=raw
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,
