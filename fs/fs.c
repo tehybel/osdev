@@ -106,7 +106,8 @@ fs_init(void)
 	static_assert(sizeof(struct File) == 256);
 
 	// Find a JOS disk.  Use the second IDE disk (number 1) if available
-	if (ide_probe_disk1()) {
+	// TODO: for now only use disk0
+	if (false && ide_probe_disk1()) {
 		cprintf("FS server will use the second disk\n");
 		ide_set_disk(1);
 	}

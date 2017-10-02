@@ -1,5 +1,5 @@
 
-Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, TODO
+Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-TODO
 
 
 
@@ -318,6 +318,17 @@ Unfortunately the OS is failing to read from the IDE drive now. And I have no
 clue why.
 
 Apparently we're getting a "floating bus" error again...
+
+
+
+.........
+
+It's the same error as before; the problem was that my netbook uses SATA, not
+ATA, and so we must find the IO_BASE via PCI. (We hardcode it for now.)
+
+
+...............
+
 
 
 
