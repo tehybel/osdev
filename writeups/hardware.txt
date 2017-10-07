@@ -1,5 +1,6 @@
 
-Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-TODO
+Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-16:30,
+11-TODO,
 
 
 
@@ -329,6 +330,42 @@ ATA, and so we must find the IO_BASE via PCI. (We hardcode it for now.)
 
 ...............
 
+
+
+Now we can boot the OS from USB, with the custom file system residing on the
+main hard drive. And that works!
+
+The problem is that I would like to boot the OS without a USB plugged in. So
+the hard drive should contain:
+- GRUB
+- the kernel ELF file, loaded by GRUB
+- the custom file system, somewhere on disk where my OS can find it
+
+So we need to figure out how to make GRUB's ISO creation process put the
+custom file system somewhere static.
+
+Some relevant info:
+
+	http://wiki.osdev.org/I_use_a_Custom_Filesystem_-_What_Bootloader_Solution_is_right_for_me%3F
+
+
+
+We need to modify our custom file system such that we e.g. reserve the first
+10 MB of the disk for GRUB and the OS image, and at offset 10 MB we have the
+file system itself.
+
+We might want to do the following: we split the disk into three partitions.
+Partition 0 is 10 MB and contains GRUB. Partition 1 is 10 MB and contains the
+OS; grub will load it for us. Partition 2 contains the raw file system, which
+is only managed by our OS, never by GRUB.
+
+Actually GRUB doesn't need to know any of this. We can use dd to have a single
+raw image which is a valid ELF file, padded up to 10 MB, and which then
+contains the file system. Then the OS just needs to know where the FS starts.
+
+
+The next step is therefore to make a raw disk image which contains all of
+those things.
 
 
 
