@@ -365,6 +365,8 @@ telnet-7:
 usb: all
 	cp obj/kern/rawkernel isodir/boot/myos.bin
 	grub-mkrescue -o myos.iso isodir
+	truncate -s 32M myos.iso # pad with zeros to 32M
+	dd if=obj/fs/fs.img of=myos.iso seek=32M oflag=seek_bytes # add the file system at offset 32M
 
 write-usb: usb
 	sudo dd if=myos.iso of=/dev/sdb bs=512
