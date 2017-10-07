@@ -3,12 +3,12 @@
 
 For the hardware lab:
 
+- make it run on the netbook without a USB, just from disk
 - use PCI to find the IO_BASE when accessing disk
-- figure out why disk1 is detected as OK and is preferred
 - make sure the project still runs on qemu/virtualbox
 - make graphics work
-- make it run on the netbook without a USB, just from disk
 - make a "startx" command
+- clean up the writeup
 
 
 

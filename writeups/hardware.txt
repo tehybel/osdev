@@ -1,6 +1,6 @@
 
 Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-16:30,
-11-TODO,
+11-12:15, TODO
 
 
 
@@ -366,6 +366,15 @@ contains the file system. Then the OS just needs to know where the FS starts.
 
 The next step is therefore to make a raw disk image which contains all of
 those things.
+
+........
+
+It works now! I made the rule for our custom FS that the first 32 MB are
+reserved. Then GRUB's ISO goes there, and it contains the ELF file that is our
+kernel.
+
+
+
 
 
 

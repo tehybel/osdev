@@ -399,7 +399,7 @@ static void parse_madt(physaddr_t madt_pa) {
 	bootcpu = &cpus[0];
 	bootcpu->cpu_status = CPU_STARTED;
 
-	cprintf("Discovered %d CPUs via the MADT\n", ncpu);
+	cprintf("Discovered %d CPU(s) via the MADT\n", ncpu);
 }
 
 bool init_mp_via_acpi() {

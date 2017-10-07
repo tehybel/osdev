@@ -148,7 +148,6 @@ boot_alloc(uint32_t n)
 	if (!nextfree) {
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
-		cprintf("boot_alloc is allocating memory starting from 0x%x\n", nextfree);
 	}
 
 	// nextfree should always stay page aligned

@@ -101,8 +101,6 @@ check_bitmap(void)
 void
 fs_init(void)
 {
-	cprintf("fs_init running..\n");
-
 	static_assert(sizeof(struct File) == 256);
 
 	ide_set_disk(0);
