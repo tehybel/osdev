@@ -374,7 +374,8 @@ write-usb: usb
 	sudo rm /dev/sdb
 
 run-usb: usb
-	qemu-system-i386 -cdrom ./myos.iso -serial mon:stdio -gdb tcp::26000 -drive file=obj/fs/fs.img,index=1,media=disk,format=raw
+	#qemu-system-i386 -cdrom ./myos.iso -serial mon:stdio -gdb tcp::26000 -drive file=obj/fs/fs.img,index=1,media=disk,format=raw
+	qemu-system-i386 -drive file=myos.iso,media=disk,format=raw -serial mon:stdio -gdb tcp::26000
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,

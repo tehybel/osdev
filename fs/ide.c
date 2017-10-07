@@ -13,11 +13,11 @@
 #define IDE_ERR		0x01
 
 // ATA base:
-// #define IO_BASE 0x1f0
+#define IO_BASE 0x1f0
 
 // SATA base (for my netbook, found with "lspci -v" on Linux):
 // TODO: find this dynamically with PCI
-#define IO_BASE 0x60b8
+// #define IO_BASE 0x60b8
 
 static int diskno = 1;
 

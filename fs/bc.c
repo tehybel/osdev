@@ -25,13 +25,13 @@ va_is_dirty(void *va)
 }
 
 int block_read(uint32_t blockno, void *addr, size_t nbytes) {
-	uint32_t secno = blockno * BLKSECTS;
+	uint32_t secno = blockno * BLKSECTS + FS_OFFSET;
 	size_t nsecs = ROUNDUP(nbytes, SECTSIZE) / SECTSIZE;
 	return ide_read(secno, addr, nsecs);
 }
 
 int block_write(uint32_t blockno, void *addr, size_t nbytes) {
-	uint32_t secno = blockno * BLKSECTS;
+	uint32_t secno = blockno * BLKSECTS + FS_OFFSET;
 	size_t nsecs = ROUNDUP(nbytes, SECTSIZE) / SECTSIZE;
 	return ide_write(secno, addr, nsecs);
 }

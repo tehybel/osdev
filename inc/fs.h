@@ -12,6 +12,11 @@
 #define BLKSIZE		PGSIZE
 #define BLKBITSIZE	(BLKSIZE * 8)
 
+// The file system actually starts at 32MB, not at 0, because the first 32MB
+// are reserved to hold the boot loader and the kernel itself.
+#define FS_BYTES_OFFSET (1024*1024*32)
+#define FS_OFFSET (FS_BYTES_OFFSET/SECTSIZE)
+
 // Maximum size of a filename (a single path component), including null
 // Must be a multiple of 4
 #define MAXNAMELEN	128
