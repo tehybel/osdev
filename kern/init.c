@@ -26,10 +26,6 @@ static void enable_v86();
 
 void i386_init(void) {
 
-	// clear out the .bss
-	// extern char edata[], end[];
-	// memset(edata, 0, end - edata);
-
 	// initializes keyboard-, mouse-, and serial-i/o
 	init_io();
 

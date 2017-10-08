@@ -1,6 +1,6 @@
 
 Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-16:30,
-11-12:15, 11:15-TODO
+11-12:15, 11:15-14:00, TODO
 
 
 
@@ -379,6 +379,9 @@ kernel.
 I changed the IDE code to first use PCI to find the io_base.
 
 .........
+
+Next, the goal is to get graphics working on the netbook. I'm getting "failed
+to set video mode", though. So next we need to figure out why.
 
 
 

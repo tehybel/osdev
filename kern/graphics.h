@@ -3,6 +3,7 @@
 
 #define GRAPHICS_HEIGHT 768
 #define GRAPHICS_WIDTH 1024
+
 // bits per pixel
 #define GRAPHICS_BPP 32
 
