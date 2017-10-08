@@ -146,7 +146,6 @@ mpsearch1(physaddr_t a, int len)
 		if (memcmp(mp->signature, "_MP_", 4) == 0) {
 			uint8_t checksum = sum(mp, sizeof(*mp));
 			if (checksum == 0) {
-				print_mp(mp);
 				return mp;
 			} 
 		}
@@ -201,7 +200,6 @@ mpconfig(struct mp **pmp)
 	struct mp *mp;
 
 	if ((mp = mpsearch()) == 0) {
-		cprintf("warning: mpsearch failed\n");
 		return NULL;
 	}
 	if (mp->physaddr == 0 || mp->type != 0) {
@@ -435,14 +433,11 @@ void init_multiprocessing() {
 	if (init_mp_via_mpconfig())
 		return;
 
-	cprintf("warning: mpconfig failed\n");
-	
 	// if that fails (which it does on my netbook) then try to find the same
 	// information via ACPI
 	if (init_mp_via_acpi()) {
 		return;
 	}
-	
-	cprintf("warning: mp via ACPI failed\n");
-	cprintf("warning: could not initialize multiprocessing!\n");
+
+	cprintf("warning: multiprocesing failed, both via mpconfig and ACPI.\n");
 }
