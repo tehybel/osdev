@@ -190,15 +190,13 @@ void _panic(const char *file, int line, const char *fmt, ...) {
 	// Be extra sure that the machine is in as reasonable state
 	asm volatile("cli; cld");
 
-	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-	cprintf("!!!!!\n");
 	va_start(ap, fmt);
-	cprintf("!!!!! kernel panic on CPU %d at %s:%d: ", cpunum(), file, line);
+	cprintf("!!!!!\n");
+	cprintf("!!!!! kernel panic on CPU %d at %s:%d: \n", cpunum(), file, line);
+	cprintf("!!!!! ");
 	vcprintf(fmt, ap);
-	va_end(ap);
 	cprintf("\n!!!!!\n");
-	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-	cprintf("\nDropping into the monitor.\n");
+	va_end(ap);
 
 	dead:
 	/* break into the kernel monitor */

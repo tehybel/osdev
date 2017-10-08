@@ -176,24 +176,18 @@ mpsearch(void)
 	// starting at byte 0x0E of the BDA.  0 if not present.
 	if ((p = *(uint16_t *) (bda + 0x0E))) {
 		p <<= 4;	// Translate from segment to PA
-		cprintf("found the address of the EBDA: 0x%x\n", p);
 		if ((mp = mpsearch1(p, 1024)))
 			return mp;
 	} else {
 		// The size of base memory, in KB is in the two bytes
 		// starting at 0x13 of the BDA.
 		p = *(uint16_t *) (bda + 0x13) * 1024;
-		cprintf("the EBDA wasn't present!\n");
-		cprintf("instead we look in the last KB of base memory\n");
-		cprintf("we have 0x%x bytes of base memory.\n", p);
 		if ((mp = mpsearch1(p - 1024, 1024)))
 			return mp;
 	}
-	cprintf("falling back to looking in the BIOS ROM around 0xf0000...\n");
 	if ((mp = mpsearch1(0xF0000, 0x10000)))
 		return mp;
 	
-	cprintf("this is bad. We'll try an exhaustive search instead...\n");
 	return mpsearch1(0, 0x1000000);
 }
 
@@ -236,7 +230,6 @@ mpconfig(struct mp **pmp)
 }
 
 bool init_mp_via_mpconfig() {
-	return 0; // simulate failures for now
 	struct mp *mp;
 	struct mpconf *conf;
 	struct mpproc *proc;

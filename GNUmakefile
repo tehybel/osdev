@@ -113,6 +113,7 @@ OBJDIRS :=
 
 # Make sure that 'all' is the first target
 all:
+	
 
 # Eliminate default suffix rules
 .SUFFIXES:
@@ -205,7 +206,7 @@ print-gdbport:
 
 # For deleting the build
 clean:
-	rm -rf $(OBJDIR) .gdbinit jos.in qemu.log
+	rm -rf $(OBJDIR) .gdbinit jos.in qemu.log myos.iso
 
 realclean: clean
 	rm -rf lab$(LAB).tar.gz \

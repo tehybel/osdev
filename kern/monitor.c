@@ -144,13 +144,11 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
-
 	if (tf != NULL)
 		print_trapframe(tf);
 
 	while (1) {
-		buf = readline("K> ");
+		buf = readline(" > ");
 		if (buf != NULL)
 			if (runcmd(buf, tf) < 0)
 				break;

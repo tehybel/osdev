@@ -3,11 +3,10 @@
 
 For the hardware lab:
 
-- use PCI to find the IO_BASE when accessing disk
-- make sure the project still runs on qemu/virtualbox
 - make graphics work
 - make a "startx" command
 - clean up the writeup
+- make sure the project still runs on virtualbox
 
 
 
