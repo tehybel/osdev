@@ -145,3 +145,7 @@ int sys_get_io_events(void *arr, size_t size) {
 	return syscall(SYS_get_io_events, 0, (uint32_t) arr, (uint32_t) size, 0, 0, 0);
 }
 
+unsigned int sys_get_ide_io_base() {
+	return (unsigned int) syscall(SYS_get_ide_io_base, 0, 0, 0, 0, 0, 0);
+}
+

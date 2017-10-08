@@ -1,6 +1,7 @@
 #include <inc/x86.h>
 #include <inc/assert.h>
 #include <inc/string.h>
+#include <inc/ide.h>
 #include <kern/pci.h>
 #include <kern/pcireg.h>
 #include <kern/e1000.h>
@@ -25,6 +26,9 @@ struct pci_driver {
 // pci_attach_class matches the class and subclass of a PCI device
 struct pci_driver pci_attach_class[] = {
 	{ PCI_CLASS_BRIDGE, PCI_SUBCLASS_BRIDGE_PCI, &pci_bridge_attach },
+
+	// attach to IDE disks so that our file system can read/write files
+	{ PCI_CLASS_MASS_STORAGE, PCI_SUBCLASS_MASS_STORAGE_IDE, &ide_disk_attach },
 	{ 0, 0, 0 } // end
 };
 
@@ -84,7 +88,7 @@ pci_attach_match(uint32_t key1, uint32_t key2,
 				return r;
 			if (r < 0)
 				cprintf("pci_attach_match: attaching "
-					"%x.%x (%p): e\n",
+					"%x.%x (%p): %e\n",
 					key1, key2, list[i].attachfn, r);
 		}
 	}

@@ -23,6 +23,7 @@ enum {
 	SYS_v86,
 	SYS_map_lfb,
 	SYS_get_io_events,
+	SYS_get_ide_io_base,
 	NSYSCALLS
 };
 

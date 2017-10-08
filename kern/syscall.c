@@ -4,6 +4,7 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/ide.h>
 
 #include <kern/graphics.h>
 #include <kern/env.h>
@@ -536,7 +537,12 @@ static int sys_get_io_events(struct io_event *events_array,
 	return num_to_drain;
 }
 
-
+static int sys_get_ide_io_base() {
+	if (io_base == 0)
+		return -1;
+	
+	return io_base;
+}
 
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
@@ -608,6 +614,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	case SYS_get_io_events:
 		return sys_get_io_events((void *) a1, (size_t) a2);
+
+	case SYS_get_ide_io_base:
+		return sys_get_ide_io_base();
 
 	default:
 		return -E_NOSYS;

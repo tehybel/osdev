@@ -355,6 +355,7 @@ umain(int argc, char **argv)
 	outw(0x8A00, 0x8A00);
 
 	serve_init();
+	ide_init();
 	fs_init();
 	serve();
 }

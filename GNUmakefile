@@ -322,30 +322,31 @@ myapi.key:
 #	@./handin-prep
 
 # For test runs
-prep-net_%: override INIT_CFLAGS+=-DTEST_NO_NS
-
-prep-%:
-	$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS} -DTEST=`case $* in *_*) echo $*;; *) echo user_$*;; esac`" $(IMAGES)
-
-prep:
-	$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS}" $(IMAGES)
-
-run-%-nox-gdb: prep-% pre-qemu
-	$(QEMU) -nographic $(QEMUOPTS) -S
-
-run-%-gdb: prep-% pre-qemu
-	$(QEMU) $(QEMUOPTS) -S
-
-run-%-nox: prep-% pre-qemu
-	$(QEMU) -nographic $(QEMUOPTS)
-
-run-%: prep-% pre-qemu
-	$(QEMU) $(QEMUOPTS)
-
-run: prep pre-qemu
-	$(QEMU) $(QEMUOPTS)
-
+# prep-net_%: override INIT_CFLAGS+=-DTEST_NO_NS
+# 
+# prep-%:
+# 	$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS} -DTEST=`case $* in *_*) echo $*;; *) echo user_$*;; esac`" $(IMAGES)
+# 
+# prep:
+# 	$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS}" $(IMAGES)
+# 
+# run-%-nox-gdb: prep-% pre-qemu
+# 	$(QEMU) -nographic $(QEMUOPTS) -S
+# 
+# run-%-gdb: prep-% pre-qemu
+# 	$(QEMU) $(QEMUOPTS) -S
+# 
+# run-%-nox: prep-% pre-qemu
+# 	$(QEMU) -nographic $(QEMUOPTS)
+# 
+# run-%: prep-% pre-qemu
+# 	$(QEMU) $(QEMUOPTS)
+# 
+# run: prep pre-qemu
+# 	$(QEMU) $(QEMUOPTS)
+# 
 # For network connections
+
 which-ports:
 	@echo "Local port $(PORT7) forwards to JOS port 7 (echo server)"
 	@echo "Local port $(PORT80) forwards to JOS port 80 (web server)"
@@ -362,18 +363,18 @@ telnet-80:
 telnet-7:
 	telnet localhost $(PORT7)
 
-usb: all
+prep: all
 	cp obj/kern/rawkernel isodir/boot/myos.bin
 	grub-mkrescue -o myos.iso isodir
 	truncate -s 32M myos.iso # pad with zeros to 32M
 	dd if=obj/fs/fs.img of=myos.iso seek=32M oflag=seek_bytes # add the file system at offset 32M
 
-write-usb: usb
+write-usb: prep
 	sudo dd if=myos.iso of=/dev/sdb bs=512
 	sudo bash -c "echo 1 > /sys/block/sdb/device/delete"
 	sudo rm /dev/sdb
 
-run-usb: usb
+run: prep
 	#qemu-system-i386 -cdrom ./myos.iso -serial mon:stdio -gdb tcp::26000 -drive file=obj/fs/fs.img,index=1,media=disk,format=raw
 	qemu-system-i386 -drive file=myos.iso,media=disk,format=raw -serial mon:stdio -gdb tcp::26000
 

@@ -3,7 +3,6 @@
 
 For the hardware lab:
 
-- make it run on the netbook without a USB, just from disk
 - use PCI to find the IO_BASE when accessing disk
 - make sure the project still runs on qemu/virtualbox
 - make graphics work
