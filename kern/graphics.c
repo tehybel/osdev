@@ -21,16 +21,16 @@ void io_event_put(struct io_event *event) {
 }
 
 static void print_mode_info(struct vbe_mode_info *m) {
-	cprintf("height: %d\n", m->height);
-	cprintf("width:  %d\n", m->width);
-	cprintf("pitch:  %d\n", m->pitch);
+	cprintf("height: %d, ", m->height);
+	cprintf("width:  %d, ", m->width);
 	cprintf("bpp:    %d\n", m->bpp);
+	cprintf("pitch:  %d, ", m->pitch);
 	cprintf("LFB:    0x%x\n", m->framebuffer);
 
 }
 
 bool graphics_enabled() {
-	return 1;
+	return 0;
 }
 
 void init_graphics() {

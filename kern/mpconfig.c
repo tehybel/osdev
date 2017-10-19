@@ -296,6 +296,25 @@ bool init_mp_via_mpconfig() {
 	return 1;
 }
 
+static void phys_memcpy_new(void *dst_va, physaddr_t src_pa, size_t count) {
+	cprintf("copying %d bytes from PA 0x%x to VA 0x%x", count, src_pa,
+	dst_va);
+	
+	void *src_va = (void *) src_pa;
+
+	pte_t *pte = pgdir_walk(kern_pgdir, src_va, 1);
+	pte_t old_pte = *pte;
+
+	*pte = ROUNDDOWN(src_pa, PGSIZE) | PTE_P;
+	invlpg(ROUNDDOWN(src_va, PGSIZE));
+	invlpg(src_va);
+	memcpy(dst_va, src_va, count);
+
+	*pte = old_pte;
+	invlpg(ROUNDDOWN(src_va, PGSIZE));
+	invlpg(src_va);
+}
+
 static void phys_memcpy(void *dst_va, physaddr_t src_pa, size_t count) {
 	// make sure that the physical address is mapped to a virtual one before
 	// copying
@@ -305,12 +324,13 @@ static void phys_memcpy(void *dst_va, physaddr_t src_pa, size_t count) {
 	size_t offset = PGOFF(src_pa);
 
 	assert (offset <= PGOFF(src_pa + count));
+	assert (count <= PGSIZE);
 	// otherwise we must map in two pages, not just one
 
 	pte_t *pte = pgdir_walk(kern_pgdir, tmp, 1);
 
-	*pte = src_pa | PTE_P;
 	invlpg(tmp);
+	*pte = ROUNDDOWN(src_pa, PGSIZE) | PTE_P;
 	memcpy(dst_va, tmp + offset, count);
 	*pte = 0;
 	invlpg(tmp);
@@ -348,11 +368,11 @@ struct RSDP_descriptor *find_rsdp() {
 	return search_for_rsdp((uint32_t) KADDR(0xe0000), 0x20000);
 }
 
-physaddr_t find_table(struct RSDT *rsdt, char *signature) {
+physaddr_t find_table(struct RSDT *rsdt, char *signature, size_t ptr_size) {
 	int i;
-	size_t num_entries = (rsdt->h.length - sizeof(rsdt->h)) / sizeof(void *);
+	size_t num_entries = (rsdt->h.length - sizeof(rsdt->h)) / ptr_size;
 	for (i = 0; i < num_entries; i++) {
-		physaddr_t sdt_ptr = rsdt->sdt_ptrs[i];
+		physaddr_t sdt_ptr = *(physaddr_t *)(((char *) rsdt->sdt_ptrs) + (ptr_size*i));
 		struct SDT_header header;
 		phys_memcpy(&header, sdt_ptr, sizeof(header));
 		if (!strncmp(header.signature, signature, 4))
@@ -402,8 +422,9 @@ static void parse_madt(physaddr_t madt_pa) {
 
 bool init_mp_via_acpi() {
 	physaddr_t madt;
-	struct RSDT rsdt;
+	struct RSDT rsdt = {0};
 	uint32_t rsdt_address;
+	size_t ptr_size;
 
 	// first we must find the RSDP (Root System Description Pointer)
 	struct RSDP_descriptor *rsdp = find_rsdp();
@@ -416,20 +437,18 @@ bool init_mp_via_acpi() {
 		return 0;
 	}
 
+	cprintf("Revision is %d\n", rsdp->revision);
 	if (rsdp->revision < 2) {
 		// this is the case on old real hardware and QEMU
 		// we must use the RSDT
 		rsdt_address = rsdp->rsdt_address;
-
+		ptr_size = 4;
 	}
 	else {
 		// this is the case on VirtualBox
 		// we must prefer the XSDT over the RSDT
-		char *ptr = (char *) &rsdp->xsdt_address;
-		int i;
-		for (i = 0; i < 8; i++)
-			cprintf("0x%x\n", ptr[i]);
 		rsdt_address = rsdp->xsdt_address;
+		ptr_size = 8;
 	}
 
 	// grab a copy of the RSDT from physical memory.
@@ -438,19 +457,21 @@ bool init_mp_via_acpi() {
 
 	// first grab the header, which has the length
 	phys_memcpy(&rsdt, rsdt_address, sizeof(struct SDT_header));
-	if (strncmp(rsdt.h.signature, "RSDT", 4)) {
-		cprintf("Got an invalid RSDT!\n");
+	if (strncmp(rsdt.h.signature, "RSDT", 4) != 0 &&
+		strncmp(rsdt.h.signature, "XSDT", 4) != 0) {
+		cprintf("Got an invalid RSDT! '%s'\n", rsdt.h.signature);
 		return 0;
 	}
 
 	// then copy all of it
 	assert (rsdt.h.length <= sizeof(rsdt));
-	phys_memcpy(&rsdt, rsdt_address, rsdt.h.length); 
+	size_t length = MIN(rsdt.h.length, sizeof(rsdt));
+	phys_memcpy(&rsdt, rsdt_address, length);
 
 	// the RSDT basically points to a bunch of other tables; one of these is
 	// the MADT (Multiple APIC Description Table) which lets us find the
 	// LAPIC, so find the MADT.
-	if (!(madt = find_table(&rsdt, "APIC"))) {
+	if (!(madt = find_table(&rsdt, "APIC", ptr_size))) {
 		cprintf("could not find the MADT\n");
 		return 0;
 	} 
@@ -475,5 +496,5 @@ void init_multiprocessing() {
 		return;
 	}
 
-	cprintf("warning: multiprocesing failed, both via mpconfig and ACPI.\n");
+	cprintf("warning: multiprocessing failed, both via mpconfig and ACPI.\n");
 }
