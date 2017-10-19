@@ -58,7 +58,7 @@ void init_graphics() {
 		return;
 	}
 
-	// if do_int_graphics succeeded, a mode info struct now resides at 0xd000
+	// if do_init_graphics succeeded, a mode info struct now resides at 0xd000
 	mode_info = *(struct vbe_mode_info *) 0xd000;
 
 	have_graphics = 1;
