@@ -383,6 +383,23 @@ I changed the IDE code to first use PCI to find the io_base.
 Next, the goal is to get graphics working on the netbook. I'm getting "failed
 to set video mode", though. So next we need to figure out why.
 
+.........
+
+The problem was that 1024x768 wasn't supported. I had to rewrite the assembly
+which gets and sets the video mode -- before it would search for a specific
+width and height, but now it can instead enumerate all the modes and we can
+dynamically select an appropriate one.
+
+The real issue here was that I'd taken shortcuts earlier, making the OS only
+support a single video mode (which worked in QEMU).
+
+........
+
+Now it works on my netbook -- I can actually see graphics! The main problem at
+the moment is that the mouse driver seems.. broken.. the mouse is going all
+over the place when I move it.
+
+
 
 
 

@@ -543,7 +543,7 @@ void umain(int argc, char **argv) {
 	init_zbuffer();
 	init_fonts();
 
-	Application *term = spawn_application("terminal", 100, 200, 500, 500);
+	Application *term = spawn_application("terminal", 300, 50, 500, 450);
 	spawn_application("paint", 10, 10, 300, 500);
 
 	// always bring the terminal to the foreground.. TODO improve this to be
