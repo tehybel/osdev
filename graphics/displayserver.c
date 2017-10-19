@@ -82,7 +82,7 @@ static void init_lfb() {
 	height = mode_info.height;
 	pitch = mode_info.pitch; // bytes per horizontal line
 	bpp = mode_info.bpp;
-	lfb_size = (width + pitch) * height * bpp / 8;
+	lfb_size = (pitch) * height * bpp / 8;
 }
 
 static void init_zbuffer() {
@@ -111,8 +111,8 @@ static inline void do_draw_pixel(const int x, const int y, const int color) {
 	assert (bpp == 32);
 	uint32_t *p = (uint32_t *) zbuffer;
 
-	if (p[y*((width+pitch)/4) + x] != color)
-		p[y*((width+pitch)/4) + x] = color;
+	if (p[y*((pitch)/4) + x] != color)
+		p[y*((pitch)/4) + x] = color;
 }
 
 static void do_draw_text(char *text, int x, int y, int col, Font *font) {
@@ -132,7 +132,7 @@ static void draw_rectangle(const int x1, const int y1,
 	assert (x1 >= 0);
 	assert (y1 >= 0);
 
-	int times = (width + pitch)/4;
+	int times = (pitch)/4;
 
 	int x, y;
 	for (y = y1; y < y2; y++) {
@@ -179,7 +179,7 @@ static void refresh_screen() {
 	Pixel p;
 		
 	for (y = 0; y < height; y++) {
-		tmp = y*((width+pitch)>>2);
+		tmp = y*((pitch)>>2);
 		for (x = 0; x < width; x++) {
 			index = tmp + x;
 			p = zbuffer[index];
@@ -432,7 +432,7 @@ static void draw_canvas(int wx, int wy, Canvas *c) {
 	size_t c_height = c->height;
 	size_t c_width = c->width;
 
-	int tmp = ((width+pitch)>>2);
+	int tmp = ((pitch)>>2);
 	for (y = 0; y < c_height; y++) {
 		// these ugly variables are here since we manually lift computations
 		// outside of the inner loop when possible

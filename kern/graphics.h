@@ -1,8 +1,8 @@
 #ifndef JOS_INC_GRAPHICS_H
 #define JOS_INC_GRAPHICS_H
 
-#define GRAPHICS_HEIGHT 600
-#define GRAPHICS_WIDTH 800
+#define GRAPHICS_HEIGHT 768
+#define GRAPHICS_WIDTH 1024
 
 // bits per pixel
 #define GRAPHICS_BPP 32
