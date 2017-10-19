@@ -74,13 +74,14 @@ static void init_lfb() {
 	
 	lfb = (uint32_t *) LFB_BASE;
 
-	// hardcode these for now. 
-	// we should really get them from the mode_info struct in the kernel via a
-	// syscall.
-	width = 1024;
-	height = 768;
-	pitch = 4096; // bytes per horizontal line
-	bpp = 32;
+	struct vbe_mode_info mode_info = {0};
+	if ((r = sys_get_mode_info(&mode_info)))
+		panic("could not get mode info: %e\n", r);
+
+	width = mode_info.width;
+	height = mode_info.height;
+	pitch = mode_info.pitch; // bytes per horizontal line
+	bpp = mode_info.bpp;
 	lfb_size = (width + pitch) * height * bpp / 8;
 }
 

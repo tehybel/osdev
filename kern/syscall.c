@@ -498,7 +498,7 @@ static int sys_map_lfb() {
 		return -E_BAD_ENV;
 	
 	physaddr_t pa = mode_info.framebuffer;
-	size_t size = lfb_size;
+	size_t size = ROUNDUP(lfb_size, PGSIZE);
 	void *va = (void *) LFB_BASE;
 
 	size_t offset;
@@ -542,6 +542,12 @@ static int sys_get_ide_io_base() {
 		return -1;
 	
 	return io_base;
+}
+
+static int sys_get_mode_info(struct vbe_mode_info * ptr) {
+	// will fail if the address is invalid.
+	copy_to_user(ptr, &mode_info, sizeof(mode_info));
+	return 0;
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -617,6 +623,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	case SYS_get_ide_io_base:
 		return sys_get_ide_io_base();
+
+	case SYS_get_mode_info:
+		return sys_get_mode_info((struct vbe_mode_info *) a1);
 
 	default:
 		return -E_NOSYS;

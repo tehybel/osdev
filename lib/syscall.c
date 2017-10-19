@@ -149,3 +149,6 @@ unsigned int sys_get_ide_io_base() {
 	return (unsigned int) syscall(SYS_get_ide_io_base, 0, 0, 0, 0, 0, 0);
 }
 
+int sys_get_mode_info(struct vbe_mode_info *p) {
+	return syscall(SYS_get_mode_info, 0, (uint32_t) p, 0, 0, 0, 0);
+}

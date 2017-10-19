@@ -289,8 +289,7 @@ init_memory(void)
 
 	// set up the mapping for the LFB used in graphics
 	if (have_graphics) {
-		int bytes_needed = 
-			mode_info.width * mode_info.height * mode_info.bpp / 8;
+		size_t bytes_needed = ROUNDUP(lfb_size, PGSIZE);
 		boot_map_region(kern_pgdir, (uintptr_t) LFB_BASE,
 						bytes_needed, mode_info.framebuffer, PTE_W);
 	}

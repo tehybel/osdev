@@ -24,6 +24,7 @@ enum {
 	SYS_map_lfb,
 	SYS_get_io_events,
 	SYS_get_ide_io_base,
+	SYS_get_mode_info,
 	NSYSCALLS
 };
 
