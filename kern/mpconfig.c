@@ -75,8 +75,15 @@ struct RSDP_descriptor {
 	char signature[8];
 	uint8_t Checksum;
 	char OEMID[6];
-	uint8_t Revision;
+	uint8_t revision;
 	uint32_t rsdt_address;
+	
+	// the next fields are only valid if revision >= 2;
+	// see http://wiki.osdev.org/RSDP
+	uint32_t length;
+	uint64_t xsdt_address;
+	uint8_t ExtendedChecksum;
+	uint8_t reserved[3];
 } __attribute__ ((packed));
 
 
@@ -394,6 +401,9 @@ static void parse_madt(physaddr_t madt_pa) {
 }
 
 bool init_mp_via_acpi() {
+	physaddr_t madt;
+	struct RSDT rsdt;
+	uint32_t rsdt_address;
 
 	// first we must find the RSDP (Root System Description Pointer)
 	struct RSDP_descriptor *rsdp = find_rsdp();
@@ -401,20 +411,46 @@ bool init_mp_via_acpi() {
 		cprintf("could not find RSDP\n");
 		return 0;
 	}
+	if (strncmp(rsdp->signature, "RSD PTR ", 8)) {
+		cprintf("Got an invalid RSDP!\n");
+		return 0;
+	}
 
-	// find the RSDT (Root System Description Table) from the RSDP
+	if (rsdp->revision < 2) {
+		// this is the case on old real hardware and QEMU
+		// we must use the RSDT
+		rsdt_address = rsdp->rsdt_address;
+
+	}
+	else {
+		// this is the case on VirtualBox
+		// we must prefer the XSDT over the RSDT
+		char *ptr = (char *) &rsdp->xsdt_address;
+		int i;
+		for (i = 0; i < 8; i++)
+			cprintf("0x%x\n", ptr[i]);
+		rsdt_address = rsdp->xsdt_address;
+	}
+
+	// grab a copy of the RSDT from physical memory.
 	// we cannot just use KADDR() here because the RSDT can reside at places
 	// which aren't in our page table
-	struct RSDT rsdt;
-	phys_memcpy(&rsdt, rsdp->rsdt_address, sizeof(rsdt)); // get length
+
+	// first grab the header, which has the length
+	phys_memcpy(&rsdt, rsdt_address, sizeof(struct SDT_header));
+	if (strncmp(rsdt.h.signature, "RSDT", 4)) {
+		cprintf("Got an invalid RSDT!\n");
+		return 0;
+	}
+
+	// then copy all of it
 	assert (rsdt.h.length <= sizeof(rsdt));
-	phys_memcpy(&rsdt, rsdp->rsdt_address, rsdt.h.length); // then copy all of it
+	phys_memcpy(&rsdt, rsdt_address, rsdt.h.length); 
 
 	// the RSDT basically points to a bunch of other tables; one of these is
 	// the MADT (Multiple APIC Description Table) which lets us find the
 	// LAPIC, so find the MADT.
-	physaddr_t madt = find_table(&rsdt, "APIC");
-	if (madt == 0) {
+	if (!(madt = find_table(&rsdt, "APIC"))) {
 		cprintf("could not find the MADT\n");
 		return 0;
 	} 
