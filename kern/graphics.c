@@ -30,7 +30,7 @@ static void print_mode_info(struct vbe_mode_info *m) {
 }
 
 bool graphics_enabled() {
-	return 0;
+	return 1;
 }
 
 void init_graphics() {

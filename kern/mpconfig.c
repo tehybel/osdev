@@ -451,6 +451,8 @@ bool init_mp_via_acpi() {
 		ptr_size = 8;
 	}
 
+	cprintf("The RSDT should be at 0x%x\n", rsdt_address);
+
 	// grab a copy of the RSDT from physical memory.
 	// we cannot just use KADDR() here because the RSDT can reside at places
 	// which aren't in our page table
@@ -487,8 +489,9 @@ bool init_mp_via_acpi() {
 // out by the BIOS.
 void init_multiprocessing() {
 	// prefer to use the MP table provided by most BIOSes
-	if (init_mp_via_mpconfig())
+	if (init_mp_via_mpconfig()) {
 		return;
+	}
 
 	// if that fails (which it does on my netbook) then try to find the same
 	// information via ACPI

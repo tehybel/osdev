@@ -411,7 +411,20 @@ polishing...
 
 
 
+I still have no clue why it doesn't work in VirtualBox -- my ACPI code isn't
+finding the right tables, and when I look in memory what's there just seems
+completely wrong. I'll return to that later....
 
+.....
+
+Oh. I forgot that VirtualBox never worked with my ACPI code -- but it didn't
+need to, because it worked with mpconfig instead. So there's no problem after
+all.
+
+The OS now runs in QEMU, VirtualBox and my netbook!
+
+
+.....
 
 
 
