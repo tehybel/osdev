@@ -44,7 +44,6 @@ void init_graphics() {
 	// resides at a place which is 1:1 mapped, which should currently be true
 	// for the first 1MB of code.
 	memcpy((void *) 0x8000, do_init_graphics, 0x1000);
-
 	memcpy((void *) 0x9000, &realmode_gdt, 0x1000);
 
 	cprintf("Setting video mode..\n");

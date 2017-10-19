@@ -11,11 +11,10 @@
 
 
 
-
 # use this macro to switch to real mode
 # the 'code_start' parameter must be a label pointing to the beginning of the
 # code that's switching modes
-.macro switch_to_real_mode
+.macro switch_to_real_mode code_start
 
 	pushad
 	
@@ -60,7 +59,7 @@
 
 	# Far jump to 16-bit protected mode:
 	#     Far jump to 16-bit protected mode with a 16-bit segment index.
-	ljmp 0x8:(0x8000 + 1f - do_init_graphics)
+	ljmp 0x8:(0x8000 + 1f - \code_start)
 
 1:
 
@@ -90,7 +89,7 @@
 
 	#     Far jump to real mode:
 	#         Far jump to real mode with real mode segment selector (usually 0).
-	ljmp 0x0:(0x8000 + 1f - do_init_graphics)
+	ljmp 0x0:(0x8000 + 1f - \code_start)
 
 1:
 
@@ -116,7 +115,7 @@
 .endm # end of macro
 
 
-.macro switch_to_protected_mode
+.macro switch_to_protected_mode code_start
 
 	# use a proper 32-bit GDT
 	mov eax, (0x9000 + protmode_gdtdesc - realmode_gdt)
@@ -128,7 +127,7 @@
 	mov cr0, eax
 
 	# go to 32-bit mode
-	ljmp 0x8:(0x8000 + 1f - do_init_graphics)
+	ljmp 0x8:(0x8000 + 1f - \code_start)
 
 .code32
 1:
@@ -174,7 +173,7 @@
 
 do_init_graphics:
 	
-	switch_to_real_mode
+	switch_to_real_mode do_init_graphics
 
 	# now we can use int 0x10
 	# thus we will set the video mode
@@ -264,9 +263,10 @@ success:
 
 	# finally we must switch back to 32 bits protected mode
 
-	switch_to_protected_mode
+	switch_to_protected_mode do_init_graphics
 
 	ret
+
 
 
 .globl realmode_gdt
