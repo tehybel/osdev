@@ -372,12 +372,18 @@ static int get_data_from_keyboard() {
 	return c;
 }
 
+static void wait_before_reading_from_mouse();
 static int get_mouse_status(struct cursor *out) {
 	int i;
 	int32_t status, delta_x, delta_y;
 
+	wait_before_reading_from_mouse();
 	status = inb(KBDATAP);
+
+	wait_before_reading_from_mouse();
 	delta_x = inb(KBDATAP);
+
+	wait_before_reading_from_mouse();
 	delta_y = inb(KBDATAP);
 
 	if (!(status & MOUSE_ALWAYS_1)) {

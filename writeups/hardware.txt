@@ -399,6 +399,15 @@ Now it works on my netbook -- I can actually see graphics! The main problem at
 the moment is that the mouse driver seems.. broken.. the mouse is going all
 over the place when I move it.
 
+...
+
+The bug was that I forgot to call wait_before_reading_from_mouse() before
+using the inb instruction. Apparently hardware *does* need some cycles in
+between inb's, but QEMU doesn't. So this bug wasn't apparent on QEMU.
+
+
+Now it seems that everything finally works! Then it just needs some
+polishing...
 
 
 
