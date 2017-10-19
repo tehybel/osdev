@@ -979,7 +979,17 @@ check_kern_pgdir(void)
 
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE) {
-		assert(check_va2pa(pgdir, KERNBASE + i) == i);
+		uint32_t va = KERNBASE + i;
+		if (!(check_va2pa(pgdir, va) == i))
+			cprintf("0x%x\n", va);
+		if (va >= LFB_BASE && va < LFB_BASE + lfb_size) {
+			// the LFB is an exception; it should *not* be identity mapped at
+			// this point.
+			continue;
+		}
+
+
+		assert(check_va2pa(pgdir, va) == i);
 	}
 
 	// check kernel stack

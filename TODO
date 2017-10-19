@@ -3,9 +3,10 @@
 
 For the hardware lab:
 
-- make graphics work
-- make a "startx" command
++ make graphics work
+- make a "startx" command (or use GRUB options..)
 - clean up the writeup
+- stress test the terminal
 - make sure the project still runs on virtualbox
 
 
