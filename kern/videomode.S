@@ -167,27 +167,24 @@
 
 
 
+.globl _get_video_mode
+.type _get_video_mode, @function
 
-.globl do_init_graphics
-.type do_init_graphics, @function
-
-do_init_graphics:
+_get_video_mode:
 	
-	switch_to_real_mode do_init_graphics
+	# grab the argument (the mode offset)
+	push ebx
+	mov ebx, [esp + 8]
 
-	# now we can use int 0x10
-	# thus we will set the video mode
+	switch_to_real_mode _get_video_mode
 
-	# the following mode-setting code is inspired by:
-	# http://wiki.osdev.org/User:Omarrx024/VESA_Tutorial
+	push bx
 
-	push es					# some VESA BIOSes destroy ES, or so I read
 	mov di, 0xc000
 	mov eax, 0x32454256 	# "VBE2"
 	mov dword [di], eax
 	mov ax, 0x4F00				# get VBE BIOS info
 	int 0x10
-	pop es
 
 	cmp ax, 0x4F				# BIOS doesn't support VBE?
 	jne .error
@@ -197,74 +194,89 @@ do_init_graphics:
 	mov bx, (0xc000 + 14) # get video_modes (.offset)
 	mov si, [bx]
 
-.find_mode:
-	mov dx, fs:[si] # mode
-	add si, 2
+	pop bx
+	add si, bx # add the offset argument
+
+	mov dx, fs:[si] # grab the mode
 
 	cmp dx, 0xFFFF			# end of list?
 	je .error
 
-	push es
 	mov ax, 0x4F01				# get VBE mode info
 	mov cx, dx
 	mov di, 0xd000
 	int 0x10
-	pop es
 
 	cmp ax, 0x4F
-	jne .error
-
-	mov bx, (0xd000 + 18)
-	mov bx, [bx]
-	cmp bx, GRAPHICS_WIDTH
-	jne .next_mode
-
-	mov bx, (0xd000 + 20)
-	mov bx, [bx]
-	cmp bx, GRAPHICS_HEIGHT
-	jne .next_mode
-
-	mov bx, (0xd000 + 25)
-	mov bl, [bx]
-	cmp bl, GRAPHICS_BPP
-	jne .next_mode
-
-	# If we make it here, we've found the correct mode!
-
-	# Set the mode
-	push es
-	mov ax, 0x4F02
-	mov bx, fs:[si] # mode
-	or bx, 0x4000			# enable LFB
-	mov di, 0			# not sure if some BIOSes need this... anyway it doesn't hurt
-	int 0x10
-	pop es
-
-	cmp ax, 0x4F
-	jne .error
-
-	clc
-	jmp success
-
-.next_mode:
-	jmp .find_mode
+	je .success
 
 .error:
 	xor ebx, ebx
 	jmp .finish
 
-success:
+.success:
 	mov ebx, 1
 
 .finish:
+	
+	# we've got the video mode in 0xd000, so return.
+	switch_to_protected_mode _get_video_mode
 
-	# we've set the video mode!
-	# now the physical address of the LFB should be in (0xd000 + 40)
+	pop ebx
+	ret
 
-	# finally we must switch back to 32 bits protected mode
 
-	switch_to_protected_mode do_init_graphics
 
+.globl _set_video_mode
+.type _set_video_mode, @function
+
+_set_video_mode:
+
+	# grab the argument (the mode offset)
+	push ebx
+	mov ebx, [esp + 8]
+
+	switch_to_real_mode _set_video_mode
+
+	push bx
+
+	mov di, 0xc000
+	mov eax, 0x32454256 	# "VBE2"
+	mov dword [di], eax
+	mov ax, 0x4F00				# get VBE BIOS info
+	int 0x10
+
+	mov bx, (0xc000 + 16) # get video_modes (.segment)
+	mov fs, [bx]
+	mov bx, (0xc000 + 14) # get video_modes (.offset)
+	mov si, [bx]
+
+	pop bx
+	add si, bx
+
+	mov ax, 0x4F02
+	mov bx, fs:[si] # mode
+	or bx, 0x4000			# enable LFB
+	mov di, 0
+	int 0x10
+
+	cmp ax, 0x4F
+	jne .error2
+
+	jmp .success2
+
+.error2:
+	xor ebx, ebx
+	jmp .finish2
+
+.success2:
+	mov ebx, 1
+
+.finish2:
+
+	switch_to_protected_mode _set_video_mode
+
+	pop ebx
 	ret
 
 
