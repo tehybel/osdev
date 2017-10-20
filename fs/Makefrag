@@ -21,15 +21,6 @@ USERAPPS :=		$(USERAPPS) \
 			$(OBJDIR)/user/init \
 			$(OBJDIR)/user/ls \
 			$(OBJDIR)/user/lsfd \
-			$(OBJDIR)/user/num \
-			$(OBJDIR)/user/forktree \
-			$(OBJDIR)/user/primes \
-			$(OBJDIR)/user/primespipe \
-			$(OBJDIR)/user/testfdsharing \
-			$(OBJDIR)/user/testkbd \
-			$(OBJDIR)/user/testpipe \
-			$(OBJDIR)/user/testpteshare \
-			$(OBJDIR)/user/testshell \
 			$(OBJDIR)/user/hello \
 			$(OBJDIR)/user/faultio \
 			$(OBJDIR)/user/sh \
@@ -39,6 +30,7 @@ USERAPPS :=		$(USERAPPS) \
 
 FSIMGTXTFILES :=	$(FSIMGTXTFILES) \
 			fs/lorem \
+			fs/myfile \
 			fs/script \
 			fs/testshell.key \
 			fs/testshell.sh
