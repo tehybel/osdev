@@ -1,10 +1,120 @@
 
 Time: 17:20-19:20, 13-17, 11:20-14:50, 12-15, 14:15-17:30, 15:30-16:30,
-11-12:15, 11:15-14:00, 10-TODO
+11-12:15, 11:15-14:00, 10-17, 9:15-TODO,
 
 
 
 The goal of this "lab" is the get the OS running on real hardware.
+Specifically, I'm using an old Packard Bell netbook called the "dot s":
+
+	http://www.packardbell.com/pb/en/IL/content/model/LU.BUN0D.038
+
+
+
+Overview:
+
+- first virtualbox
+	- just engineering and settings issues; wrong network card, need LAPIC
+	  emulation, different disk setup
+- then netbook
+- problem: failure to boot
+	- tried dd'ing image to a USB drive
+	- for historical reasons, many BIOSes will only boot from a USB which
+	  "looks right", i.e., has MBR with proper BPB. Testing with and without
+	  this block shows that it's indeed necessary. Each vendor tests this in a
+	  separate way.
+	  	- the historical reason is: there's no specification for telling
+		  whether a USB disk is bootable, so some vendors decided yes, some
+		  no, and after a while they all tried to autodetect it...
+	- after some experimentation, my BIOS uses certain heuristics (0xaa55 in
+	  the right place, 1s, 0s in right places)..
+	- once I set up the BPB in the MBR correctly, the OS booted!
+- problem: bootloader doesn't support USB
+	- custom bootloader must fit in 512 bytes (minus MBR/BPB)
+	- my bootloader only supports reading the kernel from an ATA drive
+		- we need a USB driver, but it won't fit and is complicated
+	- workaround: boot a Linux ISO, dd the OS onto the disk
+		- we get further, but the netbook just hangs while loading the kernel,
+		  and I have no output
+- problem: no output
+	- we don't have a serial connection
+	- can write characters into a buffer at 0xb8000 -> shown as text
+	- I used this to figure out where in the code the hang was
+		- was painful; have to stay under 512 bytes, and booting Linux each
+		  time was slow...
+	- finally found out where it was hanging
+- problem: SATA is not ATA
+	- VirtualBox and QEMU both connect their hard drive via an ATA connection
+	- my netbook uses SATA
+	- ATA works via inb(0x1f0) and such
+	- after reading up on it, it turns out that SATA uses the same protocol,
+	  just different i/o ports, so we must find those via PCI
+		- but PCI code won't fit in 512 bytes...
+	- tried to "cheat"; booted Linux, ran "lspci -v" to find ports
+		- now we load the kernel and run its code!
+		- finally no longer limited to 512 bytes
+- problem: where's the LAPIC?
+	- our scheduler need a LAPIC for clock interrupts
+		- we don't know its hardware address
+	- previously we used the "mpconfig" way to find the LAPIC
+		- code for this was given to us
+		- searches for "_MP_" in a certain area to find a table
+		- this table has info about all the CPUs (hence "MP") and their
+		  physical LAPIC addresses
+		- unfortunately the "_MP_" table.. just isn't there?
+	- took a while to figure out the problem; development with live USB and dd
+	  is just too slow to be practical...
+- problem: can't boot from USB
+	- turns out that a custom bootloader is *not* recommended
+	- after some searching: GRUB is meant to solve our problem of booting from
+	  various media
+	- I swapped out my bootloader with GRUB, which has code for loading the
+	  kernel from USB (and SATA disk, and even the network)
+	- now the development process is nice!
+		- just run "make write-usb" and plug it in
+- back to the missing LAPIC
+	- the mpconfig way is apparently old and one should instead use ACPI
+	  tables
+	- ACPI is just yet another specification to figure out
+		- RSDP is found by scanning some area for "RSD PTR ", like with "_MP_"
+		- RSDP points at RSDT
+		- RSDT points at various ACPI tables
+		- walk over the tables until we find the "APIC" table
+	- now we get interrupts and the scheduler works again!
+- problem: page table bug
+	- on my netbook, updating a PTE had no effect
+	- after quite some time searching/thinking, I figured out that it's
+	  necessary to invalidate the TLB entry when you update a PTE
+	- QEMU and VirtualBox apparently don't emulate the TLB faithfully, so the
+	  bug never surfaced in emulators
+	  	- could be used to detect virtualization...
+- problem: my custom FS is confused by GRUB
+	- the FS assumes that its superblock is at index 1, but GRUB is there now
+	- changed the rules so that the first 32 MB of disk are reserved, then
+	  GRUB and the kernel go there, we use dd to pad with zeros, and then we
+	  put the file system
+	- after updating the code and makefile, we can load files again
+- at this point, if we disable graphics the kernel actually boots!!
+- problem: ATA/SATA code uses hardcoded inports
+	- we used "lspci -v" on Linux to "cheat" and get the right ports earlier
+	- that's hacky; have to change code when switching from QEMU to netbook
+	- went back and wrote PCI code which finds this info dynamically
+- problem: graphics don't work
+	- the video mode needs to be set
+	- old assembly code would switch to real mode, walk over modes, find one
+	  that was 1024x768x32, and set it
+	- had to rewrite this to be able to retrieve each mode and print it, then
+	  choose a proper one and set it
+	  	- 16-bit assembly code is not very maintainable...
+	- problem was: my netbook only supports 800x600x32
+- problem: mouse driver broken
+	- turns out that I was forgetting to wait between calls to inb, so that
+	  three calls in a row would read the same byte
+	  	- again, QEMU and VirtualBox didn't emulate this faithfully
+- finally: the OS works in QEMU, VirtualBox, and on my netbook!
+
+
+
 
 
 
@@ -313,7 +423,7 @@ address, despite me having changed the page tables.
 
 
 
-Now SMP initialization works, via the AHCI interface. Great.
+Now SMP initialization works, via the ACPI interface. Great.
 
 Unfortunately the OS is failing to read from the IDE drive now. And I have no
 clue why.
