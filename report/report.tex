@@ -44,6 +44,7 @@ TODO: write an abstract here.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\section*{Introduction}
 
 
 - introduction
@@ -52,14 +53,120 @@ TODO: write an abstract here.
 		- following the course from MIT
 	- why are we doing it
 	- overview of the coming chapters
-- lab 1
-	- bios to boot loader
-	- boot loader loads the kernel
-	- some extra work is performed before loading kernel
-		- explain this
+
+
+
+%%%%% LAB 1 %%%%%
+
+\section*{Lab 1}
+
+In this lab we wrote initialization code for our operating system. This code
+sets up a rudimentary page table and switches the processor from 16-bit real
+mode to 32-bit protected mode. We also wrote a boot loader, which is a small
+program that loads the main kernel from disk and transfers control to it.
+
+\subsection*{The boot process}
+To understand the purpose of a boot loader, it is first necessary to have an
+overview of the process which an x86 machine goes through upon startup.
+
+% source: https://en.wikipedia.org/wiki/BIOS
+When an x86 machine starts, its BIOS code is run. The BIOS initializes some of
+the system's hardware components (e.g., keyboard, graphics card, and hard
+drive). The BIOS will then load one sector (512 bytes) from the boot medium
+into memory at a hard-coded address (0x7C00). Once this first sector is loaded
+into memory, the BIOS will transfer execution to the loaded code.
+
+The first sector will typically contain a small program known as the boot
+loader. Its purpose is to load the main kernel from disk and transfer
+execution to it.
+
+Before the boot loader loads the kernel, we first run some initialization code
+which sets up a more comfortable environment for the boot loader and kernel to
+work in.
+
+
+
+\subsection*{Initialization code}
+When the BIOS jumps into our code, the processor is running in 16-bit real
+mode. However the code produced by a modern compiler expects to run in 32-bit
+protected mode. We therefore needed to write code which performs this
+switching of processor modes.
+
+The main difference between real mode and protected mode is how address
+resolution is performed. In real mode, accessing a physical address is done
+using a segment selector register and a general-purpose register. In
+contast, protected mode allows (but does not require) the use of
+\emph{paging}, i.e., the mapping from virtual from physical addresses using a
+page table.
+
+Since we want our operating system to use virtual memory, we certainly want to
+switch to protected mode. We do not immediately enable paging, however.
+
+To switch to protected mode, a bit needs to be set in the status register
+\texttt{cr0}. We do so with the following assembly code:
+\begin{verbatim}
+# protected mode enable flag
+.set CR0_PE_ON, 0x1 
+movl    %cr0, %eax
+orl     $CR0_PE_ON, %eax
+movl    %eax, %cr0
+\end{verbatim}
+
+To switch to 32-bit mode, we must update the \texttt{cs} (code
+segment) register. This register is an offset into a table called the Global
+Descriptor Table (GDT) which contains a number of descriptors. Each descriptor
+has a bit which determines whether the chosen segment is a 32-bit or a 16-bit
+segment. We use the \texttt{ljmp} instruction to update the \texttt{cs}
+register.
+% TODO: possibly elaborate more on the GDT.
+
+Once our code has switched to 32-bit protected mode, it executes the boot
+loader. At this point the processor is in a state where it can execute
+compiled C code, which means that we no longer need to hand-write assembly.
+
+The file \texttt{boot/boot.S} contains the code that performs the described
+tasks.
+
+
+
+\subsection{The boot loader}
+It is the task of the boot loader to load the main kernel and transfer
+execution to it. The boot loader must do this using no more than 512 bytes of
+code, minus the bytes used by the initialization code.
+
+Our kernel will be compiled into an Executable and Linkable Format (ELF) file.
+The boot loader will parse this ELF file, using the information therein to
+load the code and data of the kernel to the right physical addresses.
+
+% TODO: possibly include information about the ELF file format here.
+
+Once the boot loader has finished loading the kernel, it determines the entry
+point address from the ELF file and jumps there, transferring execution to the
+kernel.
+
+\subsection{Minimal kernel code}
+
+
+
+% TODO: should note that our boot loader isn't actually used in the end.
+
+
+
+
+% no C stdlib
+% also write about the code we were given -- e.g. to print to serial.
+
+
+
+%%%%% LAB 2 %%%%%
+
 - lab 2
 	- alloc and free physical pages
 	- page table management
+
+
+
+%%%%% LAB 3 %%%%%
 - lab 3
 	- goal: make user-space process run
 	- functions for keeping track of proceses
@@ -67,6 +174,9 @@ TODO: write an abstract here.
 	- context switching
 	- handling exceptions
 	- handling syscalls
+
+
+%%%%% LAB 4 %%%%%
 - lab 4
 	- preemptive multitasking
 		- starting multiple processors
@@ -76,13 +186,27 @@ TODO: write an abstract here.
 		- simple fork
 		- CoW fork
 	- IPC
+
+
+%%%%% LAB 5 %%%%%
 - lab 5
 	- file system
 	- shell
+
+
+%%%%% LAB 6 %%%%%
 - lab 6
 	- networking: writing an e1000 card driver
+
+
+%%%%% GRAPHICS LAB %%%%%
 - graphics
+
+%%%%% HARDWARE LAB %%%%%
 - hardware
+
+
+
 - conclusion
 
 % TODO: we should have an abbreviations list

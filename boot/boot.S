@@ -1,6 +1,5 @@
 #include <inc/mmu.h>
 
-
 # the following is a BIOS Parameter Block; some BIOSes check for it and will
 # refuse to boot from the disk if it's not there.
 
