@@ -27,3 +27,7 @@ trace-*
 __pycache__/
 isodir/boot/myos.bin
 myos.iso
+report/report.aux
+report/report.log
+report/report.out
+report/report.toc
