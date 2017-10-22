@@ -54,6 +54,10 @@ TODO: write an abstract here.
 	- why are we doing it
 	- overview of the coming chapters
 
+% TODO: write about our development environment, i.e., that we're using QEMU.
+
+% TODO: write that you can use "git checkout lab1" to go back to the end of
+% lab1, etc.
 
 
 %%%%% LAB 1 %%%%%
@@ -129,7 +133,7 @@ tasks.
 
 
 
-\subsection{The boot loader}
+\subsection*{The boot loader}
 It is the task of the boot loader to load the main kernel and transfer
 execution to it. The boot loader must do this using no more than 512 bytes of
 code, minus the bytes used by the initialization code.
@@ -144,8 +148,18 @@ Once the boot loader has finished loading the kernel, it determines the entry
 point address from the ELF file and jumps there, transferring execution to the
 kernel.
 
-\subsection{Minimal kernel code}
+\subsection*{Minimal kernel code}
+At this point our kernel can finally run. However it does not yet have much
+functionality. Unlike user-mode programs, the kernel does not have access to a
+C standard library, unless we write one ourselves.
 
+
+% TODO: document that we were given the serial connection code via the MIT
+% course
+As a start, we would like to have the ability to input and output text.
+Our kernel can use the \texttt{inb} and \texttt{outb} instructions to
+communicate with the outside world via a serial connection. We used this to
+write out a message and confirm that the kernel runs.
 
 
 % TODO: should note that our boot loader isn't actually used in the end.
@@ -153,12 +167,9 @@ kernel.
 
 
 
-% no C stdlib
-% also write about the code we were given -- e.g. to print to serial.
-
-
-
 %%%%% LAB 2 %%%%%
+
+\section*{Lab 2}
 
 - lab 2
 	- alloc and free physical pages
@@ -167,6 +178,7 @@ kernel.
 
 
 %%%%% LAB 3 %%%%%
+\section*{Lab 3}
 - lab 3
 	- goal: make user-space process run
 	- functions for keeping track of proceses
@@ -177,6 +189,7 @@ kernel.
 
 
 %%%%% LAB 4 %%%%%
+\section*{Lab 4}
 - lab 4
 	- preemptive multitasking
 		- starting multiple processors
@@ -189,20 +202,24 @@ kernel.
 
 
 %%%%% LAB 5 %%%%%
+\section*{Lab 5}
 - lab 5
 	- file system
 	- shell
 
 
 %%%%% LAB 6 %%%%%
+\section*{Lab 6}
 - lab 6
 	- networking: writing an e1000 card driver
 
 
 %%%%% GRAPHICS LAB %%%%%
+\section*{Graphics Lab}
 - graphics
 
 %%%%% HARDWARE LAB %%%%%
+\section*{Hardware Lab}
 - hardware
 
 
