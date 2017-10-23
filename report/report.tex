@@ -4,6 +4,7 @@
 \usepackage{amsfonts}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{fancyvrb}
 \usepackage{color}
 \usepackage{bm}
 \usepackage{listings}
@@ -58,6 +59,8 @@ TODO: write an abstract here.
 
 % TODO: write that you can use "git checkout lab1" to go back to the end of
 % lab1, etc.
+% TODO: say it's an exokernel, talk about what that means for our later
+% design
 
 
 %%%%% LAB 1 %%%%%
@@ -106,7 +109,7 @@ page table.
 Since we want our operating system to use virtual memory, we certainly want to
 switch to protected mode. We do not immediately enable paging, however.
 
-To switch to protected mode, a bit needs to be set in the status register
+To switch to protected mode, a bit needs to be set in the control register
 \texttt{cr0}. We do so with the following assembly code:
 \begin{verbatim}
 # protected mode enable flag
@@ -161,6 +164,10 @@ Our kernel can use the \texttt{inb} and \texttt{outb} instructions to
 communicate with the outside world via a serial connection. We used this to
 write out a message and confirm that the kernel runs.
 
+Using instructions such as \texttt{inb} and \texttt{outb} to communicate with
+an input/output device is known as Programmed Input/Output (PIO). It is a
+technique we will be using throughout our operating system development.
+
 
 % TODO: should note that our boot loader isn't actually used in the end.
 
@@ -171,10 +178,185 @@ write out a message and confirm that the kernel runs.
 
 \section*{Lab 2}
 
-- lab 2
-	- alloc and free physical pages
-	- page table management
+The goal of this lab was to write code which sets up the page table, so that
+our operating system can use virtual memory. Before we could set up the page
+table, we first needed to implement a subsystem which manages the physical
+memory of the system.
 
+\subsection*{Physical page allocation}
+A given system has a limited amount of physical memory, depending on how much
+RAM the machine has. This memory is split up into a number of pages. On x86, a
+page is 4096 bytes of memory. In hex, 4096 is 0x1000, which means that pages
+are always aligned on 0x1000-byte boundaries.
+
+% sources: https://en.wikipedia.org/wiki/Nonvolatile_BIOS_memory
+% http://wiki.osdev.org/CMOS
+To find out how much memory is available on the system, we query a memory area
+called the CMOS. The CMOS is an area of memory which holds the amount of
+system RAM. We can read from the CMOS using PIO to figure out how many pages
+of physical memory are available to the kernel.
+
+For each page, the kernel must keep track of whether it is in use or not, and
+if so, how many references there are to the given page. To accomplish this,
+metadata about each page is stored in a \texttt{PageInfo} struct. For example,
+the \texttt{PageInfo} struct holds the reference count of each page. The
+kernel has an array of \texttt{PageInfo} structs, called \texttt{pages}.
+Each entry of the \texttt{pages} array directly corresponds to one physical
+page of memory, such that the first entry in \texttt{pages} holds metadata
+about the first page of physical memory, and so on.
+
+Free pages are additionally stored in a linked list of \texttt{PageInfo}
+structs called the \texttt{page\_free\_list}. Using a linked list lets the
+kernel return a free page in constant time.
+
+We wrote the following functions to manage physical pages:
+\begin{itemize}
+\item \texttt{page\_alloc} is used to allocate a page of physical memory
+\item \texttt{page\_free} is used to put a page on the free list
+\item \texttt{page\_decref} and \texttt{page\_incref} are used to manage
+reference counts of pages
+\end{itemize}
+With this infrastructure in place, we were ready to set up the page table so
+that we could use virtual memory.
+
+% TODO: maybe describe our memory corruption checks?
+
+
+\subsection*{Page table theory}
+To explain how our operating system implements virtual memory, it is necessary
+to introduce some theory about the page table.
+
+The page table is a two-level table whose main purpose is to let the processor
+translate a virtual address to a physical address.  Conceptually, the x86 page
+table is a 1024-ary tree of height 2. The physical address of the page table
+-- the root of the tree -- can be found in the \texttt{cr3} register.
+
+The first level of the page table contains 1024 Page Directory Entries (PDEs).
+This name makes sense because each PDE points to a second-level table, which
+is called a Page Directory. Each PDE additionally holds some status bits.
+In other words, the first level of the page table contains 1024 pointers to
+second-level tables, along with some status bits.
+
+Each second-level table, i.e., each Page Directory, holds 1024 Page Table
+Entries (PTEs). It is possible to map a virtual address to a PTE. The PTE then
+holds the physical address to which the virtual address should map. It also
+holds some status bits.
+
+The status bits of PTEs and PDEs determine such features as whether the page
+is writable, and whether it is accessible to user-mode code. There is also a
+"present" bit, which determines whether the page is virtual address maps to a
+physical page at all, or if accesses should cause a page fault instead.
+
+To translate from a virtual to a physical address, it is necessary to walk the
+page table. For sake of illustration, assume that the processor is instructed
+to access a virtual address $v = 0x11223344$. The processor first looks in the
+\texttt{cr3} register to find the root of the page table. It then uses the
+higher-order 10 bits of $v$ as an index into the page table. In this case, we
+have:
+$$ v = 0x11223344 = 0b10001001000100011001101000100 $$
+So the 10 higher-order bits are:
+$$ 0b1000100100 = 548 $$
+At index 548 into the page table, the processor finds a PDE. It extracts a
+physical address from the PDE to find a page directory. It then uses the next
+10 high-order bits of $v$ as an index into the page directory. We have:
+$$ 0b0100011001 = 281 $$
+So the processor looks at index 281 into the page directory and finds a PTE.
+The PTE holds some status bits, which the processor can use to check whether
+the page is present, and whether access permissions are appropriate. If not, a
+page fault is generated. If all goes well, the PTE holds the physical address
+of the page that should be accessed. The lower-order 12 bits of the virtual
+address are used to index into the physical page, and the processor is finally
+done with address translation.
+
+This is a costly process, and in practice the job is done by specialized
+hardware called a Memory Management Unit (MMU). Additionally, a cache called
+the Translation Lookaside Buffer (TLB) holds the results of recent
+translations, to avoid having to walk the page table too often.
+
+
+\subsection*{Page table management}
+We wrote the following functions to manage the page table:
+\begin{itemize}
+\item \texttt{pgdir\_walk} is the main workhorse of the subsystem, since it is
+called by most of the other functions. It has the same function as the MMU; it
+is given a page table and a virtual address, and it walks over the table to
+find the corresponding PTE, allocating new levels of the table if needed,
+using \texttt{page\_alloc} from the previous section.
+\item \texttt{page\_insert} is used to insert a physical page into a page
+table at a given virtual address. In other words, it finds a PTE for a virtual
+address and stores the physical address there.
+\item \texttt{page\_lookup} finds the physical address of a page, given a
+virtual address.
+\item \texttt{page\_remove} invalidates a PTE in a page table.
+\end{itemize}
+The kernel uses these functions to set up the page table. This involves
+allocating pages of physical memory and inserting them into appropriate places
+in the page table. 
+
+It is up to us where the different things should go. Figure \ref{memlayout}
+contains a diagram which gives a simplified overview of the address space. For
+a more complete version, see the file \texttt{inc/memlayout.h}.
+\begin{figure}[h!]
+    \centering
+\begin{Verbatim}[fontsize=\small]
+Virtual memory map:                                  Permissions
+                                                     kernel/user
+   4 Gig -------->  +------------------------------+
+                    :              .               :
+                    :              .               :
+                    |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
+                    |                              | RW/--
+                    |      Kernel code, data       | RW/--
+                    |                              | RW/--
+   KERNBASE, ---->  +------------------------------+ 0xf0000000      
+   KSTACKTOP        |     CPU0's Kernel Stack      | RW/--  KSTKSIZE 
+                    +------------------------------+                 
+                    |     CPU1's Kernel Stack      | RW/--  KSTKSIZE 
+                    +------------------------------+                 
+                    :              .               :                 
+                    :              .               :                 
+                    +------------------------------+ 0xef800000
+                    |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
+   UVPT      ---->  +------------------------------+ 0xef400000
+                    |          RO PAGES            | R-/R-  PTSIZE
+   UPAGES    ---->  +------------------------------+ 0xef000000
+                    :              .               :                 
+                    :              .               :                 
+   USTACKTOP  --->  +------------------------------+ 0xeebfe000
+                    |      Normal User Stack       | RW/RW  PGSIZE
+                    :              .               :                 
+                    :              .               :                 
+                    +------------------------------+
+                    .                              .
+                    .                              .
+                    |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+                    |     Program code, data       |
+   UTEXT -------->  +------------------------------+ 0x00800000
+                    :              .               :                 
+                    :              .               :                 
+                    +------------------------------+ 0x00000000
+\end{Verbatim}
+    \caption{The virtual address space of the kernel}
+    \label{memlayout}
+\end{figure}
+The diagram shows that the kernel code resides starting at virtual address
+0xf0000000. The kernel stacks, used by processors when running kernel-mode
+code, reside just below, between 0xefc00000 and 0xf0000000. Further down in
+the address space, between 0xef400000 and 0xef800000, we have the User Virtual
+Page Table (UVPT) area, which gives user-mode programs read-only access to the
+page table, enabling certain exokernel-style programs to work. The stack of
+the user-mode program starts at 0xeebfe000 and grows toward lower addresses.
+The user-mode program code and data resides at 0x00800000.
+
+After allocating a page table and updating it to reflect all these
+conventions, we update the \texttt{cr3} register to atomically update the page
+table. Finally we set a bit in \texttt{cr0} to enable paging.
+
+Our system now has virtual memory. This means that user-mode programs cannot
+access kernel memory, since we have not set the user bit in the PTEs for this
+memory. Furthermore, user-mode programs cannot interfere with each other; they
+will each be given their own separate page table, where none of the physical
+addresses overlap by default.
 
 
 %%%%% LAB 3 %%%%%
