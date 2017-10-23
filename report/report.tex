@@ -10,10 +10,100 @@
 \usepackage{listings}
 \usepackage{soul,xcolor}
 \usepackage[htt]{hyphenat} % allows breaks inside texttt
+\usepackage[acronym, toc]{glossaries}
 \setstcolor{red}
+
+\usepackage{xcolor}
+
+% this makes links prettier
+\hypersetup{
+    colorlinks,
+    linkcolor={blue!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!50!black}
+}
 
 \lstset{language=C}
 \lstset{basicstyle=\ttfamily\footnotesize}
+
+\newglossaryentry{elf}{
+	name=ELF,
+	description={Executable and Linkable Format; a file format used to store
+	executable programs. An ELF file describes the address at which each
+	section of program code or data should be loaded.}
+}
+
+\newglossaryentry{cr0}{
+	name=\texttt{cr0},
+	description={Control Register 0. It holds bits which determine how the
+	processor operates. It e.g. determines whether paging and protected mode
+	are enabled.}
+}
+
+\newglossaryentry{cr3}{
+	name=\texttt{cr3},
+	description={Control Register 3. It points to the current page table.}
+}
+
+\newglossaryentry{esp}{
+	name=\texttt{esp},
+	description={Extended Stack Pointer register.}
+}
+
+\newglossaryentry{eip}{
+	name=\texttt{eip},
+	description={Extended Instruction Pointer; a register which holds the
+	address of the next instruction to be executed.}
+}
+
+\newglossaryentry{eflags}{
+	name=\texttt{eflags},
+	description={A register which holds various flags that mostly reflect the
+	properties of the most recently executed instruction. For example the
+	signed flag is set during a subtraction whose result is below zero.}
+}
+
+\newglossaryentry{cs}{
+	name=\texttt{cs},
+	description={Code Segment selector register; it holds an index into the
+	\gls{gdt}. Its lower two bits determine the \gls{cpl}.}
+}
+
+\newglossaryentry{cpl}{
+	name=CPL,
+	description={Current Privilege Level; the current ring in which the
+	processor is executing. CPL=3 means ring, 3, i.e., user-mode, while CPL=0
+	means ring 0, i.e. kernel-mode.}
+}
+
+\newglossaryentry{gdt}{
+	name=GDT,
+	description={Global Descriptor Table; a table which holds descriptors,
+	each of which describes a segment of memory and its permissions.}
+}
+
+\newglossaryentry{pte}{
+	name=PTE,
+	description={Page Table Entry; a 32-bit integer which stores a physical
+	address to which a virtual address maps, as well as some status bits.}
+}
+\newglossaryentry{mmu}{
+	name=MMU,
+	description={Memory Management Unit.}
+}
+\newglossaryentry{tlb}{
+	name=TLB,
+	description={Translation Lookaside Buffer.}
+}
+
+\newglossaryentry{pde}{
+	name=PDE,
+	description={Page Directory Entry; a 32-bit integer which stores a
+	physical address of a second-level node in the page table, as well as some
+	status bits.}
+}
+
+\makeglossaries
 
 
 
@@ -61,7 +151,7 @@ TODO: write an abstract here.
 % lab1, etc.
 % TODO: say it's an exokernel, talk about what that means for our later
 % design
-
+% TODO: refer to the abbreviations list.
 
 %%%%% LAB 1 %%%%%
 
@@ -110,7 +200,7 @@ Since we want our operating system to use virtual memory, we certainly want to
 switch to protected mode. We do not immediately enable paging, however.
 
 To switch to protected mode, a bit needs to be set in the control register
-\texttt{cr0}. We do so with the following assembly code:
+\gls{cr0}. We do so with the following assembly code:
 \begin{verbatim}
 # protected mode enable flag
 .set CR0_PE_ON, 0x1 
@@ -119,12 +209,12 @@ orl     $CR0_PE_ON, %eax
 movl    %eax, %cr0
 \end{verbatim}
 
-To switch to 32-bit mode, we must update the \texttt{cs} (code
+To switch to 32-bit mode, we must update the \gls{cs} (code
 segment) register. This register is an offset into a table called the Global
-Descriptor Table (GDT) which contains a number of descriptors. Each descriptor
-has a bit which determines whether the chosen segment is a 32-bit or a 16-bit
-segment. We use the \texttt{ljmp} instruction to update the \texttt{cs}
-register.
+Descriptor Table (\gls{gdt}) which contains a number of descriptors. Each
+descriptor has a bit which determines whether the chosen segment is a 32-bit
+or a 16-bit segment. We use the \texttt{ljmp} instruction to update the
+\gls{cs} register.
 % TODO: possibly elaborate more on the GDT.
 
 Once our code has switched to 32-bit protected mode, it executes the boot
@@ -141,14 +231,14 @@ It is the task of the boot loader to load the main kernel and transfer
 execution to it. The boot loader must do this using no more than 512 bytes of
 code, minus the bytes used by the initialization code.
 
-Our kernel will be compiled into an Executable and Linkable Format (ELF) file.
-The boot loader will parse this ELF file, using the information therein to
-load the code and data of the kernel to the right physical addresses.
+Our kernel will be compiled into an \gls{elf} file. The boot loader will parse
+this \gls{elf} file, using the information therein to load the code and data
+of the kernel to the right physical addresses.
 
 % TODO: possibly include information about the ELF file format here.
 
 Once the boot loader has finished loading the kernel, it determines the entry
-point address from the ELF file and jumps there, transferring execution to the
+point address from the \gls{elf} file and jumps there, transferring execution to the
 kernel.
 
 \subsection*{Minimal kernel code}
@@ -229,49 +319,48 @@ to introduce some theory about the page table.
 The page table is a two-level table whose main purpose is to let the processor
 translate a virtual address to a physical address.  Conceptually, the x86 page
 table is a 1024-ary tree of height 2. The physical address of the page table
--- the root of the tree -- can be found in the \texttt{cr3} register.
+-- the root of the tree -- can be found in the \gls{cr3} register.
 
-The first level of the page table contains 1024 Page Directory Entries (PDEs).
-This name makes sense because each PDE points to a second-level table, which
-is called a Page Directory. Each PDE additionally holds some status bits.
-In other words, the first level of the page table contains 1024 pointers to
-second-level tables, along with some status bits.
+The first level of the page table is called the Page Directory. It contains
+1024 Page Directory Entries (\gls{pde}s). Each \gls{pde} points to a
+second-level node in the page table.
+Each second-level table holds 1024 Page Table
+Entries (\gls{pte}s). It is possible to map a virtual address to a \gls{pte}.
+The \gls{pte} then holds the physical address to which the virtual address
+should map. It also holds some status bits.
 
-Each second-level table, i.e., each Page Directory, holds 1024 Page Table
-Entries (PTEs). It is possible to map a virtual address to a PTE. The PTE then
-holds the physical address to which the virtual address should map. It also
-holds some status bits.
-
-The status bits of PTEs and PDEs determine such features as whether the page
-is writable, and whether it is accessible to user-mode code. There is also a
-"present" bit, which determines whether the page is virtual address maps to a
-physical page at all, or if accesses should cause a page fault instead.
+The status bits of \gls{pte}s and \gls{pde}s determine such features as
+whether the page is writable, and whether it is accessible to user-mode code.
+There is also a "present" bit, which determines whether the page is virtual
+address maps to a physical page at all, or if accesses should cause a page
+fault instead.
 
 To translate from a virtual to a physical address, it is necessary to walk the
 page table. For sake of illustration, assume that the processor is instructed
 to access a virtual address $v = 0x11223344$. The processor first looks in the
-\texttt{cr3} register to find the root of the page table. It then uses the
+\gls{cr3} register to find the root of the page table. It then uses the
 higher-order 10 bits of $v$ as an index into the page table. In this case, we
 have:
 $$ v = 0x11223344 = 0b10001001000100011001101000100 $$
 So the 10 higher-order bits are:
 $$ 0b1000100100 = 548 $$
-At index 548 into the page table, the processor finds a PDE. It extracts a
-physical address from the PDE to find a page directory. It then uses the next
-10 high-order bits of $v$ as an index into the page directory. We have:
+At index 548 into the page table, the processor finds a \gls{pde}. It extracts
+a physical address from the \gls{pde} to find a page directory. It then uses
+the next 10 high-order bits of $v$ as an index into the page directory. We
+have:
 $$ 0b0100011001 = 281 $$
-So the processor looks at index 281 into the page directory and finds a PTE.
-The PTE holds some status bits, which the processor can use to check whether
-the page is present, and whether access permissions are appropriate. If not, a
-page fault is generated. If all goes well, the PTE holds the physical address
-of the page that should be accessed. The lower-order 12 bits of the virtual
-address are used to index into the physical page, and the processor is finally
-done with address translation.
+So the processor looks at index 281 into the page directory and finds a
+\gls{pte}. The \gls{pte} holds some status bits, which the processor can use
+to check whether the page is present, and whether access permissions are
+appropriate. If not, a page fault is generated. If all goes well, the
+\gls{pte} holds the physical address of the page that should be accessed. The
+lower-order 12 bits of the virtual address are used to index into the physical
+page, and the processor is finally done with address translation.
 
 This is a costly process, and in practice the job is done by specialized
-hardware called a Memory Management Unit (MMU). Additionally, a cache called
-the Translation Lookaside Buffer (TLB) holds the results of recent
-translations, to avoid having to walk the page table too often.
+hardware called a Memory Management Unit (\gls{mmu}). Additionally, a cache
+called the Translation Lookaside Buffer (\gls{tlb}) holds the results of
+recent translations, to avoid having to walk the page table too often.
 
 
 \subsection*{Page table management}
@@ -280,14 +369,14 @@ We wrote the following functions to manage the page table:
 \item \texttt{pgdir\_walk} is the main workhorse of the subsystem, since it is
 called by most of the other functions. It has the same function as the MMU; it
 is given a page table and a virtual address, and it walks over the table to
-find the corresponding PTE, allocating new levels of the table if needed,
+find the corresponding \gls{pte}, allocating new levels of the table if needed,
 using \texttt{page\_alloc} from the previous section.
 \item \texttt{page\_insert} is used to insert a physical page into a page
-table at a given virtual address. In other words, it finds a PTE for a virtual
+table at a given virtual address. In other words, it finds a \gls{pte} for a virtual
 address and stores the physical address there.
 \item \texttt{page\_lookup} finds the physical address of a page, given a
 virtual address.
-\item \texttt{page\_remove} invalidates a PTE in a page table.
+\item \texttt{page\_remove} invalidates a \gls{pte} in a page table.
 \end{itemize}
 The kernel uses these functions to set up the page table. This involves
 allocating pages of physical memory and inserting them into appropriate places
@@ -304,7 +393,7 @@ Virtual memory map:                                  Permissions
    4 Gig -------->  +------------------------------+
                     :              .               :
                     :              .               :
-                    |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
+                    |------------------------------| RW/--
                     |                              | RW/--
                     |      Kernel code, data       | RW/--
                     |                              | RW/--
@@ -327,9 +416,9 @@ Virtual memory map:                                  Permissions
                     :              .               :                 
                     :              .               :                 
                     +------------------------------+
-                    .                              .
-                    .                              .
-                    |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+                    :              .               :
+                    :              .               :
+                    +------------------------------+
                     |     Program code, data       |
    UTEXT -------->  +------------------------------+ 0x00800000
                     :              .               :                 
@@ -349,8 +438,8 @@ the user-mode program starts at 0xeebfe000 and grows toward lower addresses.
 The user-mode program code and data resides at 0x00800000.
 
 After allocating a page table and updating it to reflect all these
-conventions, we update the \texttt{cr3} register to atomically update the page
-table. Finally we set a bit in \texttt{cr0} to enable paging.
+conventions, we update the \gls{cr3} register to atomically update the page
+table. Finally we set a bit in \gls{cr0} to enable paging.
 
 Our system now has virtual memory. This means that user-mode programs cannot
 access kernel memory, since we have not set the user bit in the PTEs for this
@@ -364,7 +453,7 @@ addresses overlap by default.
 
 The goal of this lab was to get a user-mode program running as a process in
 its own virtual address space. To accomplish this, we needed to write
-functions to manage processes and another ELF file loader. If the process
+functions to manage processes and another \gls{elf} file loader. If the process
 triggers an exception, such as a division by zero, our kernel additionally
 needs to handle this. Finally we implemented a system call mechanism to e.g.
 let programs perform input and output.
@@ -381,12 +470,12 @@ and destroying a process.
 
 \subsection*{ELF loading}
 The kernel also needs a way to load a program into an address space. Programs
-are represented as ELF files. This let us reuse our ELF loading code from our
+are represented as \gls{elf} files. This let us reuse our \gls{elf} loading code from our
 boot loader.
 
 To load a program, the kernel first allocates a fresh page table. The kernel
-then walks over each section in the ELF file, figures out the virtual address
-at which the section should go from the ELF file, allocates corresponding
+then walks over each section in the \gls{elf} file, figures out the virtual address
+at which the section should go from the \gls{elf} file, allocates corresponding
 physical pages, inserts them into the page table, and copies the code or data
 from the program into the physical pages.
 
@@ -401,14 +490,14 @@ To actually run a process, we need to perform a context switch. The
 \texttt{Env} struct includes the metadata for a process, including its
 registers. To perform a context switch, we first restore the general-purpose
 registers by using the \texttt{popal} instruction. We also load the page
-table of the process into \texttt{cr3}.
+table of the process into \gls{cr3}.
 
-We then issue the \texttt{iret} ("interrupt return") instruction, which
-atomically sets the \texttt{eip} (instruction pointer), \texttt{esp} (stack
-pointer), \texttt{eflags}, and \texttt{cs} registers. This transfers execution
-to user-mode code. The lower two bits of the \texttt{cs} register determine
-the Current Privilege Level (CPL) of the processor. This was previously 0,
-since the kernel runs in ring 0. By setting this to 3 during the
+We then issue the \texttt{iret} instruction, which
+atomically sets the \gls{eip} (instruction pointer), \gls{esp} (stack
+pointer), \gls{eflags}, and \gls{cs} registers. This transfers execution
+to user-mode code. The lower two bits of the \gls{cs} register determine
+the Current Privilege Level (\gls{cpl}) of the processor. This was previously
+0, since the kernel runs in ring 0. By setting this to 3 during the
 \texttt{iret}, the processor switches to user-mode operation, i.e., ring 3.
 
 At this point we were able to run user-mode code in its own address space.
@@ -568,6 +657,9 @@ which caused the whole system to crash.
 % API is a Bad Untrusted RPC Interface. 2013.
 
 \end{thebibliography}
+
+\printglossary[title=Abbreviations]
+
 
 
 \end{document}
