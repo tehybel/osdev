@@ -361,13 +361,70 @@ addresses overlap by default.
 
 %%%%% LAB 3 %%%%%
 \section*{Lab 3}
-- lab 3
-	- goal: make user-space process run
-	- functions for keeping track of proceses
-	- ELF loader
-	- context switching
-	- handling exceptions
-	- handling syscalls
+
+The goal of this lab was to get a user-mode program running as a process in
+its own virtual address space. To accomplish this, we needed to write
+functions to manage processes and another ELF file loader. If the process
+triggers an exception, such as a division by zero, our kernel additionally
+needs to handle this. Finally we implemented a system call mechanism to e.g.
+let programs perform input and output.
+
+\subsection*{Process management}
+Each process has some associated information. This includes its state
+(running, runnable, killed, etc.), its process ID, its parent process ID, its
+page directory, and so on. All this information is stored in a struct
+\texttt{Env}. The process subsystem is similar to the page subsystem; an
+array, \texttt{envs}, holds the \texttt{Env} struct of each process on the
+system, and free environments are stored in a linked list called
+\texttt{env\_free\_list}. We implemented functions for creating, initializing,
+and destroying a process.
+
+\subsection*{ELF loading}
+The kernel also needs a way to load a program into an address space. Programs
+are represented as ELF files. This let us reuse our ELF loading code from our
+boot loader.
+
+To load a program, the kernel first allocates a fresh page table. The kernel
+then walks over each section in the ELF file, figures out the virtual address
+at which the section should go from the ELF file, allocates corresponding
+physical pages, inserts them into the page table, and copies the code or data
+from the program into the physical pages.
+
+Note that we have not yet introduced a file system, so it is not immediately
+clear where the kernel can find the programs which it should load. To solve
+this problem we embed each user-mode program into the kernel as a blob of
+binary data. In a later section we describe our implementation of a proper
+file system for holding programs and data.
+
+\subsection*{Context switching}
+To actually run a process, we need to perform a context switch. The
+\texttt{Env} struct includes the metadata for a process, including its
+registers. To perform a context switch, we first restore the general-purpose
+registers by using the \texttt{popal} instruction. We also load the page
+table of the process into \texttt{cr3}.
+
+We then issue the \texttt{iret} ("interrupt return") instruction, which
+atomically sets the \texttt{eip} (instruction pointer), \texttt{esp} (stack
+pointer), \texttt{eflags}, and \texttt{cs} registers. This transfers execution
+to user-mode code. The lower two bits of the \texttt{cs} register determine
+the Current Privilege Level (CPL) of the processor. This was previously 0,
+since the kernel runs in ring 0. By setting this to 3 during the
+\texttt{iret}, the processor switches to user-mode operation, i.e., ring 3.
+
+At this point we were able to run user-mode code in its own address space.
+Unfortunately the code had no way to give control back to the kernel, so it
+simply ran forever, or at least until it triggered an exception or interrupt,
+which caused the whole system to crash.
+
+
+\subsection*{Theory of interrupts}
+		- exceptions, traps
+
+
+\subsection*{Handling exceptions}
+
+\subsection*{Handling system calls}
+
 
 
 %%%%% LAB 4 %%%%%
