@@ -129,6 +129,55 @@
 	triggered by an exception or interrupt.}
 }
 
+\newglossaryentry{pic}{
+	name=PIC,
+	description={Programmable Interrupt Controller; a hardware device which
+	orders interrupts before delivering them to the processor}
+}
+
+\newglossaryentry{apic}{
+	name=APIC,
+	description={Advanced \gls{pic}.}
+}
+
+\newglossaryentry{lapic}{
+	name=LAPIC,
+	description={Local \gls{apic}. The LAPIC is the processor-local component
+	of the \gls{apic}. Modern processors have one LAPIC per processor.}
+}
+
+\newglossaryentry{mmio}{
+	name=MMIO,
+	description={Memory-Mapped I/O. If you communicate with a device using
+	MMIO, it means that the registers of the device are mapped into memory at
+	some address, and so communication happens by reading from or writing to
+	memory.}
+}
+
+\newglossaryentry{mpconfig}{
+	name=mpconfig,
+	description={mpconfig is a method for finding information about multiple
+	processors described in Intel's Multi-processor specification.}
+}
+
+\newglossaryentry{bp}{
+	name=BP,
+	description={Bootstrap Processor; the first, and initially only, processor
+	that runs when a system boots.}
+}
+
+\newglossaryentry{ap}{
+	name=AP,
+	description={Application Processor; any processor which is not a \gls{bp}.
+	The APs only run once they are started by the \gls{bp}.}
+}
+
+\newglossaryentry{ipi}{
+	name=IPI,
+	description={Inter-Processor Interrupt. An interrupt sent by one processor
+	to another using the \gls{lapic}.}
+}
+
 
 \makeglossaries
 
@@ -179,6 +228,11 @@ TODO: write an abstract here.
 % TODO: say it's an exokernel, talk about what that means for our later
 % design
 % TODO: refer to the abbreviations list.
+
+% TODO: read each of the sections' introductions and see whether they make
+% sense when read alone in sequence
+% TODO: read over the report watching for confusing terms, then add them to
+% the glossary (e.g. "real mode")
 
 %%%%% LAB 1 %%%%%
 
@@ -620,37 +674,113 @@ specific system call, or by triggering any exception.
 %%%%% LAB 4 %%%%%
 \section{Lab 4}
 In the previous lab, we reached a point where our kernel could run a single
-user-mode process. The current lab concerned itself with the features needed
-to run multiple processes concurrently, and having them interact. We
-implemented preemptive multitasking, process forking, and inter-process
-communication.
+user-mode process. The current lab concerns itself with running multiple
+processes concurrently, and having them interact. We implemented preemptive
+multitasking, process forking, and inter-process communication. 
+% TODO: this description misses a few of the following sections. We should
+% update it to include more details.
+
+Before we could do this, however, we needed to implement code for interacting
+with a device called the LAPIC.
 
 
 \subsection{Interacting with the LAPIC}
-- motivation: the LAPIC is used to bring up more processors. It is also used
-  to generate clock signals, which our scheduler needs.
-- uses MMIO; hard part is getting the LAPIC mapped at a place so we can write
-  to it
-- TODO recall how this works
+% source: 
+% http://wiki.osdev.org/APIC
+% https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller
+A Programmable Interrupt Controlled (\gls{pic}) is a device which is
+responsible for managing interrupts for the processor. For example, if
+multiple interrupts are generated simultaneously, the \gls{pic} can prioritize
+the interrupts and deliver them one at a time. When Intel updated their
+\gls{pic} standard to include new features, the conforming device was called
+an Advanced PIC (\gls{apic}). The \gls{apic} has a component called the Local
+APIC (\gls{lapic}) which is local to each processor. Thus modern systems have
+one \gls{lapic} per processor.
+
+In section \ref{sec:moreprocs} we need to query the \gls{lapic} to activate
+more processors than just the initial one. Furthermore, in section
+\ref{sec:preempt} we need to ask the \gls{lapic} to generate periodic clock
+interrupts which our scheduler will use to preempt the running process.
+Therefore it is relevant to describe how our kernel communicates with the
+\gls{lapic}.
+
+The processor can communicate with its \gls{lapic} using Memory-Mapped I/O
+(\gls{mmio}). This means that the \gls{lapic} is mapped into memory at a
+specific, system-dependent physical address. Reading at certain offsets will
+correspond to reading from certain registers in the \gls{lapic}, and likewise
+for writing.
+
+This means that to communicate with the \gls{lapic}, the kernel merely needs
+to read and write to certain addresses. The difficult part is figuring out the
+physical address where the \gls{lapic} resides.
+
+There are multiple ways to find the \gls{lapic}. For now, our kernel uses the
+method described in Intel's multi-processor specification. We will refer to
+this as the \gls{mpconfig} method.
+% TODO: insert reference to specification..
+
+We leave out the details for brevity, but the method boils down to the
+following. The kernel searches for a structure called the MP floating pointer
+structure. It does so by looking in certain parts of physical memory for the
+string "\_MP\_", validating a checksum on the memory to ensure that this was
+not a false positive. This structure points to a table called the MP
+configuration table, which contains the physical address of the \gls{lapic}. 
+% TODO: mention that we were given mpconfig code
+
+
 
 \subsection{Activating more processors}
-- emulating multiple processors
-- initially only the BP runs
-- we need to boot up APs
-- to do this, we have our LAPIC send an IPI to LAPICs of other processors
-- this boots the AP in 16-bit real mode; must switch modes as described
-  earlier.
+\label{sec:moreprocs}
+So far we have been running our kernel on an emulated machine with a single
+processor. A system with $n$ processors can be emulated by passing the
+\texttt{-smp n} option to QEMU.
 
+When a system with multiple processors boots, the hardware dynamically selects
+one of the processors to be the Bootstrap Processor (\gls{bp}). The other
+processors are called Application Processors (\gls{ap}s). At first, only the
+\gls{bp} runs. It is up to the \gls{bp} to start up the remaining \gls{ap}s
+once the system is ready.
+
+Up to this point, only the \gls{bp} had been running our kernel so far;
+\gls{ap}s were never activated. We therefore needed to write code which starts
+the \gls{ap}s. This is done by asking the \gls{lapic} of the \gls{bp} to send
+an Inter-Processor Interrupt (\gls{ipi}) to each of the \gls{ap}s. This
+\gls{ipi} causes the \gls{ap}s to start executing code. The address of the
+code to run is sent as part of the \gls{ipi}.
+
+% TODO: glossary-ize "real mode"
+The \gls{ap}s start in 16-bit real mode, just as the \gls{bp} did. They
+therefore need to switch to 32-bit real mode mode. After doing so, each
+\gls{ap} calls into the scheduler to run a new process.
+
+% source:
+% https://stackoverflow.com/questions/14261612/which-core-initializes-first-when-a-system-boots
+% which refers to an intel manual
 
 \subsection{Ensuring mutual exclusion}
-- can't have processors touching kernel structures concurrently
-- big kernel lock
-- means: we have true concurrency when running multiple user applications, but
-  not in the kernel.
+With multiple processors running concurrently, all the typical issues of
+concurrency arose. Specifically, multiple processors could modify internal
+kernel structures simultaneously, leading to race conditions.
+
+We prevented this in the trivial but inefficient way: we make sure that at
+most one processor is running kernel code at the same time. In other words,
+our kernel is not truly concurrent. Still, user-mode processes \emph{can} run
+truly concurrently.
+
+The "big kernel lock" is a spinlock. It is essentially a global variable which
+determines whether the kernel is locked. A processor repeatedly uses the
+\texttt{lock} and \texttt{xchg} instructions to atomically exchange the global
+variable with the value 1. If the global value was zero, the processor now
+holds the lock and may enter the kernel. Otherwise it must retry.
+
+We added calls to lock and unlock the kernel in the right places. At this
+point our kernel was capable of running multiple user-mode processes
+concurrently. However these processes ran forever, so we needed a scheduler
+next.
 
 
-
-\subsection{Preemptive multitasking}
+\subsection{Process scheduling}
+\label{sec:preempt}
 - we don't have a scheduler yet!
 - we'll do the simplest possible thing: round-robin scheduling
 - we keep processes in an array, and the scheduler has an index into the array
@@ -742,7 +872,8 @@ communication.
 % - capabilities?
 % - basic programs like an editor, browser, etc.
 % - better windowing system (faster algorithms, better fonts, z-coordinate..)
-% - 
+% - could get a better scheduler
+% - could have true kernel concurrency
 
 
 % TODO: add references (some links are in writeup txt files)
