@@ -16,6 +16,7 @@
 \usepackage{xcolor}
 
 % this makes links prettier
+% TODO: find a nicer way to indicate that text is a link.
 \hypersetup{
     colorlinks,
     linkcolor={blue!50!black},
@@ -103,6 +104,32 @@
 	status bits.}
 }
 
+\newglossaryentry{idt}{
+	name=IDT,
+	description={Interrupt Descriptor Table; a table which describes the
+	address of the handler that should be run when a given interrupt or
+	exception is triggered.}
+}
+
+\newglossaryentry{idtr}{
+	name=IDTR,
+	description={A register which holds the physical address of the \gls{idt}.}
+}
+
+\newglossaryentry{tr}{
+	name=TR,
+	description={Task Register; a register which is used as an index into the
+	\gls{gdt} to find the \gls{tss}.}
+}
+
+\newglossaryentry{tss}{
+	name=TSS,
+	description={Task State Segment; a data structure which, among other
+	things, determines the \gls{esp}-value used during a context switch
+	triggered by an exception or interrupt.}
+}
+
+
 \makeglossaries
 
 
@@ -135,7 +162,7 @@ TODO: write an abstract here.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section*{Introduction}
+\section{Introduction}
 
 
 - introduction
@@ -155,14 +182,14 @@ TODO: write an abstract here.
 
 %%%%% LAB 1 %%%%%
 
-\section*{Lab 1}
+\section{Lab 1}
 
 In this lab we wrote initialization code for our operating system. This code
 sets up a rudimentary page table and switches the processor from 16-bit real
 mode to 32-bit protected mode. We also wrote a boot loader, which is a small
 program that loads the main kernel from disk and transfers control to it.
 
-\subsection*{The boot process}
+\subsection{The boot process}
 To understand the purpose of a boot loader, it is first necessary to have an
 overview of the process which an x86 machine goes through upon startup.
 
@@ -183,7 +210,7 @@ work in.
 
 
 
-\subsection*{Initialization code}
+\subsection{Initialization code}
 When the BIOS jumps into our code, the processor is running in 16-bit real
 mode. However the code produced by a modern compiler expects to run in 32-bit
 protected mode. We therefore needed to write code which performs this
@@ -226,7 +253,7 @@ tasks.
 
 
 
-\subsection*{The boot loader}
+\subsection{The boot loader}
 It is the task of the boot loader to load the main kernel and transfer
 execution to it. The boot loader must do this using no more than 512 bytes of
 code, minus the bytes used by the initialization code.
@@ -241,7 +268,7 @@ Once the boot loader has finished loading the kernel, it determines the entry
 point address from the \gls{elf} file and jumps there, transferring execution to the
 kernel.
 
-\subsection*{Minimal kernel code}
+\subsection{Minimal kernel code}
 At this point our kernel can finally run. However it does not yet have much
 functionality. Unlike user-mode programs, the kernel does not have access to a
 C standard library, unless we write one ourselves.
@@ -266,14 +293,14 @@ technique we will be using throughout our operating system development.
 
 %%%%% LAB 2 %%%%%
 
-\section*{Lab 2}
+\section{Lab 2}
 
 The goal of this lab was to write code which sets up the page table, so that
 our operating system can use virtual memory. Before we could set up the page
 table, we first needed to implement a subsystem which manages the physical
 memory of the system.
 
-\subsection*{Physical page allocation}
+\subsection{Physical page allocation}
 A given system has a limited amount of physical memory, depending on how much
 RAM the machine has. This memory is split up into a number of pages. On x86, a
 page is 4096 bytes of memory. In hex, 4096 is 0x1000, which means that pages
@@ -312,7 +339,7 @@ that we could use virtual memory.
 % TODO: maybe describe our memory corruption checks?
 
 
-\subsection*{Page table theory}
+\subsection{Page table theory}
 To explain how our operating system implements virtual memory, it is necessary
 to introduce some theory about the page table.
 
@@ -363,7 +390,7 @@ called the Translation Lookaside Buffer (\gls{tlb}) holds the results of
 recent translations, to avoid having to walk the page table too often.
 
 
-\subsection*{Page table management}
+\subsection{Page table management}
 We wrote the following functions to manage the page table:
 \begin{itemize}
 \item \texttt{pgdir\_walk} is the main workhorse of the subsystem, since it is
@@ -448,8 +475,12 @@ will each be given their own separate page table, where none of the physical
 addresses overlap by default.
 
 
+% TODO: make sure we describe that the user bit isn't set in kernel pages, and
+% that's what gives us security.
+
+
 %%%%% LAB 3 %%%%%
-\section*{Lab 3}
+\section{Lab 3}
 
 The goal of this lab was to get a user-mode program running as a process in
 its own virtual address space. To accomplish this, we needed to write
@@ -458,7 +489,7 @@ triggers an exception, such as a division by zero, our kernel additionally
 needs to handle this. Finally we implemented a system call mechanism to e.g.
 let programs perform input and output.
 
-\subsection*{Process management}
+\subsection{Process management}
 Each process has some associated information. This includes its state
 (running, runnable, killed, etc.), its process ID, its parent process ID, its
 page directory, and so on. All this information is stored in a struct
@@ -468,7 +499,7 @@ system, and free environments are stored in a linked list called
 \texttt{env\_free\_list}. We implemented functions for creating, initializing,
 and destroying a process.
 
-\subsection*{ELF loading}
+\subsection{ELF loading}
 The kernel also needs a way to load a program into an address space. Programs
 are represented as \gls{elf} files. This let us reuse our \gls{elf} loading code from our
 boot loader.
@@ -485,19 +516,18 @@ this problem we embed each user-mode program into the kernel as a blob of
 binary data. In a later section we describe our implementation of a proper
 file system for holding programs and data.
 
-\subsection*{Context switching}
+\subsection{Context switching}
 To actually run a process, we need to perform a context switch. The
 \texttt{Env} struct includes the metadata for a process, including its
-registers. To perform a context switch, we first restore the general-purpose
-registers by using the \texttt{popal} instruction. We also load the page
-table of the process into \gls{cr3}.
+registers. To perform a context switch, we first restore the saved
+general-purpose registers by using the \texttt{popal} instruction. We also
+load the page table of the process into \gls{cr3}.
 
-We then issue the \texttt{iret} instruction, which
-atomically sets the \gls{eip} (instruction pointer), \gls{esp} (stack
-pointer), \gls{eflags}, and \gls{cs} registers. This transfers execution
-to user-mode code. The lower two bits of the \gls{cs} register determine
-the Current Privilege Level (\gls{cpl}) of the processor. This was previously
-0, since the kernel runs in ring 0. By setting this to 3 during the
+We then issue the \texttt{iret} instruction, which restores the saved
+\gls{eip}, \gls{esp}, \gls{eflags}, and \gls{cs} registers. This transfers
+execution to user-mode code. The lower two bits of the \gls{cs} register
+determine the Current Privilege Level (\gls{cpl}) of the processor. This was
+previously 0, since the kernel runs in ring 0. By setting this to 3 during the
 \texttt{iret}, the processor switches to user-mode operation, i.e., ring 3.
 
 At this point we were able to run user-mode code in its own address space.
@@ -506,18 +536,85 @@ simply ran forever, or at least until it triggered an exception or interrupt,
 which caused the whole system to crash.
 
 
-\subsection*{Theory of interrupts}
-		- exceptions, traps
+\subsection{Theory of exceptions and interrupts}
+While executing an instruction, the processor may trigger an exception. This
+could e.g. happen due to a division by zero, or due to an illegal memory
+access. When an exception occurs, the processor performs a context switch to
+enter kernel mode. Then it runs some handler code specific to the exception.
+
+The processor may also occasionally trigger an interrupt. This often happens
+for asynchronous reasons; examples could be receiving a new network packet or
+key press. Interrupts can also happen for synchronous reasons; for example, an
+interrupt is raised as a result of executing the \texttt{int 0x80} instruction
+which is commonly used for system calls. The behavior is the same for
+exceptions; a context switch occurs to run a handler in kernel mode.
+
+We now describe how the processor knows which code to run when an interrupt or
+exception is raised. Exceptions and interrupts have numbers. Exceptions are
+numbered from 0 to 31, and interrupts are numbered from 32 to 255.
+% TODO: give some examples from http://wiki.osdev.org/Exceptions in a table.
+
+These numbers specify an index into a table called the Interrupt Descriptor
+Table (\gls{idt}). The physical address of the \gls{idt} is stored in the IDT
+Register (\gls{idtr}), which can be read and set using the \texttt{lidt} and
+\texttt{sidt} instructions, respectively.
+
+The \gls{idt} table entry describes the address at which the handler for the
+given interrupt resides.
+
+As noted, an exception or interrupt triggers a context switch. Therefore the
+processor needs to know on which stack it should save the registers of the
+faulting process. To find this \gls{esp} value, the processor reads the Task
+Register (\gls{tr})) which is an index into the \gls{gdt}. The \gls{gdt} entry
+contains the address of a data structure called the Task State Segment
+(\gls{tss}). The processor reads the new \gls{esp} value from the \gls{tss}.
+
+To sum up: when an exception or interrupt occurs, the corresponding number is
+looked up in the \gls{idt} to find the new \gls{eip} value. The \gls{tr},
+\gls{gdt} and \gls{tss} are used to find the new \gls{esp} value. The
+processor uses this information to store the registers of the faulting process
+onto the new stack and execute the relevant handler code.
 
 
-\subsection*{Handling exceptions}
+\subsection{Handling exceptions and interrupts}
+We wrote a common function, \texttt{trap}, which is called whenever an
+exception or interrupt occurs. For each exception and interrupt, we filled in
+its \gls{idt} entry with a small stub which passes the number of the exception
+or interrupt as the first argument in a call to \texttt{trap}.
 
-\subsection*{Handling system calls}
+The typical result of an exception is that the kernel terminates the running
+process. However exceptions can also occur in kernel mode, in which case there
+is a bug in the kernel. This results in a kernel panic, making the kernel
+print the exception and hang.
 
+
+
+\subsection{Handling system calls}
+A process often needs to ask the kernel to perform some task for it. This
+could e.g. involve printing text onto the console, reading a character from
+the keyboard, or spawning a new child process. We needed to implement a
+mechanism for triggering system calls in our kernel.
+
+On the x86 architecture, the typical approach is to use the \texttt{int}
+instruction, which triggers an interrupt when executed. On Linux, interrupt
+0x80 is used for system calls, but we are free to use any interrupt, so we
+arbitrarily chose number 0x30. This means that a program uses the \texttt{int
+0x30} instruction to perform a system call. The interface was up to us, but we
+kept it fairly standard; the \texttt{eax} register holds the system call
+number, while arguments go in registers \texttt{ebx}, \texttt{ecx}, etc.
+
+The \texttt{trap} function recognizes interrupt number 0x30 and calls the
+\texttt{syscall} function, which uses a large \texttt{switch} to delegate each
+system call to a specific handler.
+
+We wrote system call handlers for input and output of a single character. At
+this point we were able to run simple user-mode programs and have them
+interact with the user. The programs could terminate themselves with a
+specific system call, or by triggering any exception.
 
 
 %%%%% LAB 4 %%%%%
-\section*{Lab 4}
+\section{Lab 4}
 - lab 4
 	- preemptive multitasking
 		- starting multiple processors
@@ -530,39 +627,39 @@ which caused the whole system to crash.
 
 
 %%%%% LAB 5 %%%%%
-\section*{Lab 5}
+\section{Lab 5}
 - lab 5
 	- file system
 	- shell
 
 
 %%%%% LAB 6 %%%%%
-\section*{Lab 6}
+\section{Lab 6}
 - lab 6
 	- networking: writing an e1000 card driver
 
 
 %%%%% GRAPHICS LAB %%%%%
-\section*{Graphics Lab}
+\section{Graphics Lab}
 - graphics
 
 %%%%% HARDWARE LAB %%%%%
-\section*{Hardware Lab}
+\section{Hardware Lab}
 - hardware
 
 
 
 - conclusion
 
-% TODO: we should have an abbreviations list
 % TODO: we could include screenshots to make things more concrete
 % TODO: include (a link to) the source code somehow
 
-% question: is it a good idea to have "mistakes made" and "lessons learned"?
-% If so, how do we do this without it sounding too informal?
+% TODO: question: is it a good idea to have "mistakes made" and "lessons
+% learned"? If so, how do we do this without it sounding too informal?
 
 
 
+% TODO: add references (some links are in writeup txt files)
 
 
 
