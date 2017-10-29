@@ -613,17 +613,96 @@ interact with the user. The programs could terminate themselves with a
 specific system call, or by triggering any exception.
 
 
+% TODO: also mention that our user-mode programs don't have much of a standard
+% C library (yet)
+
+
 %%%%% LAB 4 %%%%%
 \section{Lab 4}
-- lab 4
-	- preemptive multitasking
-		- starting multiple processors
-		- simple scheduler with yields
-		- preemption (clock signals)
-	- process forking with CoW
-		- simple fork
-		- CoW fork
-	- IPC
+In the previous lab, we reached a point where our kernel could run a single
+user-mode process. The current lab concerned itself with the features needed
+to run multiple processes concurrently, and having them interact. We
+implemented preemptive multitasking, process forking, and inter-process
+communication.
+
+
+\subsection{Interacting with the LAPIC}
+- motivation: the LAPIC is used to bring up more processors. It is also used
+  to generate clock signals, which our scheduler needs.
+- uses MMIO; hard part is getting the LAPIC mapped at a place so we can write
+  to it
+- TODO recall how this works
+
+\subsection{Activating more processors}
+- emulating multiple processors
+- initially only the BP runs
+- we need to boot up APs
+- to do this, we have our LAPIC send an IPI to LAPICs of other processors
+- this boots the AP in 16-bit real mode; must switch modes as described
+  earlier.
+
+
+\subsection{Ensuring mutual exclusion}
+- can't have processors touching kernel structures concurrently
+- big kernel lock
+- means: we have true concurrency when running multiple user applications, but
+  not in the kernel.
+
+
+
+\subsection{Preemptive multitasking}
+- we don't have a scheduler yet!
+- we'll do the simplest possible thing: round-robin scheduling
+- we keep processes in an array, and the scheduler has an index into the array
+  which it increments until it finds a runnable process.
+- scheduling is voluntary for now. We need preemption.
+- LAPIC gives us preemption; we tell it to raise a clock interrupt every n
+  (miliseconds? or what?)
+	- our trap function recognizes this and schedules out the current
+	  process
+
+
+\subsection{Forking}
+- simple version
+	- do as much as possible in user land
+	- compose fork of multiple other syscalls
+		- exofork, then fill out the process with identical pages
+		- can read our page table via UVPT
+		- security: only parent can do this
+- CoW version
+	- motivation: simple fork is inefficient; might as well share non-writable
+	  pages, and even writable ones too, if they're never modified..
+	- process gets to handle its own page faults, so we can keep code out of
+	  the kernel
+	- process can register a page fault handler via a syscall
+	- then page faults will be handled by trap, such that execution is
+	  transferred to a special function (and dedicated stack)
+	  	- works by just overwriting the saved registers and putting the old
+		  ones on the new stack
+	- now CoW fork is implemented like this:
+		- all processes register a default page fault handler
+		- to fork, just copy all the pages and set the CoW bit, but not the W
+		  bit
+		- writes trigger page faults -> trap -> page fault handler in
+		  user-mode library
+		- the page fault handler makes a new writable page, copies content to
+		  it, unmaps old page, moves new page to old one's address, then
+		  resumes normal execution
+ 
+
+
+\subsection{Inter-process communication}
+- will need IPC for many things, because this is an exokernel
+	- e.g. file system will be implemented by a user-mode daemon process, and
+	  other processes will have to ask it to read/write.
+	- same for networking
+- sys\_ipc\_recv and sys\_ipc\_try\_send
+	- recv blocks
+	- send never blocks
+	- a 32-bit integer is sent, and optionally also a page of memory
+	- also wrote user-mode library functions for receiving and sending
+		- send repeatedly calls try\_send
+
 
 
 %%%%% LAB 5 %%%%%
@@ -657,6 +736,13 @@ specific system call, or by triggering any exception.
 % TODO: question: is it a good idea to have "mistakes made" and "lessons
 % learned"? If so, how do we do this without it sounding too informal?
 
+% TODO: we should talk about future work.
+% - security: ASLR, probably many other things (it's not even a multi-user
+% system yet)
+% - capabilities?
+% - basic programs like an editor, browser, etc.
+% - better windowing system (faster algorithms, better fonts, z-coordinate..)
+% - 
 
 
 % TODO: add references (some links are in writeup txt files)
