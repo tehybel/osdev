@@ -19,9 +19,9 @@
 % TODO: find a nicer way to indicate that text is a link.
 \hypersetup{
     colorlinks,
-    linkcolor={blue!50!black},
-    citecolor={blue!50!black},
-    urlcolor={blue!50!black}
+    linkcolor={blue!30!black},
+    citecolor={blue!30!black},
+    urlcolor={blue!30!black}
 }
 
 \lstset{language=C}
@@ -619,7 +619,7 @@ given interrupt resides.
 As noted, an exception or interrupt triggers a context switch. Therefore the
 processor needs to know on which stack it should save the registers of the
 faulting process. To find this \gls{esp} value, the processor reads the Task
-Register (\gls{tr})) which is an index into the \gls{gdt}. The \gls{gdt} entry
+Register (\gls{tr}) which is an index into the \gls{gdt}. The \gls{gdt} entry
 contains the address of a data structure called the Task State Segment
 (\gls{tss}). The processor reads the new \gls{esp} value from the \gls{tss}.
 
@@ -699,7 +699,7 @@ one \gls{lapic} per processor.
 
 In section \ref{sec:moreprocs} we need to query the \gls{lapic} to activate
 more processors than just the initial one. Furthermore, in section
-\ref{sec:preempt} we need to ask the \gls{lapic} to generate periodic clock
+\ref{sec:preempt} we need to ask the \gls{lapic} to generate periodic timer
 interrupts which our scheduler will use to preempt the running process.
 Therefore it is relevant to describe how our kernel communicates with the
 \gls{lapic}.
@@ -781,15 +781,33 @@ next.
 
 \subsection{Process scheduling}
 \label{sec:preempt}
-- we don't have a scheduler yet!
-- we'll do the simplest possible thing: round-robin scheduling
-- we keep processes in an array, and the scheduler has an index into the array
-  which it increments until it finds a runnable process.
-- scheduling is voluntary for now. We need preemption.
-- LAPIC gives us preemption; we tell it to raise a clock interrupt every n
-  (miliseconds? or what?)
-	- our trap function recognizes this and schedules out the current
-	  process
+The scheduler has as its main responsibility to pick a new process to run
+whenever the current process is scheduled out. We opted for round-robin
+scheduling.
+
+That is, the scheduler keeps a circular queue of all processes. To find the
+next process, the scheduler retrieves the next process from the queue until it
+finds one that is runnable, at which point the scheduler is done.
+
+The scheduler also needs a way to preempt each process when its time slice
+runs out. To accomplish this, during kernel initialization the kernel asks the
+\gls{lapic} to raise a timer interrupt periodically, waiting some fixed amount
+of bus cycles between each raised interrupt. Our \texttt{trap} function then
+recognizes this timer interrupt and reacts by asking the scheduler to schedule
+in a new process.
+
+Our scheduler has much room for improval. Round-robin scheduling is not as
+performant as more advanced algorithms. Additionally, it does not allow
+adjustment of process priorities. Scheduling being a linear-time operation is
+potentially worrying. 
+
+A final issue is that the time slice assigned to each process is always of the
+same duration. It would be useful to assign shorter time slices and more
+frequent schedulings to processes which need to feel responsive (such as
+graphics-based processes introduced later) and longer time slices to processes
+that perform heavy computations.
+
+
 
 
 \subsection{Forking}
