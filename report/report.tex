@@ -812,7 +812,11 @@ that perform heavy computations.
 \subsection{A simple fork mechanism}
 So far, every process was directly spawned by the kernel. However, processes
 should also be able to spawn more processes. We therefore needed to implement
-a mechanism to let a process fork. Since our kernel is an exokernel, we prefer
+a mechanism to let a process fork. In this section we describe our initial,
+simple implementation of fork, and in the following section we improve it by
+introducing a copy-on-write mechanism.
+
+Since our kernel is an exokernel, we prefer
 to do as much work as possible outside of kernel land. We therefore wrote a
 number of system calls which can be combined to implement a user-mode fork.
 Specifically, we wrote the following system calls:
@@ -858,6 +862,21 @@ processes cannot modify pages in arbitrary other processes.
 
 
 \subsection{Copy-on-write fork}
+The simple version of fork described in the previous section is
+memory-inefficient, because it indiscriminately copies every page of the
+parent into the child process. This involves a lot of copying, and it means
+that if the parent used $n$ physical pages of memory, then after a fork, $2n$
+physical pages will be used.
+
+However the same physical page can transparently be mapped into both the
+parent and child process, as long as it is never modified. In fact, \emph{all}
+the pages in the child process can initially be shared with the parent. It is
+only once a write happens that a page must be copied. We have implemented such
+a copy-on-write fork mechanism almost entirely in user land, following the
+exokernel design philosophy.
+
+
+
 
 - CoW version
 	- motivation: simple fork is inefficient; might as well share non-writable
