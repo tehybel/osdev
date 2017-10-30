@@ -445,6 +445,7 @@ recent translations, to avoid having to walk the page table too often.
 
 
 \subsection{Page table management}
+\label{sec:pagetables}
 We wrote the following functions to manage the page table:
 \begin{itemize}
 \item \texttt{pgdir\_walk} is the main workhorse of the subsystem, since it is
@@ -808,15 +809,56 @@ graphics-based processes introduced later) and longer time slices to processes
 that perform heavy computations.
 
 
+\subsection{A simple fork mechanism}
+So far, every process was directly spawned by the kernel. However, processes
+should also be able to spawn more processes. We therefore needed to implement
+a mechanism to let a process fork. Since our kernel is an exokernel, we prefer
+to do as much work as possible outside of kernel land. We therefore wrote a
+number of system calls which can be combined to implement a user-mode fork.
+Specifically, we wrote the following system calls:
+\begin{itemize}
+\item	\texttt{sys\_exofork}: creates a non-runnable child process with an empty address space.
+\item	\texttt{sys\_env\_set\_status}: can mark a process as runnable.
+\item	\texttt{sys\_page\_alloc}: allocates an empty page in the address space of a process.
+\item	\texttt{sys\_page\_map}: maps a page from the current process into a child process.
+\item	\texttt{sys\_page\_unmap}: unmaps a page from the current process or a child process.
+\end{itemize}
+Besides these system calls, it is also necessary for a process to have access
+to information about the layout of its own address space. This is already the
+case; in section \ref{sec:pagetables} on page table management, we set up the
+page table of a process such that part of the address space contains the page
+table itself.
+
+To fork, a parent process goes through the following steps:
+\begin{itemize}
+\item The parent process calls \texttt{sys\_exofork} to create a new child
+process with an empty address space. The child process is not initially
+runnable.
+\item The parent walks over its page table, and for each mapped page, it does
+the following:
+\begin{itemize}
+\item The parent uses \texttt{sys\_page\_map} to create a temporary page at a
+temporary address.
+\item The parent copies the contents of the current page into the temporary
+page.
+\item The parent uses \texttt{sys\_page\_map} to insert the temporary page
+into the address space of the child process at the original address.
+\item The parent uses \texttt{sys\_page\_unmap} to remove the temporary page
+from its own address space.
+\end{itemize}
+\item The parent marks the child as runnable using
+\texttt{sys\_env\_set\_status}. 
+\end{itemize}
+At this point the fork is complete, and since the child is marked as runnable,
+the scheduler will eventually schedule it in.
+
+Note that for security reasons, the system calls are coded to ensure that a
+process can only map and unmap pages in its newly created child process; a
+processes cannot modify pages in arbitrary other processes.
 
 
-\subsection{Forking}
-- simple version
-	- do as much as possible in user land
-	- compose fork of multiple other syscalls
-		- exofork, then fill out the process with identical pages
-		- can read our page table via UVPT
-		- security: only parent can do this
+\subsection{Copy-on-write fork}
+
 - CoW version
 	- motivation: simple fork is inefficient; might as well share non-writable
 	  pages, and even writable ones too, if they're never modified..
