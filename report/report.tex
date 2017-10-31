@@ -192,6 +192,12 @@
 	communicate.}
 }
 
+\newglossaryentry{pci}{
+	name=PCI,
+	description={Peripheral Component Interconnect. A type of bus to which
+	devices, such as the network card, can be connected.}
+}
+
 \makeglossaries
 
 
@@ -1053,21 +1059,87 @@ The goal of this lab was to connect our kernel to the internet by writing a
 network card driver.
 
 \subsection{The e1000 network card}
-- network card: e1000
-- overall task: send and receive packets, interact with wire.
+The operating system is connected to network via a network card. The network
+card has as its main responsibility to send and receive packets by interacting
+with the physical layer, such as a wire.
 
-\subsection{Initializing the network card}
-- overall process: read the manual
-- communicating with the card: mmio
-	- but we need an address first
-- pci code to discover the network card
+The network card emulated by QEMU is the Intel e1000. We therefore need to
+write a driver for this card. The task of the driver is to discover the
+network card, initialize and enable it, drain incoming packets from the card,
+and deliver outgoing packets to the card.
 
-\subsection{Transmitting and receiving packets}
-- result: sys\_transmit and sys\_receive.
-- overview of packet transmission
-- reception is similar
-- how transmit works in detail
-- how receive works in detail
+We found all the details needed for the driver in the manual. It describes in
+detail how the card works, how it should be initialized, and so on.
+%TODO: insert reference to the manual and a proper name..
+
+The e1000 card is connected through \gls{pci}. Our kernel uses \gls{pio} to
+scan the PCI bus, iterating over all connected devices. Each device has
+numbers representings its class, subclass, vendor ID and device ID. The kernel
+uses these numbers to recognize the e1000 card if it is connected. The
+\gls{pci} interface lets us determine a physical address at which the e1000
+card is mapped. 
+
+This completes the discovery phase; the kernel can now use \gls{mmio} to
+communicate with the card. Concretely, this means that the various registers
+of the network card can be found at specific offsets from the base address
+found via \gls{pci}. In other words, the registers of the card can be read
+from and written to by simply reading or writing at certain memory addresses.
+
+The next step is initializing the card. We next describe the data structures
+which the card uses, since these are what need to be initialized.
+
+\subsection{Packet queues}
+Overall, the e1000 network card uses two circular queues for holding packets.
+
+One queue, the transmit queue, is for packets which are yet to be sent. When
+the kernel wants to transmit a packet, it places it into this queue. The e1000
+periodically drains this queue and puts the packets on the wire.
+
+The other queue, the receive queue, is for packets which the e1000 has
+received but which have not yet been claimed by the kernel. Thus when a new
+packet arrives on the wire, the e1000 picks it up and deposits it into the
+receive queue. The kernel then periodically drains this queue.
+
+Each queue is implemented as an array of descriptor structs. A descriptor
+contains a physical address and a size, and thus it describes a memory area
+which can hold one packet. Each queue also has a tail index register and a
+head index register which are used during insertion and removal of packets.
+
+This means that when a packet arrives from the network, the e1000 card finds
+the descriptor at the tail of the receive queue, copies the raw packet data
+into the described memory area, and advances the tail register. The kernel
+takes a packet out of the queue by copying the raw packet out of the
+descriptor at the head of the queue, and then incrementing the head register.
+Transmission of packets is analogous.
+
+This raises the question of what should happen if one of the queues is full.
+According to the manual, if the receive queue is full, the e1000 card will
+simply drop further packets. However if the transmit queue is full, it is up
+to the kernel what should be done. The kernel could potentially store packets
+until the network card has drained the queue. However for simplicity we have
+decided to simply drop packets if the transmission queue is full. We are free
+to do this since the protocols on higher levels of the network stack handle
+packet loss.
+
+\subsection{The e1000 driver}
+Before the card can be enabled, our driver must initialize these queues. That
+is, it must allocate the physical pages required to hold the queues
+themselves. It must also allocate pages for the raw packet contents, and fill
+out the addresses and lengths into the descriptors in the queues. The head and
+tail registers of each queue must also be reset. 
+
+Once our driver has done this, it writes into a register to enable the card.
+From this point it is possible to transmit and receive packets. Our driver
+implements the code for taking packets from the receive queue and inserting
+packets into the transmit queue. User-mode programs have access to this driver
+functionality through two system calls, \texttt{sys\_transmit} and
+\texttt{sys\_receive}.
+
+% TODO: we should reorder these subsections; we should first describe the card
+% in a general sense (here is how to discover it, here is how it works with
+% queues, etc.).. and then, in a separate section, we should describe what our
+% driver does.
+
 % TODO: lesson: writing drivers is tricky. (debugging: QEMU source modification)
 
 
