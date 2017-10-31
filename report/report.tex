@@ -3,6 +3,7 @@
 \usepackage{graphicx}
 \usepackage{amsfonts}
 \usepackage{amsmath}
+\usepackage{framed}
 \usepackage{hyperref}
 \usepackage{fancyvrb}
 \usepackage{color}
@@ -252,6 +253,11 @@ TODO: write an abstract here.
 
 % TODO: we haven't talked about ATA yet.
 
+% TODO: did we describe the console subsystem which lets us do i/o initially?
+
+
+% TODO: in the end we should browse through the kernel code and see if there's
+% any of it we didn't describe anywhere
 
 
 %%%%% LAB 1 %%%%%
@@ -1036,13 +1042,45 @@ disk. The shell also features input redirection ("<"), output redirection
 (">"), and pipes ("|"). It is now possible to write to the disk and have the
 changes persist across reboots.
 
-% TODO: maybe show an example interaction.
+% TODO: we didn't describe the init process.
+
+% TODO: show an example interaction.
 
 
 %%%%% LAB 6 %%%%%
 \section{Lab 6}
-- lab 6
-	- networking: writing an e1000 card driver
+The goal of this lab was to connect our kernel to the internet by writing a
+network card driver.
+
+\subsection{The e1000 network card}
+- network card: e1000
+- overall task: send and receive packets, interact with wire.
+
+\subsection{Initializing the network card}
+- overall process: read the manual
+- communicating with the card: mmio
+	- but we need an address first
+- pci code to discover the network card
+
+\subsection{Transmitting and receiving packets}
+- result: sys\_transmit and sys\_receive.
+- overview of packet transmission
+- reception is similar
+- how transmit works in detail
+- how receive works in detail
+% TODO: lesson: writing drivers is tricky. (debugging: QEMU source modification)
+
+
+\subsection{The network stack daemon}
+- motivation: processes know only of data, not of packets
+- used lwip
+	- its task is to run as a daemon, be given raw data, and assemble the
+	  correct packet for that data
+
+
+\subsection{Web server}
+- implemented a web server to test
+
 
 
 %%%%% GRAPHICS LAB %%%%%
@@ -1076,6 +1114,13 @@ changes persist across reboots.
 
 % TODO: add references (some links are in writeup txt files)
 
+
+\begin{framed}
+\makebox[\textwidth]{Lesson learned: foo} \\
+% TODO:
+Maybe we can use something like this to describe the various lessons we
+learned...
+\end{framed}
 
 
 
