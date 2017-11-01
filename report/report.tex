@@ -1180,7 +1180,41 @@ working web page.
 
 %%%%% GRAPHICS LAB %%%%%
 \section{Graphics Lab}
-- graphics
+- overview of section
+
+
+- drawing pixels
+	- linear frame buffer needed
+	- needed to switch back to 16-bit real mode to query the BIOS
+	- had to write assembly code for this
+
+- graphics stack design
+	- overview of how it all works together, what all the pieces do
+	- user-mode graphics program
+		- has a canvas (works via IPC)
+		- spawned by display server
+
+- display server 
+	- writes to the LFB
+		- it's mapped in by the kernel
+	- z-buffer
+	- manages windows
+	- data structures etc. (Could be improved.)
+	- had to be hand-optimized 
+
+- user-mode graphics library
+	- can render fonts
+		- uses one linux font, explain how it works
+	- can draw straight lines, rectangles
+	- can draw windows
+	- read source, what else can it do?
+
+- user-mode programs
+	- a terminal emulator
+	- a paint program
+
+- PS/2 mouse driver
+
 
 %%%%% HARDWARE LAB %%%%%
 \section{Hardware Lab}
@@ -1205,6 +1239,7 @@ working web page.
 % - could get a better scheduler
 % - could have true kernel concurrency
 % - better file system (timestamps, ...)
+% - more efficient display server
 
 
 % TODO: add references (some links are in writeup txt files)
