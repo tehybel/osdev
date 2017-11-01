@@ -144,7 +144,7 @@
 \newglossaryentry{lapic}{
 	name=LAPIC,
 	description={Local \gls{apic}. The LAPIC is the processor-local component
-	of the \gls{apic}. Modern processors have one LAPIC per processor.}
+	of the \gls{apic}. Modern systems have one LAPIC per processor.}
 }
 
 \newglossaryentry{mmio}{
@@ -1143,16 +1143,39 @@ functionality through two system calls, \texttt{sys\_transmit} and
 % TODO: lesson: writing drivers is tricky. (debugging: QEMU source modification)
 
 
-\subsection{The network stack daemon}
-- motivation: processes know only of data, not of packets
-- used lwip
-	- its task is to run as a daemon, be given raw data, and assemble the
-	  correct packet for that data
+\subsection{The network daemon}
+With the driver written, our kernel was capable of transmitting and receiving
+packets. However most processes only know of the data they wish to send; they
+are not capable of constructing packets.
+
+We therefore needed a TCP/IP stack. Allegedly, writing such a network stack
+from scratch is an immense task. We therefore used the open-source stack lwIP
+("lightweight IP"). lwIP acts as a black box for our purposes, taking raw data
+as input, and producing packets as output.
+
+Rather than adding lwIP to the kernel, we embedded it in a network daemon. The
+daemon is responsible for managing sockets, just as the file system daemon was
+responsible for managing file descriptors. The network daemon takes in
+\texttt{send} requests via IPC, produces packets, and hands these over to the
+operating system via the \texttt{sys\_transmit} system call. Likewise, it
+takes in \texttt{receive} requests and uses \texttt{sys\_receive}, parses the
+resulting packets, and hands over the data to the other process.
+
+The IPC communication is hidden away in the C standard library, such that
+user-mode programs have access to the usual \texttt{connect}, \texttt{send}
+and \texttt{receive} interface.
+
+% TODO: we have not written about MACs and ip address assignment..
 
 
 \subsection{Web server}
-- implemented a web server to test
+To test the new functionality, we wrote a simple web server which can serve
+files from the file system. The web server thus makes use of both the file
+system daemon and the network daemon. 
 
+We configured QEMU to forward requests at port 80 to the emulated machine. At
+this point we were able to point a browser at the machine and be served a
+working web page.
 
 
 %%%%% GRAPHICS LAB %%%%%
