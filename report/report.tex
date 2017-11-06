@@ -198,6 +198,12 @@
 	devices, such as the network card, can be connected.}
 }
 
+\newglossaryentry{lfb}{
+	name=LFB,
+	description={Linear Frame Buffer, a buffer that repesents the pixels which
+	are drawn to the screen.}
+}
+
 \makeglossaries
 
 
@@ -210,7 +216,8 @@ nice title here
 \line(1,0){250}
 }
 \author{Thomas Hybel}
-\date{Aarhus University \\ October 2017}
+%TODO: have your email here.
+\date{Aarhus University \\ November 2017}
 
 \begin{document}
 \pagenumbering{roman}
@@ -257,6 +264,8 @@ TODO: write an abstract here.
 % instead of using GRUB, and we created a custom file system instead of
 % implementing a common one.
 
+% TODO rewrite "the goal of this lab was", it sounds bad and repetitive
+
 % TODO: we haven't talked about ATA yet.
 
 % TODO: did we describe the console subsystem which lets us do i/o initially?
@@ -264,6 +273,8 @@ TODO: write an abstract here.
 
 % TODO: in the end we should browse through the kernel code and see if there's
 % any of it we didn't describe anywhere
+
+% TODO: we should have an appendix that describes how to get and run the code.
 
 
 %%%%% LAB 1 %%%%%
@@ -1192,7 +1203,7 @@ working web page.
 intro goes here
 
 \subsection{Drawing pixels}
-Before our kernel could render a full \gls{gui}, it first needed the ability
+Before our kernel could render a full GUI, it first needed the ability
 to render a single pixel at a time. From this primitive is it straightforward
 to implement rendering of bigger shapes like rectangles, lines, and so on.
 
@@ -1321,15 +1332,7 @@ emulator. The other is a simple paint program.
 - hardware
 
 
-
-- conclusion
-
-% TODO: we could include screenshots to make things more concrete
-% TODO: include (a link to) the source code somehow
-
-% TODO: question: is it a good idea to have "mistakes made" and "lessons
-% learned"? If so, how do we do this without it sounding too informal?
-
+\section{Future work}
 % TODO: we should talk about future work.
 % - security: ASLR, probably many other things (it's not even a multi-user
 % system yet)
@@ -1340,6 +1343,18 @@ emulator. The other is a simple paint program.
 % - could have true kernel concurrency
 % - better file system (timestamps, ...)
 % - more efficient display server
+% - more drivers.... e.g. network cards.
+
+
+\section{Conclusion}
+- conclusion
+
+% TODO: we could include screenshots to make things more concrete
+% TODO: include (a link to) the source code somehow
+
+% TODO: question: is it a good idea to have "mistakes made" and "lessons
+% learned"? If so, how do we do this without it sounding too informal?
+
 
 
 % TODO: add references (some links are in writeup txt files)
