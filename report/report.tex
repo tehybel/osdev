@@ -1246,11 +1246,14 @@ the mouse or keyboard, a driver handles these packets by putting them into an
 event queue. The display server periodically drains this queue through a
 system call. It then forwards each event to the appropriate application.
 
+A graphics library provides common functionality needed by the user
+applications and the display server. The library provides functions for
+rendering rectangles, straight lines, fonts, and windows.
+
 The following diagram shows an overview of the different components and how
 they interact with each other:
 % TODO insert a diagram.
 
-% TODO also describe the graphics library component
 
 Thus imagine that a user sits in front of the machine with a terminal emulator
 application open and active. If the user presses the 'A' key, the following
@@ -1277,23 +1280,38 @@ the graphics library to render an 'A' on its canvas using the default font.
 \end{itemize}
 
 
-\subsection{Implementing the display server}
-- maps the LFB with aid from the kernel
-- uses a z-buffer for efficiency
-- uses simple data structures
-- had to be hand-optimized
+% TODO: tie these sections together better
 
-\subsection{Implementing the graphics library}
-- can render fonts
-	- uses one linux font, explain how it works
-- can draw straight lines, rectangles
-- can draw windows
-- read source, what else can it do?
+\subsection{Details of the display server}
+The display server needs to have write access to the \gls{lfb}, which is
+mapped at a physical address by the BIOS. To accomplish this, the display
+server uses a new system call, \texttt{sys\_map\_lfb}, which causes the kernel
+to add the \gls{lfb} to the page table of the display server.
+% TODO: rephrase this to "we could make the kernel write to LFB, but instead
+% for effiency we map it directly via page tables"
+% then the title of this can be "effiency"..
+
+It is highly important that the display server is efficient; if it runs too
+slowly, the system will have a low frame rate, and interaction will feel
+choppy. We had to carefully optimize the code for the display server before we
+got an acceptable frame rate inside QEMU.
+
+One of the optimizations is the following. The display server takes the
+content of each canvas and writes it into the \gls{lfb}. However if
+canvases overlap, there is no need to first write the lower canvas into the
+\gls{lfb}, and then immediately overwrite it with the canvas that is on top.
+We therefore introduced a buffer held in RAM. The display server first
+constructs the final canvas in this buffer, and then copies each pixel once
+and for all into the \gls{lfb}.
+
+% TODO: write about this: - uses simple data structures (linked lists)
+
 
 \subsection{Sample graphical applications}
-- a terminal emulator
-- a paint program
+We have written two sample graphical applications. One is a simple terminal
+emulator. The other is a simple paint program.
 
+% TODO: maybe describe these in some more detail?
 
 % TODO: fit in details about PS/2 mouse driver somewhere.
 
