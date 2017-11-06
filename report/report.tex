@@ -1178,42 +1178,124 @@ this point we were able to point a browser at the machine and be served a
 working web page.
 
 
+
+
+
+
 %%%%% GRAPHICS LAB %%%%%
+
+
 \section{Graphics Lab}
-- overview of section
 
 
-- drawing pixels
-	- linear frame buffer needed
-	- needed to switch back to 16-bit real mode to query the BIOS
-	- had to write assembly code for this
+% TODO write intro
+intro goes here
 
-- graphics stack design
-	- overview of how it all works together, what all the pieces do
-	- user-mode graphics program
-		- has a canvas (works via IPC)
-		- spawned by display server
+\subsection{Drawing pixels}
+Before our kernel could render a full \gls{gui}, it first needed the ability
+to render a single pixel at a time. From this primitive is it straightforward
+to implement rendering of bigger shapes like rectangles, lines, and so on.
 
-- display server 
-	- writes to the LFB
-		- it's mapped in by the kernel
-	- z-buffer
-	- manages windows
-	- data structures etc. (Could be improved.)
-	- had to be hand-optimized 
+To draw pixels, it is necessary to set a video mode. A video mode describes
+the width, height, and depth of the screen. The video mode can be set by
+querying the BIOS. Once the kernel selects a video mode, the BIOS maps a
+buffer called the Linear Frame Buffer (\gls{lfb}) into RAM. 
 
-- user-mode graphics library
-	- can render fonts
-		- uses one linux font, explain how it works
-	- can draw straight lines, rectangles
-	- can draw windows
-	- read source, what else can it do?
+The \gls{lfb} represents the pixels of the screen; it can be thought of as a
+two-dimensional array, where each value is a 32-bit integer representing the
+RGB value of a pixel on the screen. Thus to write a pixel to the screen, the
+kernel must simply calculate the correct offset into the \gls{lfb} and write a
+32-bit integer there.
 
-- user-mode programs
-	- a terminal emulator
-	- a paint program
+To set the video mode, the BIOS can be queried with the \texttt{int 0x10}
+instruction. This transfers execution to the code of the BIOS. However since
+the BIOS is written as 16-bit real mode code, our kernel must switch the
+processor back to 16-bit real mode before it can issue the interrupt.
 
-- PS/2 mouse driver
+We therefore wrote assembly code which switches the processor mode,
+queries the BIOS to enumerate the valid video modes, and selects one with a
+satisfactory resolution.
+
+At this point our kernel was able to color the screen by writing all over the
+\gls{lfb}. We were then ready to design the graphics stack.
+
+
+\subsection{Graphics stack design}
+To design our graphics stack, we first read up on how graphics work in common
+operating systems and used this as a basis for our design. We decided to
+have a central privileged process, called the display server, which is
+responsible for most of the work.
+
+The display server is responsible for spawning other graphical applications,
+assigning a portion of the screen to each application. The display server is
+the only process with access to the \gls{lfb}, so it is responsible for
+drawing all pixels to the screen. 
+
+Each graphical application is spawned by the display server. When this
+happens, the two set up an area of shared memory through \gls{ipc}. This
+memory is called the canvas of the application. The application can write
+pixels into the canvas, and the display server will periodically read the
+pixels from the canvas and write them to the \gls{lfb}.
+
+Graphical applications wait in a so-called event loop; they continuously wait
+for input events to arrive from the display server. When an input arrives, the
+application handles it and can make changes to its canvas on this basis.
+
+The kernel keeps a queue for input events. When raw input packets arrive from
+the mouse or keyboard, a driver handles these packets by putting them into an
+event queue. The display server periodically drains this queue through a
+system call. It then forwards each event to the appropriate application.
+
+The following diagram shows an overview of the different components and how
+they interact with each other:
+% TODO insert a diagram.
+
+% TODO also describe the graphics library component
+
+Thus imagine that a user sits in front of the machine with a terminal emulator
+application open and active. If the user presses the 'A' key, the following
+series of events will occur: 
+\begin{itemize}
+\item The user presses the 'A' key.
+\item The keyboard generates an interrupt to signal to the kernel that input
+is available.
+\item The kernel keyboard driver reads the pressed key using \gls{pio}.
+\item The driver puts the event into the events queue.
+\item The display server eventually drains the events queue and finds the key
+press event.
+\item The display server finds that the terminal application is active and
+therefore forwards the event to it using \gls{ipc}.
+\item The terminal application receives the event and adds the 'A' to a buffer
+which holds the current input of the user. This buffer will eventually be used
+to run a command once the user presses the enter key.
+\item The terminal application also wants to display the 'A' on the screen, so
+that the user can see what is written so far. The application therefore asks
+the graphics library to render an 'A' on its canvas using the default font.
+\item The display server writes the pixels from the canvas into part of the
+\gls{lfb}.
+\item The user sees the 'A' appear on screen.
+\end{itemize}
+
+
+\subsection{Implementing the display server}
+- maps the LFB with aid from the kernel
+- uses a z-buffer for efficiency
+- uses simple data structures
+- had to be hand-optimized
+
+\subsection{Implementing the graphics library}
+- can render fonts
+	- uses one linux font, explain how it works
+- can draw straight lines, rectangles
+- can draw windows
+- read source, what else can it do?
+
+\subsection{Sample graphical applications}
+- a terminal emulator
+- a paint program
+
+
+% TODO: fit in details about PS/2 mouse driver somewhere.
 
 
 %%%%% HARDWARE LAB %%%%%
