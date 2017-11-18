@@ -276,6 +276,8 @@ TODO: write an abstract here.
 
 % TODO: we should have an appendix that describes how to get and run the code.
 
+% TODO search for gls and remove as many as possible
+
 
 %%%%% LAB 1 %%%%%
 
@@ -387,8 +389,8 @@ for allocating and freeing pages of physical memory.
 % http://wiki.osdev.org/CMOS
 A given system has a limited amount of physical memory, depending on how much
 RAM the machine has. This memory is split up into a number of pages. On x86 a
-page is 4096 bytes, or 0x1000 in hexadecimal. Thus pages always aligned on
-0x1000-byte boundaries. The kernel determines the amount of RAM by using
+page is 4096 bytes, or \texttt{0x1000} in hexadecimal. Thus pages always aligned on
+\texttt{0x1000}-byte boundaries. The kernel determines the amount of RAM by using
 \gls{pio} to query a memory area called the CMOS. 
 
 The physical page management subsystem will keep a reference count for each
@@ -414,80 +416,57 @@ features.
 
 
 \subsection{Page table theory}
-To explain how our operating system implements virtual memory, it is necessary
-to introduce some theory about the page table.
+It is necessary to introduce some theory before we can explain how our kernel
+initializes its page table.
 
-The page table is a two-level table whose main purpose is to let the processor
-translate a virtual address to a physical address.  Conceptually, the x86 page
-table is a 1024-ary tree of height 2. The physical address of the page table
--- the root of the tree -- can be found in the \gls{cr3} register.
+The x86 page table is a two-level table whose main purpose is to let the
+processor translate a virtual address to a physical address. The page table
+can be thought of as a 1024-ary tree with two levels. 
 
-The first level of the page table is called the Page Directory. It contains
-1024 Page Directory Entries (\gls{pde}s). Each \gls{pde} points to a
-second-level node in the page table.
-Each second-level table holds 1024 Page Table
-Entries (\gls{pte}s). It is possible to map a virtual address to a \gls{pte}.
-The \gls{pte} then holds the physical address to which the virtual address
-should map. It also holds some status bits.
-
-The status bits of \gls{pte}s and \gls{pde}s determine such features as
-whether the page is writable, and whether it is accessible to user-mode code.
-There is also a "present" bit, which determines whether the page is virtual
-address maps to a physical page at all, or if accesses should cause a page
-fault instead.
+A pointer to the first level of the page table can be found in the
+\texttt{cr3} register. The first level is called the Page Directory. It
+contains 1024 Page Directory Entries (\gls{pde}s). Each \gls{pde} points to a
+second-level node, which contains 1024 Page Table Entries (\gls{pte}s). 
+A \gls{pte} specifies a page of physical memory and its permissions, including
+whether it is writable and whether it is accessible to user-mode code.
 
 To translate from a virtual to a physical address, it is necessary to walk the
-page table. For sake of illustration, assume that the processor is instructed
-to access a virtual address $v = 0x11223344$. The processor first looks in the
-\gls{cr3} register to find the root of the page table. It then uses the
-higher-order 10 bits of $v$ as an index into the page table. In this case, we
-have:
-$$ v = 0x11223344 = 0b10001001000100011001101000100 $$
-So the 10 higher-order bits are:
-$$ 0b1000100100 = 548 $$
-At index 548 into the page table, the processor finds a \gls{pde}. It extracts
-a physical address from the \gls{pde} to find a page directory. It then uses
-the next 10 high-order bits of $v$ as an index into the page directory. We
-have:
-$$ 0b0100011001 = 281 $$
-So the processor looks at index 281 into the page directory and finds a
-\gls{pte}. The \gls{pte} holds some status bits, which the processor can use
-to check whether the page is present, and whether access permissions are
-appropriate. If not, a page fault is generated. If all goes well, the
-\gls{pte} holds the physical address of the page that should be accessed. The
-lower-order 12 bits of the virtual address are used to index into the physical
-page, and the processor is finally done with address translation.
+page table. Say that the process wishes to access a virtual address $v$. It
+first looks in the \gls{cr3} register to find the Page Directory. It uses the
+10 higher-order bits of $v$ to specify a \gls{pde}. It uses the next 10 bits
+of $v$ to specify a \gls{pte}. The \gls{pte} contains the address of a
+physical page. The last 12 bits of $v$ are used as an offset into this page,
+and the address translation is complete. The processor also validates the
+permissions of the page before the access, and generates a page fault if these
+are inappropriate.
 
 This is a costly process, and in practice the job is done by specialized
-hardware called a Memory Management Unit (\gls{mmu}). Additionally, a cache
-called the Translation Lookaside Buffer (\gls{tlb}) holds the results of
-recent translations, to avoid having to walk the page table too often.
+hardware called a Memory Management Unit (MMU). Additionally, recent
+translations are cached in the so-called Translation Lookaside Buffer
+(\gls{tlb}).
 
 
 \subsection{Page table management}
 \label{sec:pagetables}
 We wrote the following functions to manage the page table:
 \begin{itemize}
-\item \texttt{pgdir\_walk} is the main workhorse of the subsystem, since it is
-called by most of the other functions. It has the same function as the MMU; it
-is given a page table and a virtual address, and it walks over the table to
-find the corresponding \gls{pte}, allocating new levels of the table if needed,
-using \texttt{page\_alloc} from the previous section.
+\item \texttt{pgdir\_walk} is called by most of the other functions to walk the
+page table, finding the \gls{pte} corresponding to a given virtual address. It
+allocates new levels of the page table as needed using \texttt{page\_alloc}
+from the previous section.
 \item \texttt{page\_insert} is used to insert a physical page into a page
-table at a given virtual address. In other words, it finds a \gls{pte} for a virtual
-address and stores the physical address there.
+table at a given virtual address. In other words, it finds a \gls{pte} using
+\texttt{pgdir\_walk} and stores the physical address there.
 \item \texttt{page\_lookup} finds the physical address of a page, given a
 virtual address.
 \item \texttt{page\_remove} invalidates a \gls{pte} in a page table.
 \end{itemize}
-The kernel uses these functions to set up the page table. This involves
-allocating pages of physical memory and inserting them into appropriate places
-in the page table. 
+To set up the page table, the kernel allocates pages of physical memory and
+uses the newly implemented functions to insert these into the table.
 
-It is up to us where the different things should go. Figure \ref{memlayout}
-contains a diagram which gives a simplified overview of the address space. For
-a more complete version, see the file \texttt{inc/memlayout.h}.
-\begin{figure}[h!]
+The memory layout of the address space of the kernel is largely up to us.
+Figure \ref{memlayout} gives a simplified overview of the layout we opted for.
+\begin{figure}
     \centering
 \begin{Verbatim}[fontsize=\small]
 Virtual memory map:                                  Permissions
@@ -531,28 +510,22 @@ Virtual memory map:                                  Permissions
     \label{memlayout}
 \end{figure}
 The diagram shows that the kernel code resides starting at virtual address
-0xf0000000. The kernel stacks, used by processors when running kernel-mode
-code, reside just below, between 0xefc00000 and 0xf0000000. Further down in
-the address space, between 0xef400000 and 0xef800000, we have the User Virtual
-Page Table (UVPT) area, which gives user-mode programs read-only access to the
+\texttt{0xf0000000}. The kernel stacks, used by processors when running
+kernel-mode code, reside just below, between \texttt{0xefc00000} and
+\texttt{0xf0000000}. Further down in the address space, between
+\texttt{0xef400000} and \texttt{0xef800000}, we have the User Virtual Page
+Table (UVPT) area, which gives user-mode processes read-only access to their
 page table, enabling certain exokernel-style programs to work. The stack of
-the user-mode program starts at 0xeebfe000 and grows toward lower addresses.
-The user-mode program code and data resides at 0x00800000.
+the user-mode program starts at \texttt{0xeebfe000} and grows towards lower
+addresses. The user-mode code and data reside near the bottom of the address
+space, around \texttt{0x00800000}.
 
-After allocating a page table and updating it to reflect all these
-conventions, we update the \gls{cr3} register to atomically update the page
-table. Finally we set a bit in \gls{cr0} to signal that the process should use
-the page table.
-
-Our system now has virtual memory. This means that user-mode programs cannot
-access kernel memory, since we have not set the user bit in the PTEs for this
-memory. Furthermore, user-mode programs cannot interfere with each other; they
-will each be given their own separate page table, where none of the physical
-addresses overlap by default.
-
-
-% TODO: make sure we describe that the user bit isn't set in kernel pages, and
-% that's what gives us security.
+We created a page table according to this layout. We then updated the
+\texttt{cr3} register and set a bit in the \texttt{cr0} register to enable the
+use of the page table. At this point our kernel had proper virtual memory.
+Once user-mode processes have been implemented, virtual memory guarantees that
+the processes cannot modify the address space of one another, nor can they
+corrupt the kernel.
 
 
 %%%%% LAB 3 %%%%%
@@ -674,13 +647,13 @@ mechanism for triggering system calls in our kernel.
 
 On the x86 architecture, the typical approach is to use the \texttt{int}
 instruction, which triggers an interrupt when executed. On Linux, interrupt
-0x80 is used for system calls, but we are free to use any interrupt, so we
-arbitrarily chose number 0x30. This means that a program uses the \texttt{int
+\texttt{0x80} is used for system calls, but we are free to use any interrupt, so we
+arbitrarily chose number \texttt{0x30}. This means that a program uses the \texttt{int
 0x30} instruction to perform a system call. The interface was up to us, but we
 kept it fairly standard; the \texttt{eax} register holds the system call
 number, while arguments go in registers \texttt{ebx}, \texttt{ecx}, etc.
 
-The \texttt{trap} function recognizes interrupt number 0x30 and calls the
+The \texttt{trap} function recognizes interrupt number \texttt{0x30} and calls the
 \texttt{syscall} function, which uses a large \texttt{switch} to delegate each
 system call to a specific handler.
 
@@ -1352,7 +1325,7 @@ which made it difficult to determine why the boot loader was hanging.
 We therefore had to write code which outputs text to the screen instead.
 Before a video mode has been set as described in section \ref{lab:graphics},
 the machine is in text mode. In text mode, by convention a buffer at physical
-address 0xb8000 represents the text on the screen; we can write characters
+address \texttt{0xb8000} represents the text on the screen; we can write characters
 directly into this buffer to show text on screen.
 
 
