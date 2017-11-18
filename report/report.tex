@@ -280,6 +280,7 @@ TODO: write an abstract here.
 %%%%% LAB 1 %%%%%
 
 \section{Lab 1}
+\label{sec:lab1}
 
 In this lab we wrote initialization code for our operating system. This code
 sets up a rudimentary page table and switches the processor from 16-bit real
@@ -729,6 +730,7 @@ with a device called the LAPIC.
 
 
 \subsection{Interacting with the LAPIC}
+\label{sec:mpconfig}
 % source: 
 % http://wiki.osdev.org/APIC
 % https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller
@@ -1197,6 +1199,7 @@ working web page.
 
 
 \section{Graphics Lab}
+\label{sec:graphics}
 
 
 % TODO write intro
@@ -1329,46 +1332,176 @@ emulator. The other is a simple paint program.
 
 %%%%% HARDWARE LAB %%%%%
 \section{Hardware Lab}
+Up to this point, our kernel had always been running in the QEMU emulator. In
+this lab, our goal was to get it running on real hardware, specifically a
+Packard Bell Dot S netbook. The road there was paved with surprisingly many
+complications. Most of the issues were caused by the fact that QEMU emulates
+different hardware than that of the netbook. There were also instances where
+QEMU did not emulate certain aspects of a machine faithfully, causing latent
+bugs to surface on real hardware.
 
 
-- goal: getting the OS to run on a specific netbook
-- booting from USB
-	- BIOS will only boot from USB (and disks in general) which has proper MBR and BPB
-	- historical reasons
-- bootloader doesn't support USB
-	- so dd the image onto a disk by booting into a live distro... however
-	  this is slow.
-- no serial connection
-	- the kernel was hanging somewhere, but we had no serial connection...
-	- found out about a buffer at 0xb8000 which can show text on screen
-- SATA disk, not ATA
-	- different disk type
-	- still need PIO, but ports are different; need to find them via PCI
-	- but PCI code won't fit in 512 bytes
-	- so I "cheated", booting into Linux to find those ports with the "lspci"
-	  tool...
-	- now we finally get past the boot loader, but the scheduler is broken!
-- need to boot from USB
-	- using dd and a linux distro is just too slow
-	- replaced bootloader with GRUB, which can load from USB, network, etc.
-- finding the LAPIC
-	- we need the LAPIC to generate clock interrupts for the scheduler
-	- we used mpconfig to find the LAPIC's paddr
-	- mpconfig is outdated, ACPI tables should be used instead, or as a
-	  fallback
-	- describe the whole RSDP -> RSDT -> APIC table
-- a page table bug
-	- must invalidate a PTE after updating it
-	- QEMU and VirtualBox don't emulate this faithfully, so we never saw the
-	  bug in emulators/VMs
-- custom FS and GRUB don't play well together
-	- reserve the first 32 MB for GRUB
-- found SATA ports via PCI
-- mouse driver broken
-	- had to wait between calls to inb on real hardware, but not in
-	  QEMU/VirtualBox..
-- finally: the OS works in QEMU, VirtualBox, and on my netbook!
+\subsection{Booting from USB}
+The build process of our kernel produces a raw disk image which QEMU will
+boot. The first block of this image is the boot loader, which the BIOS loads
+and transfers execution to as described in section \ref{sec:lab1}. Since QEMU
+will boot from this image, we figured that so would the netbook. We put the
+raw disk image on a USB drive and had the netbook boot from it. However the
+netbook did not recognize the USB as a bootable medium.
 
+It turns out that a USB drive must have a valid data structure called a Master
+Boot Record (MBR) in its first block, otherwise most machines will not
+recognize the drive as bootable. The MBR must also contain a valid data
+structure called the BIOS Parameter Block (BPB).
+
+The reason for this is historical; when USB technology was new, there was
+disagreement on whether a USB drive should be a raw storage drive or a
+bootable medium. Initially the user could decide through a BIOS setting. But
+for usability reasons, manufacturers eventually instead used heuristics to
+detect whether a USB is bootable or not. These heuristics are based on the
+MBR and BPB.
+
+Once we added a valid MBR and BPB to our boot loader, the netbook booted.
+However the machine got stuck at some point during the boot loader code.
+
+
+\subsection{No serial connection}
+Previously the kernel printed debugging information through a serial
+connection which QEMU emulated. However we did not have the hardware necessary
+to set up a serial connection to the netbook. We therefore had no output,
+which made it difficult to determine why the boot loader was hanging.
+
+We therefore had to write code which outputs text to the screen instead.
+Before a video mode has been set as described in section \ref{lab:graphics},
+the machine is in text mode. In text mode, by convention a buffer at physical
+address 0xb8000 represents the text on the screen; we can write characters
+directly into this buffer to show text on screen.
+
+
+\subsection{No USB driver}
+With the ability to print text to the screen, we figured out why the boot
+loader was hanging. Our boot loader is naively coded such that it loads the
+kernel from a disk connected with an ATA connection. But currently the kernel
+resides on a USB drive, which is a completely different interface.
+
+To continue, we needed to write a USB disk driver for the boot loader. However
+the boot loader is still constrained to 512 bytes, since it is loaded from the
+first sector of disk by the BIOS. Fitting a USB driver there is tricky.
+
+We therefore opted for a different approach. We booted from USB into a Linux
+distribution, and used that to overwrite the hard drive of the netbook with
+our raw kernel image. Now we can boot from a proper hard drive rather than
+USB.
+
+This approach had the major downside of being slow; we had to boot the weak
+netbook into a Linux distribution and enter several commands manually every
+time we wanted to test a new iteration of our kernel. This slowed development
+speed down significantly.
+
+Additionally, the boot loader continued to get stuck.
+
+
+\subsection{No SATA support}
+After more debugging we determined the problem: the hard drive in the netbook
+uses a SATA connection, while the machine emulated by QEMU used ATA. Thus
+reading the kernel from disk was failing.
+
+Fortunately, ATA and SATA are almost identical. ATA uses \gls{pio} to
+communicate with the disk on fixed ports. SATA uses the same protocol; the
+only difference is that the ports are machine-specific and must be found with
+\gls{pci}.
+
+So we tried to add PCI support to our boot loader but ran out of space -- we
+only had 512 bytes to work with, after all. As a temporary workaround, we
+booted into a Linux distribution and used the "lspci" tool to figure out the
+SATA I/O ports and hardcoded them. 
+
+With that, the boot loader finally succeeded in loading the kernel, which
+promptly broke; the scheduler was failing to switch in new applications.
+
+
+\subsection{A better boot loader}
+We attempted to debug the scheduler, but our development process was too slow
+and unwieldy to get anywhere; as mentioned, every time we made a change to the
+kernel code we had to boot into a Linux distribution and enter commands to
+write the raw kernel image to the hard disk. We needed to get around this;
+ideally we would simply insert a USB drive and immediately boot into our
+kernel. 
+
+To facilitate booting from USB, we replaced our boot loader with a better one.
+GRUB is the gold standard for boot loaders; it supports booting from various
+hard drive types, USB, and even booting via an ethernet connection. After
+integrating GRUB into the project, we were finally able to boot directly from
+USB, and development sped up significantly.
+
+Our custom file system assumes that the boot loader will fit into the first
+512 bytes, with the superblock residing in the following sector. However as
+GRUB uses multiple stages, it needs much more space. We therefore had to
+modify our file system such that the first 32 MB are reserved for GRUB, and
+the superblock resides thereafter.
+
+
+\subsection{Finding the LAPIC}
+Usually the LAPIC generates clock interrupts periodically, and on such an
+interrupt the scheduler switches in a new process. However no clock interrupts
+were generated, and thus only one process got any processing time. 
+
+In section \ref{sec:mpconfig} we described how our kernel uses the so-called
+\gls{mpconfig} method to find the LAPIC; that is, it looks for an MP
+configuration table in memory to find the physical address of the LAPIC. This
+physical address is used to communicate with the LAPIC, asking it to generate
+clock interrupts. However our kernel failed to find these MP configuration
+tables. They were simply not present in the memory of the netbook.
+
+It turns out that the \gls{mpconfig} method is outdated and unsupported by
+modern hardware. We therefore had to implement a different way to find the
+LAPIC.
+
+We leave out the details of the method, but in essence newer machines contain
+so-called ACPI tables. One of these is the APIC table, which contains the
+physical addres of the LAPIC. The ACPI tables can be found by scanning a
+region of memory for a data structure called the RSDP, which points at another
+data structure, the RSDT, which finally points at the ACPI tables.
+
+After implementing this finding and parsing of ACPI tables, the kernel found
+the LAPIC and clock signals were generated, letting the scheduler work as
+intended.
+
+Then another bug was uncovered.
+
+
+\subsection{A page table bug}
+Our kernel was behaving oddly; modifying a \gls{pte} seemed to have no effect.
+After the modification, writing to memory at the virtual address still
+affected memory at the old physical address rather than the new one.
+
+We figured that this must be related to the \gls{tlb}, since this seemed to be
+a caching issue. After much searching we learned that the \texttt{invlpg}
+instruction must be used to invalidate a \gls{tlb} entry after a \gls{pte} has
+been modified. Otherwise the outdated cached \gls{tlb} entry will continue to
+be used until it is evicted.
+
+Interestingly, this bug never surfaced while running the kernel in QEMU. We
+assume that QEMU does not faithfully emulate the TLB for performance
+reasons.\footnote{VirtualBox behaved similarly to QEMU; we therefore believe
+that this quirk can be used as a means to detect virtualization/emulation.}
+
+
+\subsection{Broken mouse driver}
+At this point the kernel successfully booted into a graphical interface.
+However the mouse was behaving oddly, jumping around when moved. The PS/2
+mouse driver we wrote during the graphics lab was at fault; the driver uses
+\gls{pio} to read from the mouse. Before each \texttt{inb} instruction, it is
+necessary to wait for the mouse to signal that it has sent another byte of
+data. The driver did not do this. However in QEMU these waits were not
+necessary; thus this was another instance of QEMU not emulating hardware
+perfectly.
+
+
+\subsection{The final result}
+With all the changes and fixes described so far, the kernel finally ran on our
+netbook.
+% TODO: include a screenshot?
 
 
 
