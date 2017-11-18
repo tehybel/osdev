@@ -1329,7 +1329,48 @@ emulator. The other is a simple paint program.
 
 %%%%% HARDWARE LAB %%%%%
 \section{Hardware Lab}
-- hardware
+
+
+- goal: getting the OS to run on a specific netbook
+- booting from USB
+	- BIOS will only boot from USB (and disks in general) which has proper MBR and BPB
+	- historical reasons
+- bootloader doesn't support USB
+	- so dd the image onto a disk by booting into a live distro... however
+	  this is slow.
+- no serial connection
+	- the kernel was hanging somewhere, but we had no serial connection...
+	- found out about a buffer at 0xb8000 which can show text on screen
+- SATA disk, not ATA
+	- different disk type
+	- still need PIO, but ports are different; need to find them via PCI
+	- but PCI code won't fit in 512 bytes
+	- so I "cheated", booting into Linux to find those ports with the "lspci"
+	  tool...
+	- now we finally get past the boot loader, but the scheduler is broken!
+- need to boot from USB
+	- using dd and a linux distro is just too slow
+	- replaced bootloader with GRUB, which can load from USB, network, etc.
+- finding the LAPIC
+	- we need the LAPIC to generate clock interrupts for the scheduler
+	- we used mpconfig to find the LAPIC's paddr
+	- mpconfig is outdated, ACPI tables should be used instead, or as a
+	  fallback
+	- describe the whole RSDP -> RSDT -> APIC table
+- a page table bug
+	- must invalidate a PTE after updating it
+	- QEMU and VirtualBox don't emulate this faithfully, so we never saw the
+	  bug in emulators/VMs
+- custom FS and GRUB don't play well together
+	- reserve the first 32 MB for GRUB
+- found SATA ports via PCI
+- mouse driver broken
+	- had to wait between calls to inb on real hardware, but not in
+	  QEMU/VirtualBox..
+- finally: the OS works in QEMU, VirtualBox, and on my netbook!
+
+
+
 
 
 \section{Future work}
