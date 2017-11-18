@@ -279,50 +279,39 @@ TODO: write an abstract here.
 
 %%%%% LAB 1 %%%%%
 
-\section{Lab 1}
+
+\section{Booting}
 \label{sec:lab1}
 
-In this lab we wrote initialization code for our operating system. This code
-sets up a rudimentary page table and switches the processor from 16-bit real
-mode to 32-bit protected mode. We also wrote a boot loader, which is a small
-program that loads the main kernel from disk and transfers control to it.
+In this lab we wrote initialization code and a boot loader for our kernel. 
+The initialization code sets up a rudimentary page table and switches the
+processor to 32-bit protected mode. The boot loader loads the rest of the
+kernel into memory and jumps to it.
 
 \subsection{The boot process}
-To understand the purpose of a boot loader, it is first necessary to have an
-overview of the process which an x86 machine goes through upon startup.
+To understand the purpose of a boot loader, it helps to have an overview of
+the startup process of an x86 machine.
+When an x86 machine starts, its BIOS code runs. The BIOS initializes some of
+the hardware, and then it loads the first sector (512 bytes) from the boot
+medium into a hard-coded address which it jumps to.
 
-% source: https://en.wikipedia.org/wiki/BIOS
-When an x86 machine starts, its BIOS code is run. The BIOS initializes some of
-the system's hardware components (e.g., keyboard, graphics card, and hard
-drive). The BIOS will then load one sector (512 bytes) from the boot medium
-into memory at a hard-coded address (0x7C00). Once this first sector is loaded
-into memory, the BIOS will transfer execution to the loaded code.
-
-The first sector will typically contain a small program known as the boot
+This first sector will typically contain a small program known as the boot
 loader. Its purpose is to load the main kernel from disk and transfer
 execution to it.
 
-Before the boot loader loads the kernel, we first run some initialization code
-which sets up a more comfortable environment for the boot loader and kernel to
-work in.
-
+Before the boot loader loads the kernel, the kernel should first run some
+initialization code which sets up a more comfortable environment for the boot
+loader and kernel to work in.
 
 
 \subsection{Initialization code}
 When the BIOS jumps into our code, the processor is running in 16-bit real
 mode. However the code produced by a modern compiler expects to run in 32-bit
-protected mode. We therefore needed to write code which performs this
-switching of processor modes.
+protected mode. The initialization code should therefore be written in
+assembly and should switch processor modes.
 
-The main difference between real mode and protected mode is how address
-resolution is performed. In real mode, accessing a physical address is done
-using a segment selector register and a general-purpose register. In
-contast, protected mode allows (but does not require) the use of
-\emph{paging}, i.e., the mapping from virtual from physical addresses using a
-page table.
-
-Since we want our operating system to use virtual memory, we certainly want to
-switch to protected mode. We do not immediately enable paging, however.
+The most important difference between real and protected mode is that real
+mode does not support the use of a page table to implement virtual memory.
 
 To switch to protected mode, a bit needs to be set in the control register
 \gls{cr0}. We do so with the following assembly code:
@@ -334,95 +323,83 @@ orl     $CR0_PE_ON, %eax
 movl    %eax, %cr0
 \end{verbatim}
 
-To switch to 32-bit mode, we must update the \gls{cs} (code
-segment) register. This register is an offset into a table called the Global
-Descriptor Table (\gls{gdt}) which contains a number of descriptors. Each
-descriptor has a bit which determines whether the chosen segment is a 32-bit
-or a 16-bit segment. We use the \texttt{ljmp} instruction to update the
-\gls{cs} register.
-% TODO: possibly elaborate more on the GDT.
+We do not immediately enable virtual memory, though, since we do not yet have
+the infrastructure to set up a proper page table. This happens in section
+\ref{sec:mem}. Until then, all addressing is physical.
 
-Once our code has switched to 32-bit protected mode, it executes the boot
-loader. At this point the processor is in a state where it can execute
-compiled C code, which means that we no longer need to hand-write assembly.
+To switch to 32-bit mode, we must update the \texttt{cs} (code segment)
+register. The \texttt{cs} register is an offset into a table called the Global
+Descriptor Table (\gls{gdt}) which is an array of descriptors. Each descriptor
+describes a segment of memory; a bit in the descriptor determines whether the
+segment contains 16-bit or 32-bit code. 
 
-The file \texttt{boot/boot.S} contains the code that performs the described
-tasks.
+We use the \texttt{ljmp} instruction to update the \gls{cs} register and use a
+32-bit segment descriptor. Next, the boot loader is executed; since the
+processor is in 32-bit protected mode, the rest of the kernel code can be
+written in C rather than assembly.
+
+%The file \texttt{boot/boot.S} contains the code that performs the described
+%tasks.
 
 
 
 \subsection{The boot loader}
 It is the task of the boot loader to load the main kernel and transfer
-execution to it. The boot loader must do this using no more than 512 bytes of
-code, minus the bytes used by the initialization code.
+execution to it. Since the boot loader resides on the first sector of the hard
+drive, it must load the kernel using no more than 512 bytes of code, minus the
+bytes used by the initialization code.
 
-Our kernel will be compiled into an \gls{elf} file. The boot loader will parse
-this \gls{elf} file, using the information therein to load the code and data
-of the kernel to the right physical addresses.
+Our kernel is compiled into an Execute and Linkable Format (ELF) file. The ELF
+file specifies the physical addresses into which the code and data of the
+kernel must be loaded. The boot loader must thus parse the ELF file to load
+the kernel.
 
-% TODO: possibly include information about the ELF file format here.
+Once the boot loader has loaded the kernel, it determines the entry point
+address from the ELF file and jumps there.
 
-Once the boot loader has finished loading the kernel, it determines the entry
-point address from the \gls{elf} file and jumps there, transferring execution to the
-kernel.
 
 \subsection{Minimal kernel code}
-At this point our kernel can finally run. However it does not yet have much
-functionality. Unlike user-mode programs, the kernel does not have access to a
+At this point we were able to run kernel code. However we did not yet have any
+functionality; unlike user-mode programs, the kernel does not have access to a
 C standard library, unless we write one ourselves.
 
-
-% TODO: document that we were given the serial connection code via the MIT
-% course
-As a start, we would like to have the ability to input and output text.
-Our kernel can use the \texttt{inb} and \texttt{outb} instructions to
+As a start, we wanted the ability to input and output text.
+Our kernel uses the \texttt{inb} and \texttt{outb} instructions to
 communicate with the outside world via a serial connection. We used this to
-write out a message and confirm that the kernel runs.
+print a "hello, world" message and confirm that the kernel runs.
 
 Using instructions such as \texttt{inb} and \texttt{outb} to communicate with
-an input/output device is known as Programmed Input/Output (\gls{pio}). It is a
-technique we will be using throughout our operating system development.
-
-
-% TODO: should note that our boot loader isn't actually used in the end.
-
-
+an input/output device is quite common. The method is known as Programmed
+Input/Output (\gls{pio}); it will be used often in the following sections.
 
 
 %%%%% LAB 2 %%%%%
 
-\section{Lab 2}
+\section{Memory management}
+\label{sec:mem}
+The goal of this lab was to enable virtual memory after setting up a page
+table. To set up the page table, we first needed to implement a subsystem
+for allocating and freeing pages of physical memory.
 
-The goal of this lab was to write code which sets up the page table, so that
-our operating system can use virtual memory. Before we could set up the page
-table, we first needed to implement a subsystem which manages the physical
-memory of the system.
 
-\subsection{Physical page allocation}
-A given system has a limited amount of physical memory, depending on how much
-RAM the machine has. This memory is split up into a number of pages. On x86, a
-page is 4096 bytes of memory. In hex, 4096 is 0x1000, which means that pages
-are always aligned on 0x1000-byte boundaries.
-
+\subsection{Physical page management}
 % sources: https://en.wikipedia.org/wiki/Nonvolatile_BIOS_memory
 % http://wiki.osdev.org/CMOS
-To find out how much memory is available on the system, we query a memory area
-called the CMOS. The CMOS is an area of memory which holds the amount of
-system RAM. We can read from the CMOS using \gls{pio} to figure out how many pages
-of physical memory are available to the kernel.
+A given system has a limited amount of physical memory, depending on how much
+RAM the machine has. This memory is split up into a number of pages. On x86 a
+page is 4096 bytes, or 0x1000 in hexadecimal. Thus pages always aligned on
+0x1000-byte boundaries. The kernel determines the amount of RAM by using
+\gls{pio} to query a memory area called the CMOS. 
 
-For each page, the kernel must keep track of whether it is in use or not, and
-if so, how many references there are to the given page. To accomplish this,
-metadata about each page is stored in a \texttt{PageInfo} struct. For example,
-the \texttt{PageInfo} struct holds the reference count of each page. The
-kernel has an array of \texttt{PageInfo} structs, called \texttt{pages}.
-Each entry of the \texttt{pages} array directly corresponds to one physical
-page of memory, such that the first entry in \texttt{pages} holds metadata
-about the first page of physical memory, and so on.
+The physical page management subsystem will keep a reference count for each
+page. If the count is zero, the page is free and can be allocated. This
+metadata is stored in an array of \texttt{PageInfo} structs. Each entry in
+this array directly corresponds to one physical page of memory, such that the
+first \texttt{PageInfo} struct holds metadata about the first page of physical
+memory, and so on.
 
-Free pages are additionally stored in a linked list of \texttt{PageInfo}
-structs called the \texttt{page\_free\_list}. Using a linked list lets the
-kernel return a free page in constant time.
+The \texttt{PageInfo} of free pages are additionally stored in a linked list,
+such that the kernel can return a free page in constant time.
 
 We wrote the following functions to manage physical pages:
 \begin{itemize}
@@ -431,10 +408,9 @@ We wrote the following functions to manage physical pages:
 \item \texttt{page\_decref} and \texttt{page\_incref} are used to manage
 reference counts of pages
 \end{itemize}
-With this infrastructure in place, we were ready to set up the page table so
-that we could use virtual memory.
+These functions provide critical infrastructure needed by other kernel
+features.
 
-% TODO: maybe describe our memory corruption checks?
 
 
 \subsection{Page table theory}
@@ -565,7 +541,8 @@ The user-mode program code and data resides at 0x00800000.
 
 After allocating a page table and updating it to reflect all these
 conventions, we update the \gls{cr3} register to atomically update the page
-table. Finally we set a bit in \gls{cr0} to enable paging.
+table. Finally we set a bit in \gls{cr0} to signal that the process should use
+the page table.
 
 Our system now has virtual memory. This means that user-mode programs cannot
 access kernel memory, since we have not set the user bit in the PTEs for this
@@ -579,7 +556,8 @@ addresses overlap by default.
 
 
 %%%%% LAB 3 %%%%%
-\section{Lab 3}
+% TODO: think of a better name for this lab, it's not quite right..
+\section{Process management}
 
 The goal of this lab was to get a user-mode program running as a process in
 its own virtual address space. To accomplish this, we needed to write
@@ -588,7 +566,7 @@ triggers an exception, such as a division by zero, our kernel additionally
 needs to handle this. Finally we implemented a system call mechanism to e.g.
 let programs perform input and output.
 
-\subsection{Process management}
+\subsection{Process information}
 Each process has some associated information. This includes its state
 (running, runnable, killed, etc.), its process ID, its parent process ID, its
 page directory, and so on. All this information is stored in a struct
@@ -717,7 +695,7 @@ specific system call, or by triggering any exception.
 
 
 %%%%% LAB 4 %%%%%
-\section{Lab 4}
+\section{Multiprocessing}
 In the previous lab, we reached a point where our kernel could run a single
 user-mode process. The current lab concerns itself with running multiple
 processes concurrently, and having them interact. We implemented preemptive
@@ -957,14 +935,14 @@ efficiency an extra argument to the system calls allows the sender to share a
 full page of memory with the recieving process.
 
 
-This marks the end of lab 4. Our kernel can now run user-mode processes in a
-truly concurrent fashion. A scheduler manages the running processes,
-preempting them when necessary. Processes can efficiently fork and communicate
-via \gls{ipc}.
+This marks the end of the multiprocessing lab. Our kernel can now run
+user-mode processes in a truly concurrent fashion. A scheduler manages the
+running processes, preempting them when necessary. Processes can efficiently
+fork and communicate via \gls{ipc}.
 
 
 %%%%% LAB 5 %%%%%
-\section{Lab 5}
+\section{File system}
 The goal of this lab was to implement a custom file system and a shell.
 
 \subsection{Custom file system}
@@ -1067,7 +1045,7 @@ changes persist across reboots.
 
 
 %%%%% LAB 6 %%%%%
-\section{Lab 6}
+\section{Networking}
 The goal of this lab was to connect our kernel to the internet by writing a
 network card driver.
 
@@ -1198,7 +1176,7 @@ working web page.
 %%%%% GRAPHICS LAB %%%%%
 
 
-\section{Graphics Lab}
+\section{Graphics}
 \label{sec:graphics}
 
 
@@ -1331,7 +1309,7 @@ emulator. The other is a simple paint program.
 
 
 %%%%% HARDWARE LAB %%%%%
-\section{Hardware Lab}
+\section{Hardware}
 Up to this point, our kernel had always been running in the QEMU emulator. In
 this lab, our goal was to get it running on real hardware, specifically a
 Packard Bell Dot S netbook. The road there was paved with surprisingly many
