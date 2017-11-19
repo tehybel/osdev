@@ -219,6 +219,11 @@
 \makeglossaries
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \begin{document}
 
 \pagenumbering{roman}
@@ -260,6 +265,7 @@ Operating System \\ Implementation
 \rule{\textwidth}{1pt} % Thick horizontal rule
 
 \end{titlepage}
+\newpage
 
 
 %TODO: have your email in the title page
@@ -269,10 +275,12 @@ Operating System \\ Implementation
 \noindent 
 TODO: write an abstract here.
 \end{abstract}
+\newpage
 
 
 \tableofcontents
 
+\newpage
 \pagenumbering{arabic}
 
 
@@ -280,46 +288,65 @@ TODO: write an abstract here.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Introduction}
+This report documents our journey through writing an operating system from
+scratch. Our primary goal was to learn about operating systems internals and
+design, and to investigate the difficulty of the task. Neither usability nor
+efficiency were significant goals throughout the process, except when
+their consideration facilitated learning.
+
+% TODO: add citation https://pdos.csail.mit.edu/6.828/2016/schedule.html
+To get started on kernel development we made extensive use of material from
+the MIT 2016 Operating System Engineering course, which is accessible online.
+The MIT course is divided into six major "labs", with each lab encapsulating a
+set of kernel functionality. For example, lab 4 involves functionality needed
+for multitasking and concurrency, while lab 5 comprises the implementation of
+a custom file system. 
+
+The kernel we wrote is for the 32-bit x86 architecture. The kernel is written
+in C, with some parts having to be hand-written in assembly. 
+We have used GCC as our compiler and Git for version
+control. Additionally, it was convenient to develop the kernel on emulated
+hardware rather than a real machine, since this eased debugging and increased
+development speed. It also made it trivial to change the amount of system RAM,
+and to add new processors or an extra hard drive. We have used the full-system
+emulator QEMU for this task.
+
+Each MIT lab has an associated web page which describes what needs to be done
+and provides links to resources like manuals and specifications. Since we opted
+to follow the MIT course, this also meant that some design decisions were made
+for us. One example of this is us following an exokernel philosophy, which
+meant that we have pushed large parts of the kernel functionality into user
+space.
+
+During kernel development, occasionally some functionality was important,
+but not technically interesting to implement. In these cases the MIT lab often
+provided the code for us, with enough code missing that we had to understand
+the concept to complete it, while still saving significant amounts of time. An
+example of this is the code for communicating with the outside world over a
+serial connection, which is used throughout the labs.
 
 
-- introduction
-	- what are we trying to do
-	- how are we doing it
-		- following the course from MIT
-	- why are we doing it
-	- overview of the coming chapters
+In addition to the six labs of the MIT course, we have decided upon two labs
+on our own. In lab 7 we designed and implemented a graphical user interface
+for the operating system. In lab 8 we made the operating system run on real
+hardware instead of QEMU. Since we were given zero guidance nor code, these
+labs were significantly more difficult and time-consuming than previous ones.
 
-% TODO: write about our development environment, i.e., that we're using QEMU.
+Each of the following sections corresponds directly to one lab. They describe
+the development process, from first booting into a minimal kernel, until the end
+when we run a full graphical operating system on a real machine.
 
-% TODO: write that you can use "git checkout lab1" to go back to the end of
-% lab1, etc.
-% TODO: say it's an exokernel, talk about what that means for our later
-% design
-% TODO: refer to the abbreviations list.
+
+% TODO get rid of the glossary, or at least minimize it. If we keep it, add a
+% reference to it here in the intr.
 
 % TODO: read each of the sections' introductions and see whether they make
 % sense when read alone in sequence
-% TODO: read over the report watching for confusing terms, then add them to
-% the glossary (e.g. "real mode")
-% TODO: note that the goal was to learn, not to create the most user-friendly
-% or efficient system. So we e.g. created our own boot loader initially
-% instead of using GRUB, and we created a custom file system instead of
-% implementing a common one.
+
 
 % TODO rewrite "the goal of this lab was", it sounds bad and repetitive
 
-% TODO: we haven't talked about ATA yet.
-
-% TODO: did we describe the console subsystem which lets us do i/o initially?
-
-
-% TODO: in the end we should browse through the kernel code and see if there's
-% any of it we didn't describe anywhere
-
-% TODO: we should have an appendix that describes how to get and run the code.
-
-% TODO search for gls and remove as many as possible
-
+% TODO: clarify OS vs kernel in the whole report.
 
 %%%%% LAB 1 %%%%%
 
@@ -563,8 +590,7 @@ corrupt the kernel.
 
 
 %%%%% LAB 3 %%%%%
-% TODO: think of a better name for this lab, it's not quite right..
-\chapter{Process management}
+\chapter{User space}
 
 The goal of this lab was to run a user-mode process. This required us to write
 infrastructure for managing processes and their metadata. We also modified our
@@ -1535,6 +1561,7 @@ learned...
 \end{framed}
 
 
+% TODO: we should have an appendix that describes how to get and run the code.
 
 \begin{thebibliography}{1}
 
