@@ -1,7 +1,7 @@
 \documentclass{report}
 %\documentclass[10pt,letterpaper]{scrartcl}
 
-\usepackage[]{classicthesis}
+\usepackage[dottedtoc,manychapters]{classicthesis}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{amsfonts}
@@ -25,13 +25,16 @@
 
 \usepackage{xcolor}
 
-% this makes links prettier
 % TODO: find a nicer way to indicate that text is a link.
+\definecolor{light-grey}{gray}{0.30}
+
+% this makes links prettier
 \hypersetup{
     colorlinks,
-    linkcolor={blue!30!black},
+	linktoc=page,
+    linkcolor={light-grey}, % color of internal links (sections, pages, etc.)
     citecolor={blue!30!black},
-    urlcolor={blue!30!black}
+    urlcolor={blue!30!black} % color of URL links (mail, web)
 }
 
 \lstset{language=C}
@@ -896,105 +899,129 @@ efficiently fork and communicate via IPC.
 %%%%% LAB 5 %%%%%
 \chapter{File system}
 \label{sec:fs}
-The goal of this lab was to implement a custom file system and a shell.
+The goal of this lab was to implement a custom file system and a user-mode
+shell program.
 
-\section{Custom file system}
-So far, our kernel has embedded any user-mode programs inside itself as binary
-blobs. This is highly undesirable; it requires recompilation of the full
-kernel to modify user-mode programs, and it makes it impossible for programs
-to store data persistently on disk. We therefore implemented a custom file
-system, which we now describe.
+\section{File system design}
+Having a file system lets programs store data persistently on disk. It also
+provides a storage place for programs, instead of embedding them directly in
+the kernel as we have done so far. In this section we describe our design of
+a custom file system.\footnote{
+To keep our file system simple, we have left out many potential features, such
+as file and folder permissions, symbolic and hard links, and timestamps.}
 
-A file system exists on a disk. A disk can be thought of as a large amount of
-writable space. We can partition the disk's space into blocks, where each
-block has a specific size. For our file system, the block size will be 4096
-bytes.
+A file system can be thought of as a way to manage how files, folders, and
+their metadata are stored on a disk. A raw disk is essentially a portion of
+memory which can be read from and written to. It is customary to partition the
+memory of a disk into fixed-size blocks. For our file system, the block size
+will be 4096 bytes.
 
-One of these blocks is special; it's called the "superblock". The superblock
-holds any metadata needed for the file system, such as the disk size, where to
-find the root folder, etc.
+One of these blocks is special, since it contains metadata for the file
+system. This block is called the superblock. This metadata includes such
+things as the disk size and where to find the root folder.
 
-Our file system is laid out as follows. The disk is partitioned into blocks as
-mentioned. Block 0, the first one, is not used by our FS. (This way it can
-hold the boot loader.) Block 1 is, by convention, the superblock. 
-
-The next blocks, starting at block 2, hold a bitmap of free blocks; bits
-correspond to blocks on disk, and each bit is 1 if, and only if, the
-corresponding block is free. This way we can allocate and free blocks.
-
-The remaining blocks are used to store the concrete files and folders.
-
-We have decided to keep our file system as simple as possible for ease of
-implementation. Thus there is no concept of permissions, symbolic and hard
-links, timestamps, and so on.
+Our file system is laid out as follows. Block 0, is not used by our FS; it is
+reserved for the boot loader. Block 1 is the superblock. The next few blocks,
+starting at block 2, hold a bitmap which determines whether the remaining
+blocks on disk are in use or free. The remaining blocks are used to store the
+concrete files and folders.
 
 % TODO: include graphics from https://pdos.csail.mit.edu/6.828/2016/labs/lab5/disk.png
 
-A file is represented in C as a \texttt{struct file}, which is stored in a
+A file is represented as a \texttt{struct file}, which is stored in its own
 block. Such a \texttt{file} struct contains metadata, such as the file name
-and size. The struct also has 10 pointers to the blocks that hold
-the raw file data. If the data cannot fit in 10 blocks, the \texttt{file}
-struct has a pointer to a block which holds another 1024 pointers to data
-blocks. Thus our file system has a maximum file size of $(10+1024)*4096
-= 4235264$ bytes, i.e., around 4 MB.
+and size. The struct also has 10 pointers to blocks that hold the raw file
+data. If the data cannot fit in 10 blocks, the \texttt{file} struct has a
+pointer to a block which holds another 1024 pointers to data blocks. Thus our
+file system has a maximum file size of $(10+1024)*4096 = 4235264$ bytes, i.e.,
+around 4 MB.
 
 % TODO: also this https://pdos.csail.mit.edu/6.828/2016/labs/lab5/file.png
 
-Folders are represented as a \texttt{struct folder}, which is exactly
-identical to a \texttt{struct file}, except that the $10+1024$ block
-pointers no longer point to raw data, but to other blocks holding
-\texttt{file} or \texttt{folder} structs. There is a type flag allowing us to
-distinguish between files and folders.
+A folder is represented as a \texttt{struct folder}, which is exactly
+identical to a \texttt{struct file}, except that the $10+1024$ block pointers
+no longer point to raw data, but to other blocks holding \texttt{file} or
+\texttt{folder} structs. There is a type flag which allows distinction between
+files and folders.
 
 We used a small script to create a raw disk image with an initialized file
 system of the described format. The script let us add files, such as sample
 programs, to the file system. We then attached this raw disk to QEMU.
 
 
+
 \section{File system daemon}
 In accord with exokernel design, we let all file system interaction go through
-a single privileged process which we call the file system daemon.
+a user-mode process which we call the file system daemon.
 
-The daemon interacts with the disk using \gls{pio}. However normal user land
-processes cannot use the \texttt{inb} and \texttt{outb} instructions to
-perform \gls{pio}, so our kernel needs to give the daemon I/O privileges. It
-does so by setting a bit in the \gls{eflags} register for the daemon process.
+The daemon interacts with the disk using \gls{pio}. However a normal user-mode
+process cannot use the \texttt{inb} and \texttt{outb} instructions to perform
+\gls{pio}, so our kernel needs to give the daemon I/O privileges. It does so
+by setting a bit in the \texttt{eflags} register while spawning the daemon.
+
+The disk knows nothing of the file system which is stored upon it. The daemon
+can merely read a sector of the disk at a time. It is therefore up to the
+daemon to implement reading and writing of files and folders according to the
+file system specification. We wrote the necessary functions for interacting
+with the file system.
 
 The file system daemon spends its time looping, waiting for other processes to
-contact it via \gls{ipc}. Processes can send requests to open, read, write,
-and stat files. The \gls{ipc} details are hidden behind our implementation of
-a C standard library, such that processes have the usual interface with
-functions such as \texttt{open}, \texttt{read} and \texttt{write}.
+contact it via IPC. Processes can send requests to open, read, write,
+and stat files. The IPC details are hidden inside the user-mode C standard
+library, giving processes the usual interface with functions such as
+\texttt{open}, \texttt{read} and \texttt{write}.
 
-We have further improved the efficiency of the file system daemon by
-implemented a block caching system. When a block is first read, its contents
-are stored in RAM, and subsequent reads do not need to interact with the disk
-until the cache entry is invalidated through a write.
+For sake of illustration, the following happens when a process wants to open a
+file:
+\begin{itemize}
+\item The process calls the \texttt{open} library function.
+\item The library uses IPC to contact the file system daemon.
+\item The daemon reads the superblock to find the block of the root folder.
+\item The daemon follows pointers from folder to folder according to the given
+path.
+\item When the path has been traversed, the daemon has found the block that
+contains the \texttt{file} struct.
+\item The offset into the disk that holds the \texttt{file} struct is stored
+in a file descriptor.
+\item File descriptors are numbered; the daemon returns this number as the
+result of the IPC call.
+\end{itemize}
+When the process subsequently reads from the file descriptor, the daemon
+uses the pointers in the \texttt{file} struct to find the raw data and return
+it via IPC.
 
-
-
-To summarize, when a process wants to open a file, the following happens. The
-process calls the \texttt{open} library function. The library uses \gls{ipc}
-to contact the file system daemon. The daemon uses the file system superblock
-to find the root folder. It walks over the folder structure by following block
-pointers, until it finds the block that holds the data for the correct file.
-This location on disk is stored in a file descriptor, and the number of the
-file descriptor is returned to the first process via \gls{ipc}. When a
-subsequent \texttt{read} is performed, the daemon uses the pointers in the
-\texttt{file} struct to find the raw data block and sends the requested data
-back via \gls{ipc}.
-
+We have also implemented a block caching system to improve the efficiency of
+the file system daemon. When a block is first read, its contents are stored in
+RAM, and subsequent reads do not need to interact with the disk until the
+cache entry is invalidated through a write.
 
 
 \section{Shell}
-We implemented a simplistic shell which lets us load and execute programs from
-disk. The shell also features input redirection ("<"), output redirection
-(">"), and pipes ("|"). It is now possible to write to the disk and have the
-changes persist across reboots.
+To test the interaction between programs and the disk, we implemented a
+simplistic shell which allows loading and execution of programs from disk. The
+shell allows reads from and writes to the disk through input redirection
+(\texttt{<}) and output redirection (\texttt{>}). The shell additionally
+supports piping of the output of one program into another program. A small
+program, "cat", lets the user read files from the disk. A sample interaction
+is shown in figure \ref{fig:shellinteraction}.
 
-% TODO: we didn't describe the init process.
+\begin{figure}[h]
+\begin{framed}
+\begin{Verbatim}[fontsize=\small]
+$ ls
+cat
+echo
+ls
+sh
+$ echo "Hello, OS." > motd
+$ cat motd
+"Hello, OS." 
+\end{Verbatim}
+\end{framed}
+\caption{A sample interaction with the shell}
+\label{fig:shellinteraction}
+\end{figure}
 
-% TODO: show an example interaction.
 
 
 %%%%% LAB 6 %%%%%
@@ -1432,7 +1459,7 @@ perfectly.
 \section{The final result}
 With all the changes and fixes described so far, the kernel finally ran on our
 netbook.
-% TODO: include a screenshot?
+% TODO: include a photo?
 
 
 
@@ -1469,17 +1496,17 @@ netbook.
 % TODO: we could include screenshots to make things more concrete
 % TODO: include (a link to) the source code somehow
 
-% TODO: question: is it a good idea to have "mistakes made" and "lessons
-% learned"? If so, how do we do this without it sounding too informal?
-
 
 
 % TODO: add references (some links are in writeup txt files)
 
 
+
+
+% TODO: question: is it a good idea to have "mistakes made" and "lessons
+% learned"? If so, how do we do this without it sounding too informal?
 \begin{framed}
 \makebox[\textwidth]{Lesson learned: foo} \\
-% TODO:
 Maybe we can use something like this to describe the various lessons we
 learned...
 \end{framed}
@@ -1577,6 +1604,7 @@ learned...
 
 \end{thebibliography}
 
+% TODO: maybe move this elsewhere?
 \printglossary[title=Abbreviations]
 
 
