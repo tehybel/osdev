@@ -593,98 +593,158 @@ Since this was not yet handled, any exception caused the whole system to
 crash.
 
 
-\section{Theory of exceptions and interrupts}
-While executing an instruction, the processor may trigger an exception. This
-could e.g. happen due to a division by zero, or due to an illegal memory
-access. When an exception occurs, the processor performs a context switch to
-enter kernel mode. Then it runs some handler code specific to the exception.
+\section{Handling of exceptions and interrupts}
+The processor may trigger an exception while processing an instruction, e.g.,
+on a division by zero or illegal memory access. The processor may also
+occasionally trigger an interrupt. This often happens for asynchronous
+reasons, such as when a key is pressed or a network packet is received.
+Interrupts can also be raised with the \texttt{int} instruction; this
+mechanism can be used to implement system calls.
 
-The processor may also occasionally trigger an interrupt. This often happens
-for asynchronous reasons; examples could be receiving a new network packet or
-key press. Interrupts can also happen for synchronous reasons; for example, an
-interrupt is raised as a result of executing the \texttt{int 0x80} instruction
-which is commonly used for system calls. The behavior is the same for
-exceptions; a context switch occurs to run a handler in kernel mode.
+The result of an exception or interrupt is that the processor enters kernel
+mode through a context switch, running exception- or interrupt-specific
+handler code. This handler code is found as follows. Exceptions and interrupts
+are numbered. This number specifies an index into a table called the Interrupt
+Descriptor Table (IDT), which can be found using the IDT register,
+\texttt{idtr}. The IDT entry describes the address of the handler code. 
 
-We now describe how the processor knows which code to run when an interrupt or
-exception is raised. Exceptions and interrupts have numbers. Exceptions are
-numbered from 0 to 31, and interrupts are numbered from 32 to 255.
-% TODO: give some examples from http://wiki.osdev.org/Exceptions in a table.
-
-These numbers specify an index into a table called the Interrupt Descriptor
-Table (\gls{idt}). The physical address of the \gls{idt} is stored in the IDT
-Register (\gls{idtr}), which can be read and set using the \texttt{lidt} and
-\texttt{sidt} instructions, respectively.
-
-The \gls{idt} table entry describes the address at which the handler for the
-given interrupt resides.
-
-As noted, an exception or interrupt triggers a context switch. Therefore the
-processor needs to know on which stack it should save the registers of the
-faulting process. To find this \gls{esp} value, the processor reads the Task
-Register (\gls{tr}) which is an index into the \gls{gdt}. The \gls{gdt} entry
-contains the address of a data structure called the Task State Segment
-(\gls{tss}). The processor reads the new \gls{esp} value from the \gls{tss}.
-
-To sum up: when an exception or interrupt occurs, the corresponding number is
-looked up in the \gls{idt} to find the new \gls{eip} value. The \gls{tr},
-\gls{gdt} and \gls{tss} are used to find the new \gls{esp} value. The
-processor uses this information to store the registers of the faulting process
-onto the new stack and execute the relevant handler code.
+% As noted, an exception or interrupt triggers a context switch. Therefore the
+% processor needs to know on which stack it should save the registers of the
+% faulting process. To find this \gls{esp} value, the processor reads the Task
+% Register (\gls{tr}) which is an index into the \gls{gdt}. The \gls{gdt} entry
+% contains the address of a data structure called the Task State Segment
+% (\gls{tss}). The processor reads the new \gls{esp} value from the \gls{tss}.
+% 
+% To sum up: when an exception or interrupt occurs, the corresponding number is
+% looked up in the \gls{idt} to find the new \gls{eip} value. The \gls{tr},
+% \gls{gdt} and \gls{tss} are used to find the new \gls{esp} value. The
+% processor uses this information to store the registers of the faulting process
+% onto the new stack and execute the relevant handler code.
 
 
-\section{Handling exceptions and interrupts}
+%\section{Handling exceptions and interrupts}
 We wrote a common function, \texttt{trap}, which is called whenever an
 exception or interrupt occurs. For each exception and interrupt, we filled in
-its \gls{idt} entry with a small stub which passes the number of the exception
-or interrupt as the first argument in a call to \texttt{trap}.
+its IDT entry with a small stub which passes the number of the exception
+or interrupt as the first argument and calls \texttt{trap}.
 
 The typical result of an exception is that the kernel terminates the running
-process. However exceptions can also occur in kernel mode, in which case there
-is a bug in the kernel. This results in a kernel panic, making the kernel
-print the exception and hang.
+process. If an exception occurs in kernel mode, the result is a kernel panic,
+where the kernel prints an error message and hangs.
 
 
 
-\section{Handling system calls}
-A process often needs to ask the kernel to perform some task for it. This
-could e.g. involve printing text onto the console, reading a character from
-the keyboard, or spawning a new child process. We needed to implement a
-mechanism for triggering system calls in our kernel.
+\section{Handling of system calls}
+A process frequently needs to call kernel code, e.g. to print text onto the
+screen or to perform inter-process communication. This is called a system
+call. 
 
-On the x86 architecture, the typical approach is to use the \texttt{int}
-instruction, which triggers an interrupt when executed. On Linux, interrupt
-\texttt{0x80} is used for system calls, but we are free to use any interrupt, so we
-arbitrarily chose number \texttt{0x30}. This means that a program uses the \texttt{int
-0x30} instruction to perform a system call. The interface was up to us, but we
-kept it fairly standard; the \texttt{eax} register holds the system call
-number, while arguments go in registers \texttt{ebx}, \texttt{ecx}, etc.
+One mechanism to implement system calls on the x86 architecture is to use the
+\texttt{int} instruction, which triggers an interrupt when executed. We are
+free to use any interrupt that is not in use, so we arbitrarily chose number
+\texttt{0x30}. Thus a program uses the \texttt{int 0x30} instruction to
+perform a system call. We chose a fairly standard ABI; the \texttt{eax}
+register holds the system call number, while arguments go in registers
+\texttt{ebx}, \texttt{ecx}, etc.
 
 The \texttt{trap} function recognizes interrupt number \texttt{0x30} and calls the
 \texttt{syscall} function, which uses a large \texttt{switch} to delegate each
 system call to a specific handler.
 
-We wrote system call handlers for input and output of a single character. At
-this point we were able to run simple user-mode programs and have them
-interact with the user. The programs could terminate themselves with a
-specific system call, or by triggering any exception.
+We wrote kernel system call handlers for input and output of a single
+character, as well as for process termination. User-mode programs did not have
+a C standard library at this point, so we created one, adding an interface to
+the system calls to the library. At this point we were able to run a simple
+user-mode program and have it interact with the user. 
 
-
-% TODO: also mention that our user-mode programs don't have much of a standard
-% C library (yet)
 
 
 %%%%% LAB 4 %%%%%
 \chapter{Multiprocessing}
-In the previous lab, we reached a point where our kernel could run a single
-user-mode process. The current lab concerns itself with running multiple
-processes concurrently, and having them interact. We implemented preemptive
-multitasking, process forking, and inter-process communication. 
-% TODO: this description misses a few of the following sections. We should
-% update it to include more details.
+In this lab we added the features necessary for running multiple processes
+concurrently and having them interact. 
 
-Before we could do this, however, we needed to implement code for interacting
-with a device called the LAPIC.
+We implemented a simply round-robin scheduler. The scheduler can preempt the
+running process when its time slice is up with the aid of a device called a
+LAPIC, which can generate periodic timer interrupts.
+
+We also wrote code to activate any processors beyond the first, letting
+processes run truly concurrently. 
+
+We implemented a naive fork mechanism which lets proceses spawn more
+processes. We then upgraded its efficiency with a copy-on-write mechanism.
+
+Finally, we added an inter-process communication feature, letting processes
+send values and pages of memory to one another.
+
+
+
+\section{The process scheduler}
+\label{sec:preempt}
+The main purpose of a scheduler is to decide which process to schedule in when
+the running process is scheduled out. There are many ways to make this
+decision, and the scheduler has a great impact on system responsitivity and
+efficiency. 
+
+However for simplicity reasons, we opted for a simple round-robin scheduler.
+That is, the scheduler keeps a circular queue of all processes. The first
+runnable process in the queue is chosen to be scheduled in.
+
+The scheduler also needs to preempt each process when its time slice is used.
+To accomplish this, during kernel initialization the kernel asks a device
+called the LAPIC to raise a timer interrupt periodically, waiting some fixed
+amount of bus cycles between each raised interrupt. Our \texttt{trap} function
+recognizes this timer interrupt and reacts by asking the scheduler to schedule
+in a new process. Interaction with the LAPIC is described in section
+\ref{sec:mpconfig}.
+
+
+
+\section{Activating more processors}
+\label{sec:moreprocs}
+So far the kernel has run on an emulated single-core machine. However a
+machine with $n$ processors can be emulated by passing the \texttt{-smp n}
+option to QEMU.
+
+When a system with multiple processors boots, the hardware dynamically selects
+only a single processor to run. It is called the Bootstrap Processor (BP)
+while the remaining processors, if any, are called Application Processors
+(APs). It is up the the BP to start up the APs when the system is ready.
+
+We wrote code which starts up the APs. This is accomplished by querying the
+LAPIC of the BP, having it send an inter-processor interrupt to each AP. Upon
+receiving such an interrupt, the APs start executing code at an address
+specified by the AP.
+
+The APs start in 16-bit real mode, just as the BP did. They therefore need to
+switch to 32-bit protected mode mode. After doing so, each AP calls into the
+scheduler to run a new process.
+
+% source:
+% https://stackoverflow.com/questions/14261612/which-core-initializes-first-when-a-system-boots
+% which refers to an intel manual
+
+
+
+\section{Ensuring mutual exclusion}
+With multiple processors running concurrently, all the typical issues of
+concurrency arose. Multiple processors could modify kernel data
+simultaneously, leading to race conditions.
+
+We prevented this with a trivial but inefficient approach: we added a lock
+which must be locked before running any kernel code. Thus only one processor
+may run kernel code at a time. Still, user-mode processes can run truly
+concurrently.
+
+The kernel lock is a spinlock. It is a global variable. A processor repeatedly
+uses the \texttt{lock} and \texttt{xchg} instructions to atomically exchange
+the global variable with the value 1. If the old value was zero, the processor
+now holds the lock and may enter the kernel. Otherwise it retries.
+
+We added calls to lock and unlock the kernel in the right places. At this
+point our kernel was capable of running multiple user-mode processes
+concurrently.
+
 
 
 \section{Interacting with the LAPIC}
@@ -692,155 +752,68 @@ with a device called the LAPIC.
 % source: 
 % http://wiki.osdev.org/APIC
 % https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller
-A Programmable Interrupt Controlled (\gls{pic}) is a device which is
-responsible for managing interrupts for the processor. For example, if
-multiple interrupts are generated simultaneously, the \gls{pic} can prioritize
-the interrupts and deliver them one at a time. When Intel updated their
-\gls{pic} standard to include new features, the conforming device was called
-an Advanced PIC (\gls{apic}). The \gls{apic} has a component called the Local
-APIC (\gls{lapic}) which is local to each processor. Thus modern systems have
-one \gls{lapic} per processor.
 
-In section \ref{sec:moreprocs} we need to query the \gls{lapic} to activate
-more processors than just the initial one. Furthermore, in section
-\ref{sec:preempt} we need to ask the \gls{lapic} to generate periodic timer
-interrupts which our scheduler will use to preempt the running process.
-Therefore it is relevant to describe how our kernel communicates with the
-\gls{lapic}.
+In section \ref{sec:preempt} the scheduler had to ask the LAPIC to generate
+timer interrupts for it, and in section \ref{sec:moreprocs} the BP used the
+LAPIC to send inter-processor interrupts to the APs. We therefore needed code
+to query the LAPIC.
 
-The processor can communicate with its \gls{lapic} using Memory-Mapped I/O
-(\gls{mmio}). This means that the \gls{lapic} is mapped into memory at a
-specific, system-dependent physical address. Reading at certain offsets will
-correspond to reading from certain registers in the \gls{lapic}, and likewise
-for writing.
+First, however, we explain the acronym. A Programmable Interrupt Controller
+(PIC) is a hardware device responsible for managing interrupts for the
+processor. For example, if multiple interrupts are generated simultaneously,
+the PIC can prioritize the interrupts and deliver them one at a time. When
+Intel updated their PIC standard to include new features, the conforming
+device was called an Advanced PIC (APIC). The APIC has a component called the
+Local APIC (LAPIC) which is local to each processor.
 
-This means that to communicate with the \gls{lapic}, the kernel merely needs
-to read and write to certain addresses. The difficult part is figuring out the
-physical address where the \gls{lapic} resides.
+The processor communicates with the LAPIC using Memory-Mapped I/O
+(\gls{mmio}). This means that the LAPIC is mapped into memory at a specific,
+system-dependent physical address. Reading at certain offsets will correspond
+to reading from certain registers in the LAPIC and likewise for writing. Thus
+to communicate with the LAPIC, the kernel merely needs to read and write to
+certain addresses. The difficult part is figuring out the physical address
+where the LAPIC resides.
 
-There are multiple ways to find the \gls{lapic}. For now, our kernel uses the
-method described in Intel's multi-processor specification. We will refer to
-this as the \gls{mpconfig} method.
+There are multiple ways to find the LAPIC. For now, our kernel uses the method
+described in Intel's multi-processor specification, which we will refer to as
+the \gls{mpconfig} method. It involves searching through parts of physical
+memory to find a structure called the MP floating pointer structure. This
+structure points to a table called the MP configuration table, which contains
+the physical address of the \gls{lapic}. 
+% TODO: mention that we were given mpconfig code
 % TODO: insert reference to specification..
 
-We leave out the details for brevity, but the method boils down to the
-following. The kernel searches for a structure called the MP floating pointer
-structure. It does so by looking in certain parts of physical memory for the
-string "\_MP\_", validating a checksum on the memory to ensure that this was
-not a false positive. This structure points to a table called the MP
-configuration table, which contains the physical address of the \gls{lapic}. 
-% TODO: mention that we were given mpconfig code
-
-
-
-\section{Activating more processors}
-\label{sec:moreprocs}
-So far we have been running our kernel on an emulated machine with a single
-processor. A system with $n$ processors can be emulated by passing the
-\texttt{-smp n} option to QEMU.
-
-When a system with multiple processors boots, the hardware dynamically selects
-one of the processors to be the Bootstrap Processor (\gls{bp}). The other
-processors are called Application Processors (\gls{ap}s). At first, only the
-\gls{bp} runs. It is up to the \gls{bp} to start up the remaining \gls{ap}s
-once the system is ready.
-
-Up to this point, only the \gls{bp} had been running our kernel so far;
-\gls{ap}s were never activated. We therefore needed to write code which starts
-the \gls{ap}s. This is done by asking the \gls{lapic} of the \gls{bp} to send
-an Inter-Processor Interrupt (\gls{ipi}) to each of the \gls{ap}s. This
-\gls{ipi} causes the \gls{ap}s to start executing code. The address of the
-code to run is sent as part of the \gls{ipi}.
-
-% TODO: glossary-ize "real mode"
-The \gls{ap}s start in 16-bit real mode, just as the \gls{bp} did. They
-therefore need to switch to 32-bit real mode mode. After doing so, each
-\gls{ap} calls into the scheduler to run a new process.
-
-% source:
-% https://stackoverflow.com/questions/14261612/which-core-initializes-first-when-a-system-boots
-% which refers to an intel manual
-
-\section{Ensuring mutual exclusion}
-With multiple processors running concurrently, all the typical issues of
-concurrency arose. Specifically, multiple processors could modify internal
-kernel structures simultaneously, leading to race conditions.
-
-We prevented this in the trivial but inefficient way: we make sure that at
-most one processor is running kernel code at the same time. In other words,
-our kernel is not truly concurrent. Still, user-mode processes \emph{can} run
-truly concurrently.
-
-The "big kernel lock" is a spinlock. It is essentially a global variable which
-determines whether the kernel is locked. A processor repeatedly uses the
-\texttt{lock} and \texttt{xchg} instructions to atomically exchange the global
-variable with the value 1. If the global value was zero, the processor now
-holds the lock and may enter the kernel. Otherwise it must retry.
-
-We added calls to lock and unlock the kernel in the right places. At this
-point our kernel was capable of running multiple user-mode processes
-concurrently. However these processes ran forever, so we needed a scheduler
-next.
-
-
-\section{Process scheduling}
-\label{sec:preempt}
-The scheduler has as its main responsibility to pick a new process to run
-whenever the current process is scheduled out. We opted for round-robin
-scheduling.
-
-That is, the scheduler keeps a circular queue of all processes. To find the
-next process, the scheduler retrieves the next process from the queue until it
-finds one that is runnable, at which point the scheduler is done.
-
-The scheduler also needs a way to preempt each process when its time slice
-runs out. To accomplish this, during kernel initialization the kernel asks the
-\gls{lapic} to raise a timer interrupt periodically, waiting some fixed amount
-of bus cycles between each raised interrupt. Our \texttt{trap} function then
-recognizes this timer interrupt and reacts by asking the scheduler to schedule
-in a new process.
-
-Our scheduler has much room for improval. Round-robin scheduling is not as
-performant as more advanced algorithms. Additionally, it does not allow
-adjustment of process priorities. Scheduling being a linear-time operation is
-potentially worrying. 
-
-A final issue is that the time slice assigned to each process is always of the
-same duration. It would be useful to assign shorter time slices and more
-frequent schedulings to processes which need to feel responsive (such as
-graphics-based processes introduced later) and longer time slices to processes
-that perform heavy computations.
 
 
 \section{A simple fork mechanism}
-So far, every process was directly spawned by the kernel. However, processes
-should also be able to spawn more processes. We therefore needed to implement
-a mechanism to let a process fork. In this section we describe our initial,
-simple implementation of fork, and in the following section we improve it by
-introducing a copy-on-write mechanism.
+So far, every process was directly spawned by the kernel. However, a process
+should also be able to spawn processes. We therefore needed a mechanism to let
+a process fork. In this section we describe our initial, simple implementation
+of fork, and in the following section we improve it by introducing a
+copy-on-write mechanism.
 
-Since our kernel is an exokernel, we prefer
-to do as much work as possible outside of kernel land. We therefore wrote a
-number of system calls which can be combined to implement a user-mode fork.
-Specifically, we wrote the following system calls:
+Since our kernel is an exokernel, we prefer to keep code outside of kernel
+land. We therefore wrote a number of system calls which can be combined to
+implement a user-mode fork. Specifically, we wrote the following system calls:
 \begin{itemize}
-\item	\texttt{sys\_exofork}: creates a non-runnable child process with an empty address space.
-\item	\texttt{sys\_env\_set\_status}: can mark a process as runnable.
-\item	\texttt{sys\_page\_alloc}: allocates an empty page in the address space of a process.
-\item	\texttt{sys\_page\_map}: maps a page from the current process into a child process.
-\item	\texttt{sys\_page\_unmap}: unmaps a page from the current process or a child process.
+\item	\texttt{sys\_exofork} creates a non-runnable child process with an empty address space.
+\item	\texttt{sys\_env\_set\_status} can mark a process as runnable.
+\item	\texttt{sys\_page\_alloc} allocates an empty page in the address space
+of a process.\footnote{For security reasons, the system calls are coded to
+ensure that a process cannot modify pages in unrelated, non-child processes.}
+\item	\texttt{sys\_page\_map} maps a page from the current process into a child process.
+\item	\texttt{sys\_page\_unmap} unmaps a page from the current process or a child process.
 \end{itemize}
+
 Besides these system calls, it is also necessary for a process to have access
 to information about the layout of its own address space. This is already the
-case; in section \ref{sec:pagetables} on page table management, we set up the
-page table of a process such that part of the address space contains the page
-table itself.
+case; in section \ref{sec:pagetables} we set up the page table of a process
+such that part of the address space contains its page table.
 
 To fork, a parent process goes through the following steps:
 \begin{itemize}
 \item The parent process calls \texttt{sys\_exofork} to create a new child
-process with an empty address space. The child process is not initially
-runnable.
+process with an empty address space which is not initially runnable.
 \item The parent walks over its page table, and for each mapped page, it does
 the following:
 \begin{itemize}
@@ -857,18 +830,18 @@ from its own address space.
 \texttt{sys\_env\_set\_status}. 
 \end{itemize}
 At this point the fork is complete, and since the child is marked as runnable,
-the scheduler will eventually schedule it in.
+it will eventually be scheduled in.
 
-Note that for security reasons, the system calls are coded to ensure that a
-process cannot modify pages in other, non-child processes.
 
 
 \section{Copy-on-write fork}
-The simple version of fork described in the previous section is slow and
+% TODO: this section needs more polishing, it's a bit hard to understand
+% what's going on..
+The fork mechanism described in the previous section is slow and
 memory-inefficient, because it indiscriminately copies every page of the
-parent into the child process. This involves a lot of copying, and it means
-that if the parent used $n$ physical pages of memory, then after a fork, $2n$
-physical pages will be used.
+parent into the child process. This involves a lot of reading and writing of
+RAM, and it means that if the parent used $n$ physical pages of memory, then
+after a fork, $2n$ physical pages will be used.
 
 However the same physical page can transparently be mapped into both the
 parent and child process, as long as it is never modified. In fact, \emph{all}
@@ -878,47 +851,46 @@ a copy-on-write fork mechanism almost entirely in user land, following the
 exokernel design philosophy.
 
 To perform as much work in user land as possible, we implemented a mechanism
-which lets a process handle its own page faults. By default, the kernel will
-terminate the running process if a page fault occurs. However we have
-implemented a system call, \texttt{sys\_env\_set\_pgfault\_upcall}, which lets
-a process set a handler function. If a handler is set, the kernel will handle
-a page fault by modifying the saved \gls{eip} and \gls{esp} registers of the
-process, pushing the old register values onto an exception stack, and
-switching the process back in.
+which lets a process handle its own page faults. By default a page fault will
+result in process termination. However we have implemented a system call,
+\texttt{sys\_env\_set\_pgfault\_upcall}, which lets a process set a handler
+function. Then the kernel will handle a page fault by modifying the saved
+\gls{eip} and \gls{esp} registers of the process, pushing the old register
+values onto an exception stack, and switching the process back in.
 
-Now, when a process forks, \emph{all} pages are shared between the parent and
-child process. However writable pages have their writable bit removed from
+When a process forks, \emph{all} pages are initially shared between the parent
+and child process. However writable pages have their writable bit removed from
 their page table entry (\gls{pte}). Instead we set another bit which marks the
 page as copy-on-write.
 
-If either the child or parent process attempts to write to said page, a page
-fault will occur, since the page is not writable anymore. The kernel delegates
-to the registered user-mode handler function. The handler then uses the same
-method as in the simple fork implementation to map a new writable page, copy
-the contents of the old page onto it, and replace the copy-on-write page with
-the new writable page.
+When the child or parent process attempts to write to one of the now-shared
+pages, a fault will occur since the page is not writable anymore. The kernel
+sees that the copy-on-write bit is set, and then it delegates to the
+registered user-mode handler. The handler then uses the same method as in the
+simple fork implementation to map a new writable page, copy the contents of
+the old page onto it, and replace the copy-on-write page with the new writable
+page.
 
 
 \section{Inter-process communication}
-Since our kernel is an exokernel, many of the features implemented in later
-labs will reside in user land. Two examples are a file system daemon, and a
-daemon implementing a network stack. Other processes need a way to interact
-with these daemons to make use of their services. We therefore have need of an
-inter-process communication (\gls{ipc}) mechanism.
+Since this project follows the exokernel philosophy, many future features will
+reside in user land. Two examples are a file system daemon and a daemon
+implementing a network stack. Other processes need an inter-process
+communication (IPC) mechanism to make use of these daemons.
 
 We therefore implemented two system calls, \texttt{sys\_ipc\_recv} and
-\texttt{sys\_ipc\_try\_send}, which enable \gls{ipc}. When a process calls 
-\texttt{sys\_ipc\_recv}, it will hang waiting for a process to send it data.
-\texttt{sys\_ipc\_try\_send} will send data to a process in a non-blocking
-fashion. By default, a 32-bit integer is sent between processes, but for
-efficiency an extra argument to the system calls allows the sender to share a
-full page of memory with the recieving process.
+\texttt{sys\_ipc\_try\_send}. When a process calls \texttt{sys\_ipc\_recv} it
+will hang, waiting to receive data. \texttt{sys\_ipc\_try\_send} will send
+data to a process in a non-blocking fashion. By default, a 32-bit integer is
+sent between processes, but for efficiency an extra argument to the system
+calls allows the sender to share a full page of memory per system call.
+
 
 
 This marks the end of the multiprocessing lab. Our kernel can now run
 user-mode processes in a truly concurrent fashion. A scheduler manages the
-running processes, preempting them when necessary. Processes can efficiently
-fork and communicate via \gls{ipc}.
+running processes, preempting them when necessary, and processes can
+efficiently fork and communicate via IPC.
 
 
 %%%%% LAB 5 %%%%%
@@ -1401,15 +1373,15 @@ the superblock resides thereafter.
 
 
 \section{Finding the LAPIC}
-Usually the LAPIC generates clock interrupts periodically, and on such an
-interrupt the scheduler switches in a new process. However no clock interrupts
+Usually the LAPIC generates timer interrupts periodically, and on such an
+interrupt the scheduler switches in a new process. However no timer interrupts
 were generated, and thus only one process got any processing time. 
 
 In section \ref{sec:mpconfig} we described how our kernel uses the so-called
 \gls{mpconfig} method to find the LAPIC; that is, it looks for an MP
 configuration table in memory to find the physical address of the LAPIC. This
 physical address is used to communicate with the LAPIC, asking it to generate
-clock interrupts. However our kernel failed to find these MP configuration
+timer interrupts. However our kernel failed to find these MP configuration
 tables. They were simply not present in the memory of the netbook.
 
 It turns out that the \gls{mpconfig} method is outdated and unsupported by
@@ -1423,7 +1395,7 @@ region of memory for a data structure called the RSDP, which points at another
 data structure, the RSDT, which finally points at the ACPI tables.
 
 After implementing this finding and parsing of ACPI tables, the kernel found
-the LAPIC and clock signals were generated, letting the scheduler work as
+the LAPIC and timer interrupts were generated, letting the scheduler work as
 intended.
 
 Then another bug was uncovered.
@@ -1478,6 +1450,18 @@ netbook.
 % - more efficient display server
 % - more drivers.... e.g. network cards.
 
+
+% TODO: I moved this paragraph here from the scheduler.
+% Our scheduler has much room for improval. Round-robin scheduling is not as
+% performant as more advanced algorithms. Additionally, it does not allow
+% adjustment of process priorities. Scheduling being a linear-time operation is
+% potentially worrying. 
+% 
+% A final issue is that the time slice assigned to each process is always of the
+% same duration. It would be useful to assign shorter time slices and more
+% frequent schedulings to processes which need to feel responsive (such as
+% graphics-based processes introduced later) and longer time slices to processes
+% that perform heavy computations.
 
 \chapter{Conclusion}
 - conclusion
