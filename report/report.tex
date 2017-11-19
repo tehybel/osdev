@@ -1,7 +1,7 @@
 \documentclass{report}
 %\documentclass[10pt,letterpaper]{scrartcl}
 
-\usepackage[dottedtoc,manychapters]{classicthesis}
+\usepackage[dottedtoc,manychapters,floatperchapter]{classicthesis}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{amsfonts}
@@ -219,30 +219,60 @@
 \makeglossaries
 
 
+\begin{document}
 
-\title{
-%\line(1,0){250}\\
-\Large \bfseries
+\pagenumbering{roman}
+% TODO. the numbering is off.
+
+
+\begin{titlepage} % Suppresses headers and footers on the title page
+
+\centering % Centre everything on the title page
+
+\rule{\textwidth}{1pt} % Thick horizontal rule
+\vspace{2pt}\vspace{-\baselineskip} % Whitespace between rules
+\rule{\textwidth}{0.4pt} % Thin horizontal rule
+\vspace{0.1\textheight} % Whitespace between the top rules and title
+
+{\Huge \bfseries
 % TODO improve this title.
 Operating System \\ Implementation
-%\line(1,0){250}
 }
-\author{Thomas Hybel}
-%TODO: have your email here.
-\date{Aarhus University \\ November 2017}
 
-\begin{document}
-\pagenumbering{roman}
-\maketitle
+\vspace{0.010\textheight} % Whitespace between the title and short horizontal rule
+\rule{0.3\textwidth}{0.4pt} % Short horizontal rule under the title
+\vspace{0.01\textheight} % Whitespace between the thin horizontal rule and the author name
+
+{\Large \textsc{Thomas Hybel}} \\[0.5\baselineskip]
+{\Large \textsc{Aarhus University}} \\[0.5\baselineskip]
+{\Large \textsc{November 2017}} 
+
+\vfill % Whitespace between the author name and publisher
+
+
+
+%------------------------------------------------
+%	Bottom rules
+%------------------------------------------------
+
+\rule{\textwidth}{0.4pt} % Thin horizontal rule
+\vspace{2pt}\vspace{-\baselineskip} % Whitespace between rules
+\rule{\textwidth}{1pt} % Thick horizontal rule
+
+\end{titlepage}
+
+
+%TODO: have your email in the title page
+
 
 \begin{abstract} 
 \noindent 
 TODO: write an abstract here.
 \end{abstract}
-\newpage
+
 
 \tableofcontents
-\newpage
+
 \pagenumbering{arabic}
 
 
@@ -326,19 +356,11 @@ assembly and should switch processor modes.
 The most important difference between real and protected mode is that real
 mode does not support the use of a page table to implement virtual memory.
 
-To switch to protected mode, a bit needs to be set in the control register
-\gls{cr0}. We do so with the following assembly code:
-\begin{verbatim}
-# protected mode enable flag
-.set CR0_PE_ON, 0x1 
-movl    %cr0, %eax
-orl     $CR0_PE_ON, %eax
-movl    %eax, %cr0
-\end{verbatim}
-
-We do not immediately enable virtual memory, though, since we do not yet have
-the infrastructure to set up a proper page table. This happens in section
-\ref{sec:mem}. Until then, all addressing is physical.
+We switch to protected mode by setting a bit in the control register
+\texttt{cr0}. Enabling virtual memory similarly works by setting another bit
+in \texttt{cr0}. We do not immediately enable virtual memory, though, since we
+do not yet have the infrastructure to set up a proper page table. This happens
+in section \ref{sec:mem}. Until then, all addressing is physical.
 
 To switch to 32-bit mode, we must update the \texttt{cs} (code segment)
 register. The \texttt{cs} register is an offset into a table called the Global
@@ -478,7 +500,7 @@ uses the newly implemented functions to insert these into the table.
 The memory layout of the address space of the kernel is largely up to us.
 Figure \ref{memlayout} gives a simplified overview of the layout we opted for.
 \begin{figure}
-    \centering
+\begin{framed}
 \begin{Verbatim}[fontsize=\small]
 Virtual memory map:                                  Permissions
                                                      kernel/user
@@ -517,8 +539,9 @@ Virtual memory map:                                  Permissions
                     :              .               :                 
                     +------------------------------+ 0x00000000
 \end{Verbatim}
-    \caption{The virtual address space of the kernel}
-    \label{memlayout}
+\end{framed}
+\caption{The virtual address space of the kernel}
+\label{memlayout}
 \end{figure}
 The diagram shows that the kernel code resides starting at virtual address
 \texttt{0xf0000000}. The kernel stacks, used by processors when running
