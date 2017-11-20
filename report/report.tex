@@ -1078,87 +1078,60 @@ $ cat motd
 The goal of this lab was to connect our kernel to the internet by writing a
 network card driver.
 
-\section{The e1000 network card}
-The operating system is connected to network via a network card. The network
-card has as its main responsibility to send and receive packets by interacting
-with the physical layer, such as a wire.
+\section{The network card}
+The operating system connects to a network using a network card, whose task it
+is to send and receive packets by interacting with the physical layer. QEMU
+emulates the Intel e1000 network card, which we therefore targeted. We added
+the card to our emulated machine with the "-net nic,model=e1000" option to
+QEMU, which creates a virtual router at IP 10.0.2.2 and assigns the guest an
+IP of 10.0.2.15. This let us hardcode the the IP address rather than having to
+implement a DHCP client or similar.
 
-The network card emulated by QEMU is the Intel e1000. We therefore need to
-write a driver for this card. The task of the driver is to discover the
-network card, initialize and enable it, drain incoming packets from the card,
-and deliver outgoing packets to the card.
+% %TODO: insert reference to the manual and a proper name..
+The e1000 manual describes in detail the internals of the card, as well as the
+steps a driver must take to initialize the card, read incoming packets, and
+transmit outgoing packets. 
 
-We found all the details needed for the driver in the manual. It describes in
-detail how the card works, how it should be initialized, and so on.
-%TODO: insert reference to the manual and a proper name..
+The e1000 maintains two circular packet queues: a transmit queue and a receive
+queue. To send a packet, the kernel adds it to the transmit queue, which the
+network card periodically drains. When a packet arrives on the wire, the
+network card adds it to the receive queue, which the kernel periodically
+drains.
 
-The e1000 card is connected through \gls{pci}. Our kernel uses \gls{pio} to
-scan the PCI bus, iterating over all connected devices. Each device has
-numbers representings its class, subclass, vendor ID and device ID. The kernel
-uses these numbers to recognize the e1000 card if it is connected. The
-\gls{pci} interface lets us determine a physical address at which the e1000
-card is mapped. 
+The items in the queues are not raw packets, but rather small descriptor
+structs, each of which describes an area of physical memory which can hold a
+packet. The queues are implemented as arrays, with each queue having a head
+and tail register to keep track of the head and tail of the queue.
 
-This completes the discovery phase; the kernel can now use \gls{mmio} to
-communicate with the card. Concretely, this means that the various registers
-of the network card can be found at specific offsets from the base address
-found via \gls{pci}. In other words, the registers of the card can be read
-from and written to by simply reading or writing at certain memory addresses.
 
-The next step is initializing the card. We next describe the data structures
-which the card uses, since these are what need to be initialized.
 
-\section{Packet queues}
-Overall, the e1000 network card uses two circular queues for holding packets.
+\section{The network card driver}
+We wrote an e1000 network card driver using the information from the manual.
+Our kernel uses \gls{pio} to scan the PCI bus, iterating over each connected
+device until it finds one whose vendor and device ID indicate it being an
+e1000 network card. The PCI interface supplies a physical address where the
+driver can use \gls{mmio} to communicate with the e1000.
 
-One queue, the transmit queue, is for packets which are yet to be sent. When
-the kernel wants to transmit a packet, it places it into this queue. The e1000
-periodically drains this queue and puts the packets on the wire.
+With communication possible, the first task of the driver was to initialize
+the network card. The driver allocates the arrays that make up the packet
+queues and fills these with valid descriptors. It zeroes out the head and tail
+registers.
 
-The other queue, the receive queue, is for packets which the e1000 has
-received but which have not yet been claimed by the kernel. Thus when a new
-packet arrives on the wire, the e1000 picks it up and deposits it into the
-receive queue. The kernel then periodically drains this queue.
+Once our driver has initialized the card, it writes into a register to enable
+it. It is then possible to transmit and receive packets. Our driver implements
+the code for taking packets from the receive queue and inserting packets into
+the transmit queue. User-mode programs have access to this driver
+functionality through two system calls, \texttt{sys\_receive} and
+\texttt{sys\_transmit}, respectively.
 
-Each queue is implemented as an array of descriptor structs. A descriptor
-contains a physical address and a size, and thus it describes a memory area
-which can hold one packet. Each queue also has a tail index register and a
-head index register which are used during insertion and removal of packets.
+If the transmit queue ever becomes full due to the card draining it too
+slowly, it is up to the driver what should happen. For simplicity we have
+chosen to simply drop the packet if the queue is full. This is not a problem
+because the higher-level protocols are resistant to packet loss. Alternatively
+the driver could have blocked, waiting for space in the queue. If, on the
+other hand, the receive queue is full, the e1000 is designed to simply drop
+further packets.
 
-This means that when a packet arrives from the network, the e1000 card finds
-the descriptor at the tail of the receive queue, copies the raw packet data
-into the described memory area, and advances the tail register. The kernel
-takes a packet out of the queue by copying the raw packet out of the
-descriptor at the head of the queue, and then incrementing the head register.
-Transmission of packets is analogous.
-
-This raises the question of what should happen if one of the queues is full.
-According to the manual, if the receive queue is full, the e1000 card will
-simply drop further packets. However if the transmit queue is full, it is up
-to the kernel what should be done. The kernel could potentially store packets
-until the network card has drained the queue. However for simplicity we have
-decided to simply drop packets if the transmission queue is full. We are free
-to do this since the protocols on higher levels of the network stack handle
-packet loss.
-
-\section{The e1000 driver}
-Before the card can be enabled, our driver must initialize these queues. That
-is, it must allocate the physical pages required to hold the queues
-themselves. It must also allocate pages for the raw packet contents, and fill
-out the addresses and lengths into the descriptors in the queues. The head and
-tail registers of each queue must also be reset. 
-
-Once our driver has done this, it writes into a register to enable the card.
-From this point it is possible to transmit and receive packets. Our driver
-implements the code for taking packets from the receive queue and inserting
-packets into the transmit queue. User-mode programs have access to this driver
-functionality through two system calls, \texttt{sys\_transmit} and
-\texttt{sys\_receive}.
-
-% TODO: we should reorder these subsections; we should first describe the card
-% in a general sense (here is how to discover it, here is how it works with
-% queues, etc.).. and then, in a separate section, we should describe what our
-% driver does.
 
 % TODO: lesson: writing drivers is tricky. (debugging: QEMU source modification)
 
@@ -1176,16 +1149,14 @@ as input, and producing packets as output.
 Rather than adding lwIP to the kernel, we embedded it in a network daemon. The
 daemon is responsible for managing sockets, just as the file system daemon was
 responsible for managing file descriptors. The network daemon takes in
-\texttt{send} requests via IPC, produces packets, and hands these over to the
+requests to send data via IPC, produces packets, and hands these over to the
 operating system via the \texttt{sys\_transmit} system call. Likewise, it
-takes in \texttt{receive} requests and uses \texttt{sys\_receive}, parses the
-resulting packets, and hands over the data to the other process.
+takes in requests to receive data and uses \texttt{sys\_receive}, parses the
+resulting packets, and hands over the data to the requesting process.
 
 The IPC communication is hidden away in the C standard library, such that
-user-mode programs have access to the usual \texttt{connect}, \texttt{send}
-and \texttt{receive} interface.
-
-% TODO: we have not written about MACs and ip address assignment..
+user-mode programs have access to the familiar \texttt{connect}, \texttt{send}
+and \texttt{recv} interface.
 
 
 \section{Web server}
@@ -1196,6 +1167,8 @@ system daemon and the network daemon.
 We configured QEMU to forward requests at port 80 to the emulated machine. At
 this point we were able to point a browser at the machine and be served a
 working web page.
+
+% TODO: maybe insert a screenshot.
 
 
 
