@@ -1046,6 +1046,7 @@ cache entry is invalidated through a write.
 
 
 \section{Shell}
+\label{sec:shell}
 To test the interaction between programs and the disk, we implemented a
 simplistic shell which allows loading and execution of programs from disk. The
 shell allows reads from and writes to the disk through input redirection
@@ -1195,7 +1196,7 @@ graphics library to draw pixels and more complex shapes.
 
 We then designed a graphics stack, which involved deciding how input and
 output events should flow through the system, from kernel to user application.
-We decided upon a design with a central display server which is responsible
+We decided upon a design with a central display server, which is responsible
 for rendering all of the screen and which acts as an intermediary for input
 and output events.
 
@@ -1215,7 +1216,7 @@ RGB value of a pixel on the screen. Thus to write a pixel to the screen, the
 kernel must simply calculate the correct offset into the LFB and write a
 32-bit integer there.
 
-The kernel queries the BIOS to set a video mode, which is done using the
+The kernel queries the BIOS to set a video mode using the
 \texttt{int 0x10} instruction. This transfers execution to the BIOS. However
 since the BIOS is written as 16-bit real mode code, our kernel must switch the
 processor back to 16-bit real mode before it can issue the interrupt.
@@ -1237,44 +1238,44 @@ inside a graphics library which is available to user space applications.
 
 
 \section{Graphics stack design}
-% <--- TODO got to here.
-To design our graphics stack, we first read up on how graphics work in common
-operating systems and used this as a basis for our design. We decided to
-have a central privileged process, called the display server, which is
-responsible for most of the work.
+To implement a user interface, we needed to decide how input and output events
+should flow through the system. When a mouse click or key press occurs, the
+kernel receives an interrupt. How should this event arrive at a user space
+application, and which should it be? Should a user space application render
+its own pixels? If so, how does it know which parts of the LFB it can write to
+without clashing with other applications? 
 
-The display server is responsible for spawning other graphical applications,
-assigning a portion of the screen to each application. The display server is
-the only process with access to the LFB, so it is responsible for
-drawing all pixels to the screen. 
+After considering these questions and reading about how other operating
+systems render graphics, we decided to let all events flow through a central
+privileged process, called the display server. 
 
-Each graphical application is spawned by the display server. When this
-happens, the two set up an area of shared memory through \gls{ipc}. This
-memory is called the canvas of the application. The application can write
-pixels into the canvas, and the display server will periodically read the
-pixels from the canvas and write them to the LFB.
+The display server takes input events from the kernel and delivers them to the
+target application. Each application has a canvas. The display server takes
+output events from the applications, in the form of changes to the canvas, and
+writes the changes to the LFB.
 
-Graphical applications wait in a so-called event loop; they continuously wait
-for input events to arrive from the display server. When an input arrives, the
-application handles it and can make changes to its canvas on this basis.
+Each graphical application waits to receive events from the display server in
+an event loop. The application can make changes to its canvas on the basis of
+an event occurring.
 
 The kernel keeps a queue for input events. When raw input packets arrive from
 the mouse or keyboard, a driver handles these packets by putting them into an
 event queue. The display server periodically drains this queue through a
-system call. It then forwards each event to the appropriate application.
+system call, forwarding the events.
 
-A graphics library provides common functionality needed by the user
-applications and the display server. The library provides functions for
-rendering rectangles, straight lines, fonts, and windows.
-
-The following diagram shows an overview of the different components and how
-they interact with each other:
+Figure \ref{graphicslayout} shows an overview of the different components in
+the graphics stack and how they interact. 
+\begin{figure}[h!]
+\begin{framed}
 % TODO insert a diagram.
+TODO make this figure.
+\end{framed}
+\caption{The graphics stack layout}
+\label{graphicslayout}
+\end{figure}
 
-
-Thus imagine that a user sits in front of the machine with a terminal emulator
-application open and active. If the user presses the 'A' key, the following
-series of events will occur: 
+The following sequence of events exemplifies the flow of events through the
+graphics stack:
 \begin{itemize}
 \item The user presses the 'A' key.
 \item The keyboard generates an interrupt to signal to the kernel that input
@@ -1291,46 +1292,86 @@ to run a command once the user presses the enter key.
 \item The terminal application also wants to display the 'A' on the screen, so
 that the user can see what is written so far. The application therefore asks
 the graphics library to render an 'A' on its canvas using the default font.
-\item The display server writes the pixels from the canvas into part of the
-LFB.
+\item The display server writes the pixels from the canvas into the part of the
+LFB that contains the application window.
 \item The user sees the 'A' appear on screen.
 \end{itemize}
+We describe the details of how we have implemented the display server in the
+following section.
 
 
-% TODO: tie these sections together better
+\section{The display server}
+Various events must be performed periodically by the display server: it must
+drain input events from the kernel and deliver these to applications, and it
+must render the canvases of applications by writing to the LFB. We show the
+code for the main loop of the display server in figure \ref{displayserver}.
+\begin{figure}[h]
+\begin{framed}
+\begin{Verbatim}[fontsize=\small]
+while (1) {
+	// drain input events from the kernel 
+	// and decide how to handle them
+	process_events();
 
-\section{Details of the display server}
-The display server needs to have write access to the LFB, which is
-mapped at a physical address by the BIOS. To accomplish this, the display
-server uses a new system call, \texttt{sys\_map\_lfb}, which causes the kernel
-to add the LFB to the page table of the display server.
-% TODO: rephrase this to "we could make the kernel write to LFB, but instead
-% for effiency we map it directly via page tables"
-% then the title of this can be "effiency"..
+	// deliver events to targeted applications
+	transmit_events();
 
-It is highly important that the display server is efficient; if it runs too
-slowly, the system will have a low frame rate, and interaction will feel
-choppy. We had to carefully optimize the code for the display server before we
-got an acceptable frame rate inside QEMU.
+	// draw the desktop background
+	draw_background();
 
-One of the optimizations is the following. The display server takes the
-content of each canvas and writes it into the LFB. However if
-canvases overlap, there is no need to first write the lower canvas into the
-\gls{lfb}, and then immediately overwrite it with the canvas that is on top.
-We therefore introduced a buffer held in RAM. The display server first
-constructs the final canvas in this buffer, and then copies each pixel once
-and for all into the LFB.
+	// draw each application in the correct order
+	draw_applications();
 
-% TODO: write about this: - uses simple data structures (linked lists)
+	// finally, draw the cursor on top
+	draw_cursor();
+	
+	// write the changes to the LFB
+	refresh_screen();
+}
+\end{Verbatim}
+\end{framed}
+\caption{The main loop of the display server}
+\label{displayserver}
+\end{figure}
+
+The display server is responsible for writing the pixels of every application
+into the LFB. For efficiency the display server bypasses the kernel and writes
+directly to the LFB, which is accomplished by mapping the LFB into the address
+space of the display server using a new system call, \texttt{sys\_map\_lfb}.
+
+The display server is responsible for spawning every other graphical
+application and assigning the application a portion of the screen. When
+spawning an application, an area of shared memory is set up through \gls{ipc}.
+This memory is the canvas of the application. The application can write pixels
+into the canvas, and the display server will periodically read the canvas and
+write any changes to the LFB. 
+
+The display server determines the ordering of applications along the z-axis,
+drawing the pixels of the topmost application last. It also determines which
+application is currently active and directs key presses only to it.
+
+It is highly important that the display server be efficient; if it runs too
+slowly, the system will have a low frame rate, with interaction feeling
+choppy. We had to carefully optimize the code for the display server before
+we got an acceptable frame rate inside QEMU.
+
 
 
 \section{Sample graphical applications}
-We have written two sample graphical applications. One is a simple terminal
-emulator. The other is a simple paint program.
+To test our design and implementation we have written two simple graphical
+applications: a paint program and a terminal emulator. 
 
-% TODO: maybe describe these in some more detail?
+The paint program allows the user to click its canvas, drawing a square as a
+result.
 
-% TODO: fit in details about PS/2 mouse driver somewhere.
+The terminal emulator accepts keyboard input. It renders the input as the user
+types it. When the enter key is pressed, the terminal emulator forwards the
+input to a non-graphical process running the simple shell which we described
+in section \ref{sec:shell}. The output of this shell process is displayed to
+the user inside the terminal emulator.
+
+An interaction with the two applications is displayed in figure \ref{desktop}.
+% TODO: insert this figure.
 
 
 
