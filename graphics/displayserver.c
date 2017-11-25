@@ -551,14 +551,22 @@ void umain(int argc, char **argv) {
 	foreground_application = term;
 
 	while (1) {
+		// drain input events from the kernel and decide how to handle them
 		process_events();
 
+		// deliver events to targeted applications
 		transmit_events();
 
+		// draw the desktop background
 		draw_background();
+
+		// draw each application in the correct order
 		draw_applications();
+
+		// finally, draw the cursor on top
 		draw_cursor();
 
+		// write the changes to the LFB
 		refresh_screen();
 
 		// TODO: add some kind of rate limiting so we don't eat all the CPU
