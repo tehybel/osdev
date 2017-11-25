@@ -23,6 +23,8 @@
 % \newcommand{\sectionbreak}{\clearpage}
 
 
+
+
 \usepackage{xcolor}
 
 % TODO: find a nicer way to indicate that text is a link.
@@ -1382,95 +1384,97 @@ An interaction with the two applications is displayed in figure \ref{desktop}.
 
 %%%%% HARDWARE LAB %%%%%
 \chapter{Hardware}
-Up to this point, our kernel had always been running in the QEMU emulator. In
-this lab, our goal was to get it running on real hardware, specifically a
-Packard Bell Dot S netbook. The road there was paved with surprisingly many
-complications. Most of the issues were caused by the fact that QEMU emulates
-different hardware than that of the netbook. There were also instances where
-QEMU did not emulate certain aspects of a machine faithfully, causing latent
-bugs to surface on real hardware.
+In this lab we saught to run our operating system on real hardware rather than
+the QEMU emulator.
+
+The main cause of difficulty was that our chosen hardware differed from the
+hardware emulated by QEMU. Additionally, there are aspects of a machine that
+QEMU does not emulate faithfully for efficiency reasons, but which matter when
+writing an operating system. This caused latent bugs to surface once we
+switched to real hardware.
+
+In the following sections we describe the steps we took to get our operating
+system running on our machine of choice, a Packard Bell Dot S netbook.
 
 
 \section{Booting from USB}
-The build process of our kernel produces a raw disk image which QEMU will
-boot. The first block of this image is the boot loader, which the BIOS loads
-and transfers execution to as described in section \ref{sec:lab1}. Since QEMU
-will boot from this image, we figured that so would the netbook. We put the
-raw disk image on a USB drive and had the netbook boot from it. However the
-netbook did not recognize the USB as a bootable medium.
+To boot our operating system we had to write its raw disk image to a medium
+which our netbook could boot from, such as a hard drive or a USB drive. We
+preferred to boot from a USB drive, since writing to the hard drive would
+require either cable access or booting into a different operating system,
+which would be slow and tedious.
 
-It turns out that a USB drive must have a valid data structure called a Master
-Boot Record (MBR) in its first block, otherwise most machines will not
-recognize the drive as bootable. The MBR must also contain a valid data
-structure called the BIOS Parameter Block (BPB).
+When we supplied our raw disk image to QEMU, it booted as expected. We
+therefore expected that the same would happen when we transferred the image to
+a USB drive and inserted it into the netbook. However the USB was not
+recognized as a bootable medium. 
 
-The reason for this is historical; when USB technology was new, there was
-disagreement on whether a USB drive should be a raw storage drive or a
-bootable medium. Initially the user could decide through a BIOS setting. But
-for usability reasons, manufacturers eventually instead used heuristics to
-detect whether a USB is bootable or not. These heuristics are based on the
-MBR and BPB.
+The reason turns out to be historical: when USB technology was new, there was
+disagreement between manifacturers on whether a USB drive should be a raw
+storage drive or a bootable medium. Initially the user could decide through a
+BIOS setting. But for usability reasons, manufacturers eventually opted to use
+heuristics to detect whether a USB is bootable or not. 
 
-Once we added a valid MBR and BPB to our boot loader, the netbook booted.
-However the machine got stuck at some point during the boot loader code.
-
-
-\section{No serial connection}
-Previously the kernel printed debugging information through a serial
-connection which QEMU emulated. However we did not have the hardware necessary
-to set up a serial connection to the netbook. We therefore had no output,
-which made it difficult to determine why the boot loader was hanging.
-
-We therefore had to write code which outputs text to the screen instead.
-Before a video mode has been set as described in section \ref{lab:graphics},
-the machine is in text mode. In text mode, by convention a buffer at physical
-address \texttt{0xb8000} represents the text on the screen; we can write characters
-directly into this buffer to show text on screen.
+These heuristics are based on data structures called the Master Boot Record
+(MBR) and BIOS Parameter Block (BPB). Both the MBR and BPB must be present in
+the first sector of a USB drive, otherwise most machines will assume that the
+drive is merely for data storage. Once we added a valid MBR and BPB to our
+boot loader, the netbook booted and the boot loader executed.
 
 
-\section{No USB driver}
+% \section{Writing to the screen}
+% The machine got stuck at some point during execution of the boot loader. When
+% using QEMU we would debug this either by attaching a proper debugger or by
+% inserting print statements through a serial connection into the code.
+% Attaching a debugger to our netbook was infeasible, and we did not have a
+% serial connection. We therefore needed another option for output. 
+% 
+% Before a graphical video mode has been set, the machine is in text mode; it
+% displays text on the screen. In this mode a buffer representing the text on
+% the screen resides at physical address \texttt{0xb8000}. We wrote to this
+% buffer to display output for debugging. 
+
+
+% TODO: <-------- I got to here.
+% We should probably do away with the "booting from a hard drive" section,
+% because it's not very interesting. 
+% Just say that the boot loader got stuck since it didn't have USB support. We
+% could then boot from hard drive instead, but that's too slow and tedious. So
+% we adopted GRUB and that works well..
+% 
+% ^^^^^^^^^^^^^^^^
+
+\section{Booting from a hard drive}
 With the ability to print text to the screen, we figured out why the boot
-loader was hanging. Our boot loader is naively coded such that it loads the
-kernel from a disk connected with an ATA connection. But currently the kernel
-resides on a USB drive, which is a completely different interface.
+loader got stuck. The boot loader is coded such that it loads the kernel from
+a disk connected with an ATA connection. But we had put our kernel on a USB
+drive, which is a completely different interface.
 
-To continue, we needed to write a USB disk driver for the boot loader. However
-the boot loader is still constrained to 512 bytes, since it is loaded from the
-first sector of disk by the BIOS. Fitting a USB driver there is tricky.
+We realized that to continue, we would have to modify our boot loader to
+support loading from USB. However the boot loader is contrained to 512 bytes,
+since the BIOS loads it from the first sector of the drive. Writing code that
+can load from both USB and ATA drives in 512 bytes seemed difficult.
 
-We therefore opted for a different approach. We booted from USB into a Linux
-distribution, and used that to overwrite the hard drive of the netbook with
-our raw kernel image. Now we can boot from a proper hard drive rather than
-USB.
+We therefore opted to boot from the hard drive of the netbook instead of USB,
+since our boot loader already supported the ATA interface. We wrote the kernel
+image to the hard drive by booting into a Linux distribution via USB, and then
+using the "dd" tool to write the image from another USB to the hard drive.
 
-This approach had the major downside of being slow; we had to boot the weak
-netbook into a Linux distribution and enter several commands manually every
-time we wanted to test a new iteration of our kernel. This slowed development
-speed down significantly.
-
-Additionally, the boot loader continued to get stuck.
-
-
-\section{No SATA support}
-After more debugging we determined the problem: the hard drive in the netbook
-uses a SATA connection, while the machine emulated by QEMU used ATA. Thus
-reading the kernel from disk was failing.
-
-Fortunately, ATA and SATA are almost identical. ATA uses \gls{pio} to
-communicate with the disk on fixed ports. SATA uses the same protocol; the
-only difference is that the ports are machine-specific and must be found with
-\gls{pci}.
-
-So we tried to add PCI support to our boot loader but ran out of space -- we
-only had 512 bytes to work with, after all. As a temporary workaround, we
-booted into a Linux distribution and used the "lspci" tool to figure out the
-SATA I/O ports and hardcoded them. 
+In addition, the hard drive of the netbook was connected with a SATA cable
+rather than the ATA connection emulated by QEMU. Fortunately the interfaces
+are almost identical, so we only had to make minor changes to our boot loader
+code to read from the drive.
 
 With that, the boot loader finally succeeded in loading the kernel, which
-promptly broke; the scheduler was failing to switch in new applications.
+promptly broke; the scheduler failed to switch in new applications.
 
 
 \section{A better boot loader}
+While attempting to debug the scheduler we realized that our development
+process was too unwieldy; booting into a Linux distribution and having to
+manually enter commands every time we made changes to the kernel was too slow
+to make any real progress. 
+
 We attempted to debug the scheduler, but our development process was too slow
 and unwieldy to get anywhere; as mentioned, every time we made a change to the
 kernel code we had to boot into a Linux distribution and enter commands to
@@ -1549,9 +1553,9 @@ perfectly.
 
 
 \section{The final result}
-With all the changes and fixes described so far, the kernel finally ran on our
-netbook.
-% TODO: include a photo?
+With all the changes and fixes described so far, our operating system finally
+ran on the netbook.
+% TODO: include a photo.
 
 
 
