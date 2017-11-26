@@ -1,6 +1,15 @@
 \documentclass{report}
 %\documentclass[10pt,letterpaper]{scrartcl}
 
+
+
+% Questions:
+% - should we have "future work"?
+% - is the layout too fancy?
+% - should I include more personal experiences?
+% - should I have a "discussion" section?
+% - 
+
 \usepackage[dottedtoc,manychapters,floatperchapter]{classicthesis}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
@@ -229,47 +238,15 @@
 \begin{document}
 
 \pagenumbering{roman}
+
+
+\title{Operating System \\ Implementation}
+\author{Thomas Hybel}
+\date{Aarhus University \\ November 2017}
+\maketitle
+
+
 % TODO. the numbering is off.
-
-
-\begin{titlepage} % Suppresses headers and footers on the title page
-
-\centering % Centre everything on the title page
-
-\rule{\textwidth}{1pt} % Thick horizontal rule
-\vspace{2pt}\vspace{-\baselineskip} % Whitespace between rules
-\rule{\textwidth}{0.4pt} % Thin horizontal rule
-\vspace{0.1\textheight} % Whitespace between the top rules and title
-
-{\Huge \bfseries
-% TODO improve this title.
-Operating System \\ Implementation
-}
-
-\vspace{0.010\textheight} % Whitespace between the title and short horizontal rule
-\rule{0.3\textwidth}{0.4pt} % Short horizontal rule under the title
-\vspace{0.01\textheight} % Whitespace between the thin horizontal rule and the author name
-
-{\Large \textsc{Thomas Hybel}} \\[0.5\baselineskip]
-{\Large \textsc{Aarhus University}} \\[0.5\baselineskip]
-{\Large \textsc{November 2017}} 
-
-\vfill % Whitespace between the author name and publisher
-
-
-
-%------------------------------------------------
-%	Bottom rules
-%------------------------------------------------
-
-\rule{\textwidth}{0.4pt} % Thin horizontal rule
-\vspace{2pt}\vspace{-\baselineskip} % Whitespace between rules
-\rule{\textwidth}{1pt} % Thick horizontal rule
-
-\end{titlepage}
-\newpage
-
-
 %TODO: have your email in the title page
 
 
@@ -1398,13 +1375,13 @@ system running on our machine of choice, a Packard Bell Dot S netbook.
 
 
 \section{Booting from USB}
-To boot our operating system we had to write its raw disk image to a medium
-which our netbook could boot from, such as a hard drive or a USB drive. We
-preferred to boot from a USB drive, since writing to the hard drive would
-require either cable access or booting into a different operating system,
-which would be slow and tedious.
+To boot our operating system we had to write its raw disk image to a bootable
+medium, such as a hard drive or a USB drive. We preferred to boot from a USB
+drive, since the hard drive would require either cable access or booting into
+a different operating system to transfer the image, which would be slow and
+tedious.
 
-When we supplied our raw disk image to QEMU, it booted as expected. We
+When we supplied our raw disk image to QEMU it booted as expected. We
 therefore expected that the same would happen when we transferred the image to
 a USB drive and inserted it into the netbook. However the USB was not
 recognized as a bootable medium. 
@@ -1412,100 +1389,51 @@ recognized as a bootable medium.
 The reason turns out to be historical: when USB technology was new, there was
 disagreement between manifacturers on whether a USB drive should be a raw
 storage drive or a bootable medium. Initially the user could decide through a
-BIOS setting. But for usability reasons, manufacturers eventually opted to use
+BIOS setting, but for usability reasons, manufacturers eventually opted to use
 heuristics to detect whether a USB is bootable or not. 
 
 These heuristics are based on data structures called the Master Boot Record
 (MBR) and BIOS Parameter Block (BPB). Both the MBR and BPB must be present in
 the first sector of a USB drive, otherwise most machines will assume that the
-drive is merely for data storage. Once we added a valid MBR and BPB to our
-boot loader, the netbook booted and the boot loader executed.
+drive is merely for data storage. 
 
+Once we added a valid MBR and BPB to our boot loader, the USB was recognized
+as bootable and the boot loader executed. Unfortunately it got stuck. The
+problem was that the boot loader was programmed to load the operating system
+from a hard drive connected through an ATA cable.
 
-% \section{Writing to the screen}
-% The machine got stuck at some point during execution of the boot loader. When
-% using QEMU we would debug this either by attaching a proper debugger or by
-% inserting print statements through a serial connection into the code.
-% Attaching a debugger to our netbook was infeasible, and we did not have a
-% serial connection. We therefore needed another option for output. 
-% 
-% Before a graphical video mode has been set, the machine is in text mode; it
-% displays text on the screen. In this mode a buffer representing the text on
-% the screen resides at physical address \texttt{0xb8000}. We wrote to this
-% buffer to display output for debugging. 
-
-
-% TODO: <-------- I got to here.
-% We should probably do away with the "booting from a hard drive" section,
-% because it's not very interesting. 
-% Just say that the boot loader got stuck since it didn't have USB support. We
-% could then boot from hard drive instead, but that's too slow and tedious. So
-% we adopted GRUB and that works well..
-% 
-% ^^^^^^^^^^^^^^^^
-
-\section{Booting from a hard drive}
-With the ability to print text to the screen, we figured out why the boot
-loader got stuck. The boot loader is coded such that it loads the kernel from
-a disk connected with an ATA connection. But we had put our kernel on a USB
-drive, which is a completely different interface.
-
-We realized that to continue, we would have to modify our boot loader to
+We realized that to continue, we would have to rewrite our boot loader to
 support loading from USB. However the boot loader is contrained to 512 bytes,
 since the BIOS loads it from the first sector of the drive. Writing code that
 can load from both USB and ATA drives in 512 bytes seemed difficult.
 
-We therefore opted to boot from the hard drive of the netbook instead of USB,
-since our boot loader already supported the ATA interface. We wrote the kernel
-image to the hard drive by booting into a Linux distribution via USB, and then
-using the "dd" tool to write the image from another USB to the hard drive.
+In the end we replaced our boot loader with a better one, namely GRUB, which
+supports booting from various hard drive types, USB, and even an ethernet
+connection. 
 
-In addition, the hard drive of the netbook was connected with a SATA cable
-rather than the ATA connection emulated by QEMU. Fortunately the interfaces
-are almost identical, so we only had to make minor changes to our boot loader
-code to read from the drive.
+We had to modify our file system to encorporate GRUB; the file system assumes
+that the boot loader will fit into the first 512 bytes, with the superblock
+residing in the following sector. Since GRUB uses multiple stages it needs
+much more space. We therefore had to modify our file system such that the
+first 32 MB are reserved for GRUB, and the superblock resides thereafter.
 
-With that, the boot loader finally succeeded in loading the kernel, which
-promptly broke; the scheduler failed to switch in new applications.
+After integrating GRUB into the project we were finally able to boot directly
+from USB and have kernel code loaded. Unfortunately the scheduler seemed
+broken; it was unable to switch in new processes.
 
-
-\section{A better boot loader}
-While attempting to debug the scheduler we realized that our development
-process was too unwieldy; booting into a Linux distribution and having to
-manually enter commands every time we made changes to the kernel was too slow
-to make any real progress. 
-
-We attempted to debug the scheduler, but our development process was too slow
-and unwieldy to get anywhere; as mentioned, every time we made a change to the
-kernel code we had to boot into a Linux distribution and enter commands to
-write the raw kernel image to the hard disk. We needed to get around this;
-ideally we would simply insert a USB drive and immediately boot into our
-kernel. 
-
-To facilitate booting from USB, we replaced our boot loader with a better one.
-GRUB is the gold standard for boot loaders; it supports booting from various
-hard drive types, USB, and even booting via an ethernet connection. After
-integrating GRUB into the project, we were finally able to boot directly from
-USB, and development sped up significantly.
-
-Our custom file system assumes that the boot loader will fit into the first
-512 bytes, with the superblock residing in the following sector. However as
-GRUB uses multiple stages, it needs much more space. We therefore had to
-modify our file system such that the first 32 MB are reserved for GRUB, and
-the superblock resides thereafter.
 
 
 \section{Finding the LAPIC}
-Usually the LAPIC generates timer interrupts periodically, and on such an
-interrupt the scheduler switches in a new process. However no timer interrupts
-were generated, and thus only one process got any processing time. 
+Debugging showed that timer interrupts were not being generated, which
+prevented the scheduler from preempting the running process. The LAPIC is
+used to generate these timer interrupts.
 
 In section \ref{sec:mpconfig} we described how our kernel uses the so-called
 \gls{mpconfig} method to find the LAPIC; that is, it looks for an MP
 configuration table in memory to find the physical address of the LAPIC. This
-physical address is used to communicate with the LAPIC, asking it to generate
-timer interrupts. However our kernel failed to find these MP configuration
-tables. They were simply not present in the memory of the netbook.
+address is used to communicate with the LAPIC, asking it to generate timer
+interrupts. However our kernel failed to find these configuration tables. They
+were simply not present in the memory of the netbook.
 
 It turns out that the \gls{mpconfig} method is outdated and unsupported by
 modern hardware. We therefore had to implement a different way to find the
@@ -1517,50 +1445,69 @@ physical addres of the LAPIC. The ACPI tables can be found by scanning a
 region of memory for a data structure called the RSDP, which points at another
 data structure, the RSDT, which finally points at the ACPI tables.
 
-After implementing this finding and parsing of ACPI tables, the kernel found
-the LAPIC and timer interrupts were generated, letting the scheduler work as
-intended.
-
-Then another bug was uncovered.
+After implementing this finding and parsing of ACPI tables, the kernel was
+able to discover the LAPIC and timer interrupts were generated, letting the
+scheduler work as intended.
 
 
-\section{A page table bug}
+\section{Latent bugs}
 Our kernel was behaving oddly; modifying a \gls{pte} seemed to have no effect.
 After the modification, writing to memory at the virtual address still
 affected memory at the old physical address rather than the new one.
 
-We figured that this must be related to the \gls{tlb}, since this seemed to be
-a caching issue. After much searching we learned that the \texttt{invlpg}
+Since this seemed to be a caching issue, we realized that it was likely
+related to the \gls{tlb}. Eventually we learned that the \texttt{invlpg}
 instruction must be used to invalidate a \gls{tlb} entry after a \gls{pte} has
-been modified. Otherwise the outdated cached \gls{tlb} entry will continue to
-be used until it is evicted.
+been modified. Otherwise the outdated \gls{tlb} entry will continue to be used
+until it is evicted from the cache.
 
 Interestingly, this bug never surfaced while running the kernel in QEMU. We
 assume that QEMU does not faithfully emulate the TLB for performance
 reasons.\footnote{VirtualBox behaved similarly to QEMU; we therefore believe
 that this quirk can be used as a means to detect virtualization/emulation.}
 
+After fixing the page table bug the machine successfully booted into a
+graphical interface. However the mouse behaved oddly, jumping around when
+moved.
 
-\section{Broken mouse driver}
-At this point the kernel successfully booted into a graphical interface.
-However the mouse was behaving oddly, jumping around when moved. The PS/2
-mouse driver we wrote during the graphics lab was at fault; the driver uses
-\gls{pio} to read from the mouse. Before each \texttt{inb} instruction, it is
-necessary to wait for the mouse to signal that it has sent another byte of
-data. The driver did not do this. However in QEMU these waits were not
-necessary; thus this was another instance of QEMU not emulating hardware
-perfectly.
+The PS/2 mouse driver we wrote during the graphics lab was at fault; the
+driver uses \gls{pio} to read from the mouse. Before each \texttt{inb}
+instruction, it is necessary to wait for the mouse to signal that it has sent
+another byte of data. The driver did not do this. However in QEMU these waits
+were not necessary; thus this was another instance of QEMU not emulating
+hardware perfectly. We inserted the necessary delays in the mouse driver.
+
+
+\section{The development process}
+The bugs and issues we have described seem rather obvious when explained in
+hindsight. But in practice, debugging a live system without a debugger was
+tricky and time-consuming. This was aggravated by there being a sizable delay
+between writing code and getting feedback from the machine, caused by us
+having to write the kernel image to a USB drive and switch it between
+machines for every code change.
+
+For the page table bug, we only observed that processes behaved oddly when
+writing to memory. It took a lot of time and print statements before we
+realized the root cause of the problem. The other bugs and issues were
+similar.
+
+In conclusion, there are significant advantages to developing an operating
+system on an emulator rather than a physical machine, despite emulators not
+being entirely accurate. Moving the operating system to real hardware was a
+time-consuming but not conceptually difficult process; the main task was
+supporting different hardware types and standards.
 
 
 \section{The final result}
 With all the changes and fixes described so far, our operating system finally
-ran on the netbook.
+ran on the netbook and behaved as expected. A picture of the final system is
+shown in figure \ref{TODO}.
 % TODO: include a photo.
 
 
 
 
-\chapter{Future work}
+% \chapter{Future work}
 % TODO: we should talk about future work.
 % - security: ASLR, probably many other things (it's not even a multi-user
 % system yet)
@@ -1587,9 +1534,9 @@ ran on the netbook.
 % that perform heavy computations.
 
 \chapter{Conclusion}
-- conclusion
 
-% TODO: we could include screenshots to make things more concrete
+
+
 % TODO: include (a link to) the source code somehow
 
 
@@ -1601,108 +1548,15 @@ ran on the netbook.
 
 % TODO: question: is it a good idea to have "mistakes made" and "lessons
 % learned"? If so, how do we do this without it sounding too informal?
-\begin{framed}
-\makebox[\textwidth]{Lesson learned: foo} \\
-Maybe we can use something like this to describe the various lessons we
-learned...
-\end{framed}
+% \begin{framed}
+% \makebox[\textwidth]{Lesson learned: foo} \\
+% Maybe we can use something like this to describe the various lessons we
+% learned...
+% \end{framed}
 
 
 % TODO: we should have an appendix that describes how to get and run the code.
 
-\begin{thebibliography}{1}
-
-% use like this: \cite{sigar1, sigar2}
-
-% \bibitem{proc}
-% Procyon,
-% \\\texttt{http://bitbucket.org/mstrobel/procyon}
-% 
-% \bibitem{em} 
-% Exam Monitor website.
-% \\\texttt{http://exammonitor.dk}
-% 
-% \bibitem{jnlp}
-% Exam Monitor JNLP file.
-% \\\texttt{http://login.exammonitor.dk/exam.jnlp}
-% 
-% \bibitem{sigar1}
-% Hyperic SIGAR website.
-% \\\texttt{https://support.hyperic.com/display/SIGAR/Home}
-% 
-% \bibitem{sigar2}
-% libsigar at GitHub.
-% \\\texttt{https://github.com/hyperic/sigar}
-% 
-% \bibitem{sigarapache}
-% The license file of SIGAR.
-% \\\texttt{https://github.com/hyperic/sigar/blob/master/LICENSE}
-% 
-% \bibitem{agents}
-% The package java.lang.instrument.
-% \\\texttt{https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/package-summary.html}
-% 
-% \bibitem{javassist}
-% Javassist website.
-% \\\texttt{http://www.javassist.org}
-% 
-% \bibitem{openjdk}
-% OpenJDK website.
-% \\\texttt{http://openjdk.java.net/}
-% 
-% \bibitem{webportal}
-% Exam Monitor web portal.
-% \\\texttt{https://sdu.exammonitor.dk/myexams.php}
-% 
-% \bibitem{x86harmful} 
-% Joanna Rutkowska. Intel x86 considered harmful. 2015.
-%  
-% \bibitem{sokintro} 
-% Bhushan Jain, Mirza Basim Baig, Dongli Zhang, Donald E. Porter, and Radu Sion.
-% SoK: Introspections on Trust and the Semantic Gap. 2014.
-% 
-% \bibitem{appshield} 
-% Yueqiang Cheng, Xuhua Ding, Robert H. Deng. AppShield: Protecting Applications
-% against Untrusted Operating System. 2013.
-% 
-% \bibitem{towardsappsec} 
-% Dan R. K. Ports, Tal Garfinkel. Towards Application Security on Untrusted
-% Operating Systems. 2008.
-% 
-% \bibitem{haven} 
-% Andrew Baumann, Marcus Peinado, and Galen Hunt. Shielding Applications from an
-% Untrusted Cloud with Haven. In \emph{Proceedings of the 11th USENIX Symposium
-% on Operating Systems Design and Implementation.} 2014.
-% 
-% \bibitem{sokhiee} 
-% Fengwei Zhang, Hongwei Zhang. SoK: A Study of Using Hardware-assisted Isolated
-% Execution Environments for Security. In \emph{Hardware and Architectural
-% Support for Security and Privacy (HASP '16)}. 2016.
-% 
-% \bibitem{sgxexplained} 
-% Victor Costan and Srinivas Devadas. Intel SGX Explained. 2016.
-% 
-% \bibitem{malwareinenclaves} 
-% Jeroen van Prooijen. The Design of Malware on Modern Hardware: Malware Inside
-% Intel SGX Enclaves. 2016.
-% 
-% \bibitem{enclavesinpractice} 
-% JP Aumasson, Luis Merino. SGX Secure Enclaves in Practice: Security and Crypto
-% Review. Presented at \emph{Black Hat USA 2016}.
-% 
-% \bibitem{opensgx} 
-% Prerit Jain, Soham Desai, Seongmin Kim, Ming-Wei Shih, JaeHyuk Lee,
-% Changho Choi, Youjung Shin, Taesoo Kim, Brent Byunghoon Kang, Dongsu Han.
-% OpenSGX: An Open Platform for SGX Research. 2016.
-% 
-% \bibitem{iago} 
-% Stephen Checkoway, Hovav Shacham. Iago Attacks: Why the System Call
-% API is a Bad Untrusted RPC Interface. 2013.
-
-\end{thebibliography}
-
-% TODO: maybe move this elsewhere?
-\printglossary[title=Abbreviations]
 
 
 
