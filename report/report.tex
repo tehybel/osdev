@@ -36,14 +36,11 @@
 
 \usepackage{xcolor}
 
-% TODO: find a nicer way to indicate that text is a link.
-\definecolor{light-grey}{gray}{0.30}
-
 % this makes links prettier
 \hypersetup{
     colorlinks,
 	linktoc=page,
-    linkcolor={light-grey}, % color of internal links (sections, pages, etc.)
+    linkcolor={MidnightBlue}, % color of internal links (sections, pages, etc.)
     citecolor={blue!30!black},
     urlcolor={blue!30!black} % color of URL links (mail, web)
 }
@@ -1534,6 +1531,34 @@ shown in figure \ref{TODO}.
 % that perform heavy computations.
 
 \chapter{Conclusion}
+Through writing an operating system from scratch we have gained a deep
+understanding of the many tasks that it must perform. 
+
+We have understood the boot process and the importance of a good boot loader.
+We have investigated the intricacies of physical page management and address
+translation, which were only a small part of the infrastructure needed to run
+a user space process. We have extended this infrastructure to support multiple
+interacting processes. We then wrote various user space programs and
+implemented a custom file system for them to reside on.  
+
+We then saw how various features, such as the network stack and the file
+system code, could be moved from the kernel to user space according to exokernel
+principles.
+
+By designing and implementing a graphical user interface for our system we
+have additionally seen how graphics work, all the way from drawing a single
+pixel, to the end result with a display server managing
+windows and rendering fonts. As part of this process we gained experience
+writing drivers for various devices, including a networking card and a PS/2
+mouse.
+
+By moving our operating system to a real machine rather than an emulator we
+have seen the advantages emulators bring to the development process, as well
+as their limitations.
+
+Throughout this process we have been repeatedly surprised by the scope of
+services that an operating system must provide, and which we previously took
+entirely for granted.
 
 
 
