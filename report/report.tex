@@ -48,189 +48,6 @@
 \lstset{language=C}
 \lstset{basicstyle=\ttfamily\footnotesize}
 
-\newglossaryentry{elf}{
-	name=ELF,
-	description={Executable and Linkable Format; a file format used to store
-	executable programs. An ELF file describes the address at which each
-	section of program code or data should be loaded.}
-}
-
-\newglossaryentry{cr0}{
-	name=\texttt{cr0},
-	description={Control Register 0. It holds bits which determine how the
-	processor operates. It e.g. determines whether paging and protected mode
-	are enabled.}
-}
-
-\newglossaryentry{cr3}{
-	name=\texttt{cr3},
-	description={Control Register 3. It points to the current page table.}
-}
-
-\newglossaryentry{esp}{
-	name=\texttt{esp},
-	description={Extended Stack Pointer register.}
-}
-
-\newglossaryentry{eip}{
-	name=\texttt{eip},
-	description={Extended Instruction Pointer; a register which holds the
-	address of the next instruction to be executed.}
-}
-
-\newglossaryentry{eflags}{
-	name=\texttt{eflags},
-	description={A register which holds various flags that mostly reflect the
-	properties of the most recently executed instruction. For example the
-	signed flag is set during a subtraction whose result is below zero.}
-}
-
-\newglossaryentry{cs}{
-	name=\texttt{cs},
-	description={Code Segment selector register; it holds an index into the
-	\gls{gdt}. Its lower two bits determine the \gls{cpl}.}
-}
-
-\newglossaryentry{cpl}{
-	name=CPL,
-	description={Current Privilege Level; the current ring in which the
-	processor is executing. CPL=3 means ring, 3, i.e., user-mode, while CPL=0
-	means ring 0, i.e. kernel-mode.}
-}
-
-\newglossaryentry{gdt}{
-	name=GDT,
-	description={Global Descriptor Table; a table which holds descriptors,
-	each of which describes a segment of memory and its permissions.}
-}
-
-\newglossaryentry{pte}{
-	name=PTE,
-	description={Page Table Entry; a 32-bit integer which stores a physical
-	address to which a virtual address maps, as well as some status bits.}
-}
-\newglossaryentry{mmu}{
-	name=MMU,
-	description={Memory Management Unit.}
-}
-\newglossaryentry{tlb}{
-	name=TLB,
-	description={Translation Lookaside Buffer.}
-}
-
-\newglossaryentry{pde}{
-	name=PDE,
-	description={Page Directory Entry; a 32-bit integer which stores a
-	physical address of a second-level node in the page table, as well as some
-	status bits.}
-}
-
-\newglossaryentry{idt}{
-	name=IDT,
-	description={Interrupt Descriptor Table; a table which describes the
-	address of the handler that should be run when a given interrupt or
-	exception is triggered.}
-}
-
-\newglossaryentry{idtr}{
-	name=IDTR,
-	description={A register which holds the physical address of the \gls{idt}.}
-}
-
-\newglossaryentry{tr}{
-	name=TR,
-	description={Task Register; a register which is used as an index into the
-	\gls{gdt} to find the \gls{tss}.}
-}
-
-\newglossaryentry{tss}{
-	name=TSS,
-	description={Task State Segment; a data structure which, among other
-	things, determines the \gls{esp}-value used during a context switch
-	triggered by an exception or interrupt.}
-}
-
-\newglossaryentry{pic}{
-	name=PIC,
-	description={Programmable Interrupt Controller; a hardware device which
-	orders interrupts before delivering them to the processor}
-}
-
-\newglossaryentry{apic}{
-	name=APIC,
-	description={Advanced \gls{pic}.}
-}
-
-\newglossaryentry{lapic}{
-	name=LAPIC,
-	description={Local \gls{apic}. The LAPIC is the processor-local component
-	of the \gls{apic}. Modern systems have one LAPIC per processor.}
-}
-
-\newglossaryentry{mmio}{
-	name=MMIO,
-	description={Memory-Mapped I/O. If you communicate with a device using
-	MMIO, it means that the registers of the device are mapped into memory at
-	some address, and so communication happens by reading from or writing to
-	memory.}
-}
-
-\newglossaryentry{mpconfig}{
-	name=mpconfig,
-	description={mpconfig is a method for finding information about multiple
-	processors described in Intel's Multi-processor specification.}
-}
-
-\newglossaryentry{bp}{
-	name=BP,
-	description={Bootstrap Processor; the first, and initially only, processor
-	that runs when a system boots.}
-}
-
-\newglossaryentry{ap}{
-	name=AP,
-	description={Application Processor; any processor which is not a \gls{bp}.
-	The APs only run once they are started by the \gls{bp}.}
-}
-
-\newglossaryentry{ipi}{
-	name=IPI,
-	description={Inter-Processor Interrupt. An interrupt sent by one processor
-	to another using the \gls{lapic}.}
-}
-
-\newglossaryentry{pio}{
-	name=PIO,
-	description={Programmed Input/Output. A way to read and write data from/to
-	disk (or another device) using instructions such as \texttt{inb} and
-	\texttt{outb}. Often an alternative to \gls{mmio}.}
-}
-
-\newglossaryentry{ipc}{
-	name=IPC,
-	description={Inter-Process Communication. A mechanism which lets processes
-	communicate.}
-}
-
-\newglossaryentry{pci}{
-	name=PCI,
-	description={Peripheral Component Interconnect. A type of bus to which
-	devices, such as the network card, can be connected.}
-}
-
-\newglossaryentry{lfb}{
-	name=LFB,
-	description={Linear Frame Buffer, a buffer that repesents the pixels which
-	are drawn to the screen.}
-}
-
-\makeglossaries
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
 
@@ -320,9 +137,6 @@ the development process, from first booting into a minimal kernel, until the end
 when we run a full graphical operating system on a real machine.
 
 
-% TODO get rid of the glossary, or at least minimize it. If we keep it, add a
-% reference to it here in the intr.
-
 % TODO: read each of the sections' introductions and see whether they make
 % sense when read alone in sequence
 
@@ -374,11 +188,11 @@ in section \ref{sec:mem}. Until then, all addressing is physical.
 
 To switch to 32-bit mode, we must update the \texttt{cs} (code segment)
 register. The \texttt{cs} register is an offset into a table called the Global
-Descriptor Table (\gls{gdt}) which is an array of descriptors. Each descriptor
+Descriptor Table (GDT) which is an array of descriptors. Each descriptor
 describes a segment of memory; a bit in the descriptor determines whether the
 segment contains 16-bit or 32-bit code. 
 
-We use the \texttt{ljmp} instruction to update the \gls{cs} register and use a
+We use the \texttt{ljmp} instruction to update the \texttt{cs} register and use a
 32-bit segment descriptor. Next, the boot loader is executed; since the
 processor is in 32-bit protected mode, the rest of the kernel code can be
 written in C rather than assembly.
@@ -415,7 +229,7 @@ print a "hello, world" message and confirm that the kernel runs.
 
 Using instructions such as \texttt{inb} and \texttt{outb} to communicate with
 an input/output device is quite common. The method is known as Programmed
-Input/Output (\gls{pio}); it will be used often in the following sections.
+Input/Output (PIO); it will be used often in the following sections.
 
 
 %%%%% LAB 2 %%%%%
@@ -434,7 +248,7 @@ A given system has a limited amount of physical memory, depending on how much
 RAM the machine has. This memory is split up into a number of pages. On x86 a
 page is 4096 bytes, or \texttt{0x1000} in hexadecimal. Thus pages always aligned on
 \texttt{0x1000}-byte boundaries. The kernel determines the amount of RAM by using
-\gls{pio} to query a memory area called the CMOS. 
+PIO to query a memory area called the CMOS. 
 
 The physical page management subsystem will keep a reference count for each
 page. If the count is zero, the page is free and can be allocated. This
@@ -468,16 +282,16 @@ can be thought of as a 1024-ary tree with two levels.
 
 A pointer to the first level of the page table can be found in the
 \texttt{cr3} register. The first level is called the Page Directory. It
-contains 1024 Page Directory Entries (\gls{pde}s). Each \gls{pde} points to a
-second-level node, which contains 1024 Page Table Entries (\gls{pte}s). 
-A \gls{pte} specifies a page of physical memory and its permissions, including
+contains 1024 Page Directory Entries (PDEs). Each PDE points to a
+second-level node, which contains 1024 Page Table Entries (PTEs). 
+A PTE specifies a page of physical memory and its permissions, including
 whether it is writable and whether it is accessible to user-mode code.
 
 To translate from a virtual to a physical address, it is necessary to walk the
 page table. Say that the process wishes to access a virtual address $v$. It
-first looks in the \gls{cr3} register to find the Page Directory. It uses the
-10 higher-order bits of $v$ to specify a \gls{pde}. It uses the next 10 bits
-of $v$ to specify a \gls{pte}. The \gls{pte} contains the address of a
+first looks in the \texttt{cr3} register to find the Page Directory. It uses the
+10 higher-order bits of $v$ to specify a PDE. It uses the next 10 bits
+of $v$ to specify a PTE The PTE contains the address of a
 physical page. The last 12 bits of $v$ are used as an offset into this page,
 and the address translation is complete. The processor also validates the
 permissions of the page before the access, and generates a page fault if these
@@ -486,7 +300,7 @@ are inappropriate.
 This is a costly process, and in practice the job is done by specialized
 hardware called a Memory Management Unit (MMU). Additionally, recent
 translations are cached in the so-called Translation Lookaside Buffer
-(\gls{tlb}).
+(TLB).
 
 
 \section{Page table management}
@@ -494,15 +308,15 @@ translations are cached in the so-called Translation Lookaside Buffer
 We wrote the following functions to manage the page table:
 \begin{itemize}
 \item \texttt{pgdir\_walk} is called by most of the other functions to walk the
-page table, finding the \gls{pte} corresponding to a given virtual address. It
+page table, finding the PTE corresponding to a given virtual address. It
 allocates new levels of the page table as needed using \texttt{page\_alloc}
 from the previous section.
 \item \texttt{page\_insert} is used to insert a physical page into a page
-table at a given virtual address. In other words, it finds a \gls{pte} using
+table at a given virtual address. In other words, it finds a PTE using
 \texttt{pgdir\_walk} and stores the physical address there.
 \item \texttt{page\_lookup} finds the physical address of a page, given a
 virtual address.
-\item \texttt{page\_remove} invalidates a \gls{pte} in a page table.
+\item \texttt{page\_remove} invalidates a PTE in a page table.
 \end{itemize}
 To set up the page table, the kernel allocates pages of physical memory and
 uses the newly implemented functions to insert these into the table.
@@ -802,7 +616,7 @@ device was called an Advanced PIC (APIC). The APIC has a component called the
 Local APIC (LAPIC) which is local to each processor.
 
 The processor communicates with the LAPIC using Memory-Mapped I/O
-(\gls{mmio}). This means that the LAPIC is mapped into memory at a specific,
+(MMIO). This means that the LAPIC is mapped into memory at a specific,
 system-dependent physical address. Reading at certain offsets will correspond
 to reading from certain registers in the LAPIC and likewise for writing. Thus
 to communicate with the LAPIC, the kernel merely needs to read and write to
@@ -811,10 +625,10 @@ where the LAPIC resides.
 
 There are multiple ways to find the LAPIC. For now, our kernel uses the method
 described in Intel's multi-processor specification, which we will refer to as
-the \gls{mpconfig} method. It involves searching through parts of physical
+the mpconfig method. It involves searching through parts of physical
 memory to find a structure called the MP floating pointer structure. This
 structure points to a table called the MP configuration table, which contains
-the physical address of the \gls{lapic}. 
+the physical address of the LAPIC. 
 % TODO: mention that we were given mpconfig code
 % TODO: insert reference to specification..
 
@@ -890,12 +704,12 @@ which lets a process handle its own page faults. By default a page fault will
 result in process termination. However we have implemented a system call,
 \texttt{sys\_env\_set\_pgfault\_upcall}, which lets a process set a handler
 function. Then the kernel will handle a page fault by modifying the saved
-\gls{eip} and \gls{esp} registers of the process, pushing the old register
+\texttt{eip} and \texttt{esp} registers of the process, pushing the old register
 values onto an exception stack, and switching the process back in.
 
 When a process forks, \emph{all} pages are initially shared between the parent
 and child process. However writable pages have their writable bit removed from
-their page table entry (\gls{pte}). Instead we set another bit which marks the
+their page table entry (PTE). Instead we set another bit which marks the
 page as copy-on-write.
 
 When the child or parent process attempts to write to one of the now-shared
@@ -986,9 +800,9 @@ programs, to the file system. We then attached this raw disk to QEMU.
 In accord with exokernel design, we let all file system interaction go through
 a user-mode process which we call the file system daemon.
 
-The daemon interacts with the disk using \gls{pio}. However a normal user-mode
+The daemon interacts with the disk using PIO. However a normal user-mode
 process cannot use the \texttt{inb} and \texttt{outb} instructions to perform
-\gls{pio}, so our kernel needs to give the daemon I/O privileges. It does so
+PIO, so our kernel needs to give the daemon I/O privileges. It does so
 by setting a bit in the \texttt{eflags} register while spawning the daemon.
 
 The disk knows nothing of the file system which is stored upon it. The daemon
@@ -1091,10 +905,10 @@ and tail register to keep track of the head and tail of the queue.
 
 \section{The network card driver}
 We wrote an e1000 network card driver using the information from the manual.
-Our kernel uses \gls{pio} to scan the PCI bus, iterating over each connected
+Our kernel uses PIO to scan the PCI bus, iterating over each connected
 device until it finds one whose vendor and device ID indicate it being an
 e1000 network card. The PCI interface supplies a physical address where the
-driver can use \gls{mmio} to communicate with the e1000.
+driver can use MMIO to communicate with the e1000.
 
 With communication possible, the first task of the driver was to initialize
 the network card. The driver allocates the arrays that make up the packet
@@ -1263,12 +1077,12 @@ graphics stack:
 \item The user presses the 'A' key.
 \item The keyboard generates an interrupt to signal to the kernel that input
 is available.
-\item The kernel keyboard driver reads the pressed key using \gls{pio}.
+\item The kernel keyboard driver reads the pressed key using PIO.
 \item The driver puts the event into the events queue.
 \item The display server eventually drains the events queue and finds the key
 press event.
 \item The display server finds that the terminal application is active and
-therefore forwards the event to it using \gls{ipc}.
+therefore forwards the event to it using IPC.
 \item The terminal application receives the event and adds the 'A' to a buffer
 which holds the current input of the user. This buffer will eventually be used
 to run a command once the user presses the enter key.
@@ -1324,7 +1138,7 @@ space of the display server using a new system call, \texttt{sys\_map\_lfb}.
 
 The display server is responsible for spawning every other graphical
 application and assigning the application a portion of the screen. When
-spawning an application, an area of shared memory is set up through \gls{ipc}.
+spawning an application, an area of shared memory is set up through IPC.
 This memory is the canvas of the application. The application can write pixels
 into the canvas, and the display server will periodically read the canvas and
 write any changes to the LFB. 
@@ -1433,13 +1247,13 @@ prevented the scheduler from preempting the running process. The LAPIC is
 used to generate these timer interrupts.
 
 In section \ref{sec:mpconfig} we described how our kernel uses the so-called
-\gls{mpconfig} method to find the LAPIC; that is, it looks for an MP
+mpconfig method to find the LAPIC; that is, it looks for an MP
 configuration table in memory to find the physical address of the LAPIC. This
 address is used to communicate with the LAPIC, asking it to generate timer
 interrupts. However our kernel failed to find these configuration tables. They
 were simply not present in the memory of the netbook.
 
-It turns out that the \gls{mpconfig} method is outdated and unsupported by
+It turns out that the mpconfig method is outdated and unsupported by
 modern hardware. We therefore had to implement a different way to find the
 LAPIC.
 
@@ -1455,14 +1269,14 @@ scheduler work as intended.
 
 
 \section{Latent bugs}
-Our kernel was behaving oddly; modifying a \gls{pte} seemed to have no effect.
+Our kernel was behaving oddly; modifying a PTE seemed to have no effect.
 After the modification, writing to memory at the virtual address still
 affected memory at the old physical address rather than the new one.
 
 Since this seemed to be a caching issue, we realized that it was likely
-related to the \gls{tlb}. Eventually we learned that the \texttt{invlpg}
-instruction must be used to invalidate a \gls{tlb} entry after a \gls{pte} has
-been modified. Otherwise the outdated \gls{tlb} entry will continue to be used
+related to the TLB. Eventually we learned that the \texttt{invlpg}
+instruction must be used to invalidate a TLB entry after a PTE has
+been modified. Otherwise the outdated TLB entry will continue to be used
 until it is evicted from the cache.
 
 Interestingly, this bug never surfaced while running the kernel in QEMU. We
@@ -1475,7 +1289,7 @@ graphical interface. However the mouse behaved oddly, jumping around when
 moved.
 
 The PS/2 mouse driver we wrote during the graphics lab was at fault; the
-driver uses \gls{pio} to read from the mouse. Before each \texttt{inb}
+driver uses PIO to read from the mouse. Before each \texttt{inb}
 instruction, it is necessary to wait for the mouse to signal that it has sent
 another byte of data. The driver did not do this. However in QEMU these waits
 were not necessary; thus this was another instance of QEMU not emulating

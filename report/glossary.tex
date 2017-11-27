@@ -1,0 +1,178 @@
+
+\newglossaryentry{elf}{
+	name=ELF,
+	description={Executable and Linkable Format; a file format used to store
+	executable programs. An ELF file describes the address at which each
+	section of program code or data should be loaded.}
+}
+
+\newglossaryentry{cr0}{
+	name=\texttt{cr0},
+	description={Control Register 0. It holds bits which determine how the
+	processor operates. It e.g. determines whether paging and protected mode
+	are enabled.}
+}
+
+\newglossaryentry{cr3}{
+	name=\texttt{cr3},
+	description={Control Register 3. It points to the current page table.}
+}
+
+\newglossaryentry{esp}{
+	name=\texttt{esp},
+	description={Extended Stack Pointer register.}
+}
+
+\newglossaryentry{eip}{
+	name=\texttt{eip},
+	description={Extended Instruction Pointer; a register which holds the
+	address of the next instruction to be executed.}
+}
+
+\newglossaryentry{eflags}{
+	name=\texttt{eflags},
+	description={A register which holds various flags that mostly reflect the
+	properties of the most recently executed instruction. For example the
+	signed flag is set during a subtraction whose result is below zero.}
+}
+
+\newglossaryentry{cs}{
+	name=\texttt{cs},
+	description={Code Segment selector register; it holds an index into the
+	\gls{gdt}. Its lower two bits determine the \gls{cpl}.}
+}
+
+\newglossaryentry{cpl}{
+	name=CPL,
+	description={Current Privilege Level; the current ring in which the
+	processor is executing. CPL=3 means ring, 3, i.e., user-mode, while CPL=0
+	means ring 0, i.e. kernel-mode.}
+}
+
+\newglossaryentry{gdt}{
+	name=GDT,
+	description={Global Descriptor Table; a table which holds descriptors,
+	each of which describes a segment of memory and its permissions.}
+}
+
+\newglossaryentry{pte}{
+	name=PTE,
+	description={Page Table Entry; a 32-bit integer which stores a physical
+	address to which a virtual address maps, as well as some status bits.}
+}
+\newglossaryentry{mmu}{
+	name=MMU,
+	description={Memory Management Unit.}
+}
+\newglossaryentry{tlb}{
+	name=TLB,
+	description={Translation Lookaside Buffer.}
+}
+
+\newglossaryentry{pde}{
+	name=PDE,
+	description={Page Directory Entry; a 32-bit integer which stores a
+	physical address of a second-level node in the page table, as well as some
+	status bits.}
+}
+
+\newglossaryentry{idt}{
+	name=IDT,
+	description={Interrupt Descriptor Table; a table which describes the
+	address of the handler that should be run when a given interrupt or
+	exception is triggered.}
+}
+
+\newglossaryentry{idtr}{
+	name=IDTR,
+	description={A register which holds the physical address of the \gls{idt}.}
+}
+
+\newglossaryentry{tr}{
+	name=TR,
+	description={Task Register; a register which is used as an index into the
+	\gls{gdt} to find the \gls{tss}.}
+}
+
+\newglossaryentry{tss}{
+	name=TSS,
+	description={Task State Segment; a data structure which, among other
+	things, determines the \gls{esp}-value used during a context switch
+	triggered by an exception or interrupt.}
+}
+
+\newglossaryentry{pic}{
+	name=PIC,
+	description={Programmable Interrupt Controller; a hardware device which
+	orders interrupts before delivering them to the processor}
+}
+
+\newglossaryentry{apic}{
+	name=APIC,
+	description={Advanced \gls{pic}.}
+}
+
+\newglossaryentry{lapic}{
+	name=LAPIC,
+	description={Local \gls{apic}. The LAPIC is the processor-local component
+	of the \gls{apic}. Modern systems have one LAPIC per processor.}
+}
+
+\newglossaryentry{mmio}{
+	name=MMIO,
+	description={Memory-Mapped I/O. If you communicate with a device using
+	MMIO, it means that the registers of the device are mapped into memory at
+	some address, and so communication happens by reading from or writing to
+	memory.}
+}
+
+\newglossaryentry{mpconfig}{
+	name=mpconfig,
+	description={mpconfig is a method for finding information about multiple
+	processors described in Intel's Multi-processor specification.}
+}
+
+\newglossaryentry{bp}{
+	name=BP,
+	description={Bootstrap Processor; the first, and initially only, processor
+	that runs when a system boots.}
+}
+
+\newglossaryentry{ap}{
+	name=AP,
+	description={Application Processor; any processor which is not a \gls{bp}.
+	The APs only run once they are started by the \gls{bp}.}
+}
+
+\newglossaryentry{ipi}{
+	name=IPI,
+	description={Inter-Processor Interrupt. An interrupt sent by one processor
+	to another using the \gls{lapic}.}
+}
+
+\newglossaryentry{pio}{
+	name=PIO,
+	description={Programmed Input/Output. A way to read and write data from/to
+	disk (or another device) using instructions such as \texttt{inb} and
+	\texttt{outb}. Often an alternative to \gls{mmio}.}
+}
+
+\newglossaryentry{ipc}{
+	name=IPC,
+	description={Inter-Process Communication. A mechanism which lets processes
+	communicate.}
+}
+
+\newglossaryentry{pci}{
+	name=PCI,
+	description={Peripheral Component Interconnect. A type of bus to which
+	devices, such as the network card, can be connected.}
+}
+
+\newglossaryentry{lfb}{
+	name=LFB,
+	description={Linear Frame Buffer, a buffer that repesents the pixels which
+	are drawn to the screen.}
+}
+
+\makeglossaries
