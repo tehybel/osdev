@@ -249,7 +249,14 @@
 
 \begin{abstract} 
 \noindent 
-TODO: write an abstract here.
+This report documents our implementation of an operating system from scratch,
+with the aim of furthering our understanding of operating system design and
+internals. The development process was separated into eight labs, each
+comprising a major area of functionality. In the first four labs we built the
+infrastructure necessary to run programs in user space. In the following labs
+we added a file system, networking support, and a graphical user interface to
+the operating system. We also moved the operating system from emulated
+hardware to a real machine.
 \end{abstract}
 \newpage
 
@@ -265,8 +272,8 @@ TODO: write an abstract here.
 
 \chapter{Introduction}
 This report documents our journey through writing an operating system from
-scratch. Our primary goal was to learn about operating systems internals and
-design, and to investigate the difficulty of the task. Neither usability nor
+scratch. Our primary goal was to learn about operating system internals and
+design, and to investigate the feasibility of the task. Neither usability nor
 efficiency were significant goals throughout the process, except when
 their consideration facilitated learning.
 
@@ -279,13 +286,13 @@ for multitasking and concurrency, while lab 5 comprises the implementation of
 a custom file system. 
 
 The kernel we wrote is for the 32-bit x86 architecture. The kernel is written
-in C, with some parts having to be hand-written in assembly. 
-We have used GCC as our compiler and Git for version
-control. Additionally, it was convenient to develop the kernel on emulated
-hardware rather than a real machine, since this eased debugging and increased
-development speed. It also made it trivial to change the amount of system RAM,
-and to add new processors or an extra hard drive. We have used the full-system
-emulator QEMU for this task.
+in C, with some parts having to be hand-written in assembly. We have used GCC
+as our compiler, Git for version control, and GDB for debugging. Additionally,
+it was convenient to develop the kernel on emulated hardware rather than a
+real machine, since this eased debugging and increased development speed. It
+also made it trivial to change the amount of system RAM, and to add new
+processors or an extra hard drive. We have used the full-system emulator QEMU
+for this task.
 
 Each MIT lab has an associated web page which describes what needs to be done
 and provides links to resources like manuals and specifications. Since we opted
