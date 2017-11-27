@@ -1,0 +1,93 @@
+\begin{thebibliography}{10}
+
+\bibitem{mitcourse}
+Frans Kaashoek and Robert Morris.
+\newblock 6.828 operating system engineering course.
+\newblock \url{https://pdos.csail.mit.edu/6.828/2016/index.html}.
+
+\bibitem{gdt}
+OSDev Wiki.
+\newblock Global descriptor table.
+\newblock \url{http://wiki.osdev.org/Global_Descriptor_Table}.
+
+\bibitem{cmos}
+OSDev Wiki.
+\newblock Cmos.
+\newblock \url{http://wiki.osdev.org/CMOS}.
+
+\bibitem{manual8086ch5}
+Intel Corporation.
+\newblock 80386 programmer's reference manual, chapter 5: Memory management.
+\newblock \url{https://pdos.csail.mit.edu/6.828/2016/readings/i386/c05.htm}.
+
+\bibitem{manual8086ch9}
+Intel Corporation.
+\newblock 80386 programmer's reference manual, chapter 9: Exceptions and
+  interrupts.
+\newblock \url{https://pdos.csail.mit.edu/6.828/2016/readings/i386/c09.htm}.
+
+\bibitem{exceptions}
+OSDev Wiki.
+\newblock Exceptions.
+\newblock \url{http://wiki.osdev.org/Exceptions}.
+
+\bibitem{intel3a}
+Intel Corporation.
+\newblock {\em Intel 64 and IA-32 architectures software developer's manual},
+  volume~3A of {\em System programming guide}.
+\newblock October 2017.
+
+\bibitem{apic}
+OSDev Wiki.
+\newblock Apic.
+\newblock \url{http://wiki.osdev.org/APIC}.
+
+\bibitem{mpspec}
+Intel Corporation.
+\newblock {\em MultiProcessor Specification}.
+\newblock May 1997.
+
+\bibitem{e1000manual}
+Intel Corporation.
+\newblock {\em PCI/PCI-X Family of Gigabit Ethernet Controllers Software
+  Developer’s Manual}.
+\newblock March 2009.
+
+\bibitem{graphicsstack}
+OSDev Wiki.
+\newblock Graphics stack.
+\newblock \url{http://wiki.osdev.org/Graphics_stack}.
+
+\bibitem{windowingsystem}
+Windowing system.
+\newblock \url{https://en.wikipedia.org/wiki/Windowing_system}.
+
+\bibitem{xwindowsystem}
+X window system.
+\newblock \url{https://en.wikipedia.org/wiki/X_Window_System}.
+
+\bibitem{mouseinput}
+OSDev Wiki.
+\newblock Mouse input.
+\newblock \url{http://wiki.osdev.org/Mouse_Input}.
+
+\bibitem{netbook}
+Packard bell dot s.
+\newblock \url{http://www.packardbell.com/pb/en/IL/content/model/LU.BUN0D.038}.
+
+\bibitem{bootingfromusb}
+OSDev Wiki.
+\newblock Problems booting from usb flash.
+\newblock \url{http://wiki.osdev.org/Problems_Booting_From_USB_Flash}.
+
+\bibitem{symm}
+OSDev Wiki.
+\newblock Symmetric multiprocessing.
+\newblock \url{wiki.osdev.org/Symmetric_Multiprocessing}.
+
+\bibitem{rsdp}
+OSDev Wiki.
+\newblock Rsdp.
+\newblock \url{http://wiki.osdev.org/RSDP}.
+
+\end{thebibliography}

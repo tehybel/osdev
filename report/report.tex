@@ -24,6 +24,7 @@
 \usepackage{soul,xcolor}
 \usepackage[htt]{hyphenat} % allows breaks inside texttt
 \usepackage[acronym, toc]{glossaries}
+
 \setstcolor{red}
 
 
@@ -32,6 +33,9 @@
 % \newcommand{\sectionbreak}{\clearpage}
 
 
+% call it "References", not "Bibliography"
+\AtBeginDocument{\renewcommand{\bibname}{References}}
+%\settocbibname{References}
 
 
 \usepackage{xcolor}
@@ -94,13 +98,12 @@ design, and to investigate the feasibility of the task. Neither usability nor
 efficiency were significant goals throughout the process, except when
 their consideration facilitated learning.
 
-% TODO: add citation https://pdos.csail.mit.edu/6.828/2016/schedule.html
 To get started on kernel development we made extensive use of material from
-the MIT 2016 Operating System Engineering course, which is accessible online.
-The MIT course is divided into six major "labs", with each lab encapsulating a
-set of kernel functionality. For example, lab 4 involves functionality needed
-for multitasking and concurrency, while lab 5 comprises the implementation of
-a custom file system. 
+the MIT 2016 Operating System Engineering course, which is
+accessible online \cite{mitcourse}. The MIT course is divided into six major
+"labs", with each lab encapsulating a set of kernel functionality. For
+example, lab 4 involves functionality needed for multitasking and concurrency,
+while lab 5 comprises the implementation of a custom file system. 
 
 The kernel we wrote is for the 32-bit x86 architecture. The kernel is written
 in C, with some parts having to be hand-written in assembly. We have used GCC
@@ -139,7 +142,6 @@ when we run a full graphical operating system on a real machine.
 
 % TODO: read each of the sections' introductions and see whether they make
 % sense when read alone in sequence
-
 
 % TODO rewrite "the goal of this lab was", it sounds bad and repetitive
 
@@ -188,9 +190,9 @@ in section \ref{sec:mem}. Until then, all addressing is physical.
 
 To switch to 32-bit mode, we must update the \texttt{cs} (code segment)
 register. The \texttt{cs} register is an offset into a table called the Global
-Descriptor Table (GDT) which is an array of descriptors. Each descriptor
-describes a segment of memory; a bit in the descriptor determines whether the
-segment contains 16-bit or 32-bit code. 
+Descriptor Table (GDT) which is an array of descriptors \cite{gdt}. Each
+descriptor describes a segment of memory; a bit in the descriptor determines
+whether the segment contains 16-bit or 32-bit code. 
 
 We use the \texttt{ljmp} instruction to update the \texttt{cs} register and use a
 32-bit segment descriptor. Next, the boot loader is executed; since the
@@ -242,13 +244,11 @@ for allocating and freeing pages of physical memory.
 
 
 \section{Physical page management}
-% sources: https://en.wikipedia.org/wiki/Nonvolatile_BIOS_memory
-% http://wiki.osdev.org/CMOS
 A given system has a limited amount of physical memory, depending on how much
 RAM the machine has. This memory is split up into a number of pages. On x86 a
 page is 4096 bytes, or \texttt{0x1000} in hexadecimal. Thus pages always aligned on
 \texttt{0x1000}-byte boundaries. The kernel determines the amount of RAM by using
-PIO to query a memory area called the CMOS. 
+PIO to query a memory area called the CMOS \cite{cmos}.
 
 The physical page management subsystem will keep a reference count for each
 page. If the count is zero, the page is free and can be allocated. This
@@ -277,8 +277,9 @@ It is necessary to introduce some theory before we can explain how our kernel
 initializes its page table.
 
 The x86 page table is a two-level table whose main purpose is to let the
-processor translate a virtual address to a physical address. The page table
-can be thought of as a 1024-ary tree with two levels. 
+processor translate a virtual address to a physical address
+\cite{manual8086ch5}. The page table can be thought of as a 1024-ary tree with
+two levels. 
 
 A pointer to the first level of the page table can be found in the
 \texttt{cr3} register. The first level is called the Page Directory. It
@@ -444,11 +445,11 @@ crash.
 
 \section{Handling of exceptions and interrupts}
 The processor may trigger an exception while processing an instruction, e.g.,
-on a division by zero or illegal memory access. The processor may also
-occasionally trigger an interrupt. This often happens for asynchronous
-reasons, such as when a key is pressed or a network packet is received.
-Interrupts can also be raised with the \texttt{int} instruction; this
-mechanism can be used to implement system calls.
+on a division by zero or illegal memory access \cite{manual8086ch9, exceptions}.
+The processor may also occasionally trigger an interrupt. This often happens
+for asynchronous reasons, such as when a key is pressed or a network packet is
+received. Interrupts can also be raised with the \texttt{int} instruction;
+this mechanism can be used to implement system calls.
 
 The result of an exception or interrupt is that the processor enters kernel
 mode through a context switch, running exception- or interrupt-specific
@@ -556,9 +557,10 @@ machine with $n$ processors can be emulated by passing the \texttt{-smp n}
 option to QEMU.
 
 When a system with multiple processors boots, the hardware dynamically selects
-only a single processor to run. It is called the Bootstrap Processor (BP)
-while the remaining processors, if any, are called Application Processors
-(APs). It is up the the BP to start up the APs when the system is ready.
+only a single processor to run \cite[section~8.4]{intel3a}. It is called the
+Bootstrap Processor (BP) while the remaining processors, if any, are called
+Application Processors (APs). It is up the the BP to start up the APs when the
+system is ready.
 
 We wrote code which starts up the APs. This is accomplished by querying the
 LAPIC of the BP, having it send an inter-processor interrupt to each AP. Upon
@@ -568,10 +570,6 @@ specified by the AP.
 The APs start in 16-bit real mode, just as the BP did. They therefore need to
 switch to 32-bit protected mode mode. After doing so, each AP calls into the
 scheduler to run a new process.
-
-% source:
-% https://stackoverflow.com/questions/14261612/which-core-initializes-first-when-a-system-boots
-% which refers to an intel manual
 
 
 
@@ -598,10 +596,6 @@ concurrently.
 
 \section{Interacting with the LAPIC}
 \label{sec:mpconfig}
-% source: 
-% http://wiki.osdev.org/APIC
-% https://en.wikipedia.org/wiki/Advanced_Programmable_Interrupt_Controller
-
 In section \ref{sec:preempt} the scheduler had to ask the LAPIC to generate
 timer interrupts for it, and in section \ref{sec:moreprocs} the BP used the
 LAPIC to send inter-processor interrupts to the APs. We therefore needed code
@@ -615,8 +609,8 @@ Intel updated their PIC standard to include new features, the conforming
 device was called an Advanced PIC (APIC). The APIC has a component called the
 Local APIC (LAPIC) which is local to each processor.
 
-The processor communicates with the LAPIC using Memory-Mapped I/O
-(MMIO). This means that the LAPIC is mapped into memory at a specific,
+The processor communicates with the LAPIC using Memory-Mapped I/O (MMIO)
+\cite{apic}. This means that the LAPIC is mapped into memory at a specific,
 system-dependent physical address. Reading at certain offsets will correspond
 to reading from certain registers in the LAPIC and likewise for writing. Thus
 to communicate with the LAPIC, the kernel merely needs to read and write to
@@ -624,13 +618,11 @@ certain addresses. The difficult part is figuring out the physical address
 where the LAPIC resides.
 
 There are multiple ways to find the LAPIC. For now, our kernel uses the method
-described in Intel's multi-processor specification, which we will refer to as
-the mpconfig method. It involves searching through parts of physical
-memory to find a structure called the MP floating pointer structure. This
-structure points to a table called the MP configuration table, which contains
-the physical address of the LAPIC. 
-% TODO: mention that we were given mpconfig code
-% TODO: insert reference to specification..
+described in the multi-processor specification \cite{mpspec}, which we will
+refer to as the mpconfig method. It involves searching through parts of
+physical memory to find a structure called the MP floating pointer structure.
+This structure points to a table called the MP configuration table, which
+contains the physical address of the LAPIC. 
 
 
 
@@ -885,10 +877,9 @@ QEMU, which creates a virtual router at IP 10.0.2.2 and assigns the guest an
 IP of 10.0.2.15. This let us hardcode the the IP address rather than having to
 implement a DHCP client or similar.
 
-% %TODO: insert reference to the manual and a proper name..
-The e1000 manual describes in detail the internals of the card, as well as the
-steps a driver must take to initialize the card, read incoming packets, and
-transmit outgoing packets. 
+The e1000 manual \cite{e1000manual} describes in detail the internals of the
+card, as well as the steps a driver must take to initialize the card, read
+incoming packets, and transmit outgoing packets. 
 
 The e1000 maintains two circular packet queues: a transmit queue and a receive
 queue. To send a packet, the kernel adds it to the transmit queue, which the
@@ -992,10 +983,11 @@ The kernel can draw pixels on the screen by writing to the LFB. We wrote a
 graphics library to draw pixels and more complex shapes.
 
 We then designed a graphics stack, which involved deciding how input and
-output events should flow through the system, from kernel to user application.
-We decided upon a design with a central display server, which is responsible
-for rendering all of the screen and which acts as an intermediary for input
-and output events.
+output events should flow through the system from kernel to user application.
+After reading about how graphics work in other systems \cite{graphicsstack,
+windowingsystem, xwindowsystem} we decided upon a design with a central
+display server, which is responsible for rendering all of the screen and which
+acts as an intermediary for input and output events.
 
 Finally we added a few sample graphical applications to demonstrate the new
 features.
@@ -1062,14 +1054,14 @@ system call, forwarding the events.
 
 Figure \ref{graphicslayout} shows an overview of the different components in
 the graphics stack and how they interact. 
-\begin{figure}[h!]
-\begin{framed}
-% TODO insert a diagram.
-TODO make this figure.
-\end{framed}
-\caption{The graphics stack layout}
-\label{graphicslayout}
-\end{figure}
+% \begin{figure}[h!]
+% \begin{framed}
+% % TODO insert a diagram.
+% TODO make this figure.
+% \end{framed}
+% \caption{The graphics stack layout}
+% \label{graphicslayout}
+% \end{figure}
 
 The following sequence of events exemplifies the flow of events through the
 graphics stack:
@@ -1147,11 +1139,15 @@ The display server determines the ordering of applications along the z-axis,
 drawing the pixels of the topmost application last. It also determines which
 application is currently active and directs key presses only to it.
 
-It is highly important that the display server be efficient; if it runs too
+It is highly important that the display server is efficient; if it runs too
 slowly, the system will have a low frame rate, with interaction feeling
-choppy. We had to carefully optimize the code for the display server before
-we got an acceptable frame rate inside QEMU.
+choppy. We had to carefully optimize the code for the display server before we
+got an acceptable frame rate inside QEMU.
 
+We wrote a mouse driver for a PS/2 mouse which reads data packets from the
+mouse through PIO \cite{mouseinput}. These data packets are generated whenever
+the mouse is moved. They only contain delta x- and y-coordinates, which means
+that the concept of a cursor only exists inside the display server.
 
 
 \section{Sample graphical applications}
@@ -1189,7 +1185,8 @@ writing an operating system. This caused latent bugs to surface once we
 switched to real hardware.
 
 In the following sections we describe the steps we took to get our operating
-system running on our machine of choice, a Packard Bell Dot S netbook.
+system running on our machine of choice, a Packard Bell Dot S netbook
+\cite{netbook}.
 
 
 \section{Booting from USB}
@@ -1204,11 +1201,12 @@ therefore expected that the same would happen when we transferred the image to
 a USB drive and inserted it into the netbook. However the USB was not
 recognized as a bootable medium. 
 
-The reason turns out to be historical: when USB technology was new, there was
-disagreement between manifacturers on whether a USB drive should be a raw
-storage drive or a bootable medium. Initially the user could decide through a
-BIOS setting, but for usability reasons, manufacturers eventually opted to use
-heuristics to detect whether a USB is bootable or not. 
+The reason turns out to be historical \cite{bootingfromusb}: when USB
+technology was new, there was disagreement between manifacturers on whether a
+USB drive should be a raw storage drive or a bootable medium. Initially the
+user could decide through a BIOS setting, but for usability reasons,
+manufacturers eventually opted to use heuristics to detect whether a USB is
+bootable or not. 
 
 These heuristics are based on data structures called the Master Boot Record
 (MBR) and BIOS Parameter Block (BPB). Both the MBR and BPB must be present in
@@ -1258,10 +1256,11 @@ modern hardware. We therefore had to implement a different way to find the
 LAPIC.
 
 We leave out the details of the method, but in essence newer machines contain
-so-called ACPI tables. One of these is the APIC table, which contains the
-physical addres of the LAPIC. The ACPI tables can be found by scanning a
-region of memory for a data structure called the RSDP, which points at another
-data structure, the RSDT, which finally points at the ACPI tables.
+so-called ACPI tables \cite{symm}. One of these is the APIC table, which
+contains the physical addres of the LAPIC. The ACPI tables can be found by
+scanning a region of memory for a data structure called the RSDP \cite{rsdp},
+which points at another data structure, the RSDT, which finally points at the
+ACPI tables.
 
 After implementing this finding and parsing of ACPI tables, the kernel was
 able to discover the LAPIC and timer interrupts were generated, letting the
@@ -1287,6 +1286,7 @@ that this quirk can be used as a means to detect virtualization/emulation.}
 After fixing the page table bug the machine successfully booted into a
 graphical interface. However the mouse behaved oddly, jumping around when
 moved.
+
 
 The PS/2 mouse driver we wrote during the graphics lab was at fault; the
 driver uses PIO to read from the mouse. Before each \texttt{inb}
@@ -1385,25 +1385,13 @@ entirely for granted.
 
 % TODO: include (a link to) the source code somehow
 
-
-
-% TODO: add references (some links are in writeup txt files)
-
-
-
-
-% TODO: question: is it a good idea to have "mistakes made" and "lessons
-% learned"? If so, how do we do this without it sounding too informal?
-% \begin{framed}
-% \makebox[\textwidth]{Lesson learned: foo} \\
-% Maybe we can use something like this to describe the various lessons we
-% learned...
-% \end{framed}
-
+% TODO: add more references (some links are in writeup txt files)
 
 % TODO: we should have an appendix that describes how to get and run the code.
 
 
+\bibliographystyle{unsrt}
+\bibliography{references}
 
 
 \end{document}
