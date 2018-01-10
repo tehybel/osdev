@@ -1,16 +1,6 @@
 \documentclass{report}
 %\documentclass[10pt,letterpaper]{scrartcl}
 
-% TODO: some references are missing, look at the output of pdflatex.
-
-
-% Questions:
-% - should we have "future work"?
-% - is the layout too fancy?
-% - should I include more personal experiences?
-% - should I have a "discussion" section?
-% - 
-
 \usepackage[dottedtoc,manychapters,floatperchapter]{classicthesis}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
@@ -46,8 +36,8 @@
     colorlinks,
 	linktoc=page,
     linkcolor={MidnightBlue}, % color of internal links (sections, pages, etc.)
-    citecolor={blue!30!black},
-    urlcolor={blue!30!black} % color of URL links (mail, web)
+    citecolor={MidnightBlue},
+    urlcolor={MidnightBlue} % color of URL links (mail, web)
 }
 
 \lstset{language=C}
@@ -98,18 +88,20 @@ their consideration facilitated learning.
 To get started on kernel development we made extensive use of material from
 the MIT 2016 Operating System Engineering course, which is
 accessible online \cite{mitcourse}. The MIT course is divided into six major
-``labs", with each lab encapsulating a subset of kernel functionality. For
-example, lab 4 involves multitasking and concurrency, while lab 5 comprises
-the implementation of a custom file system. 
+``labs", with each lab covering a subset of essential kernel functionality.
+For example, lab 4 involves multitasking and concurrency, while lab 5
+comprises the implementation of a custom file system. Each lab has a
+corresponding web page (e.g., \cite{lab1}) with most of the
+information needed to complete the lab. These lab pages were our main source
+of information for the first six labs.
 
-We wrote the kernel for the 32-bit x86 architecture. The kernel is written
-in C, with some parts hand-written in assembly. We have used GCC
-as our compiler, Git for version control, and GDB for debugging. Additionally,
-it was convenient to develop the kernel on emulated hardware rather than a
-real machine, since this eased debugging and increased development speed. It
-also made it trivial to change the amount of system RAM, and to add new
-processors or an extra hard drive. We have used the full-system emulator QEMU
-for this task.
+We wrote the kernel in C and assembly, targeting the 32-bit x86 architecture.
+We have used GCC as our compiler, Git for version control, and GDB for
+debugging. Additionally, it was convenient to develop the kernel on emulated
+hardware rather than a real machine, since this eased debugging and increased
+development speed. It also made it trivial to change the amount of system RAM,
+and to add new processors or an extra hard drive. We have used the full-system
+emulator QEMU for this task.
 
 Each MIT lab has an associated web page which describes what needs to be done
 and provides links to manuals and specifications. Since we opted

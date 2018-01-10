@@ -6,45 +6,45 @@ Database file #1: references.bib
 Warning--empty publisher in intel3a
 Warning--empty publisher in mpspec
 Warning--empty publisher in e1000manual
-You've used 19 entries,
+You've used 20 entries,
             1791 wiz_defined-function locations,
-            507 strings with 5116 characters,
-and the built_in function-call counts, 2448 in all, are:
-= -- 190
-> -- 75
+            510 strings with 5193 characters,
+and the built_in function-call counts, 2591 in all, are:
+= -- 201
+> -- 83
 < -- 1
-+ -- 37
-- -- 18
-* -- 34
-:= -- 358
-add.period$ -- 54
-call.type$ -- 19
-change.case$ -- 16
++ -- 40
+- -- 20
+* -- 36
+:= -- 380
+add.period$ -- 57
+call.type$ -- 20
+change.case$ -- 17
 chr.to.int$ -- 0
-cite$ -- 22
-duplicate$ -- 111
-empty$ -- 347
-format.name$ -- 18
-if$ -- 585
+cite$ -- 23
+duplicate$ -- 116
+empty$ -- 365
+format.name$ -- 20
+if$ -- 619
 int.to.chr$ -- 0
-int.to.str$ -- 19
+int.to.str$ -- 20
 missing$ -- 6
-newline$ -- 95
-num.names$ -- 16
-pop$ -- 106
+newline$ -- 100
+num.names$ -- 17
+pop$ -- 111
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 90
+skip$ -- 96
 stack$ -- 0
 substring$ -- 0
-swap$ -- 21
+swap$ -- 22
 text.length$ -- 1
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
 warning$ -- 3
-while$ -- 16
-width$ -- 21
-write$ -- 168
+while$ -- 17
+width$ -- 22
+write$ -- 177
 (There were 3 warnings)

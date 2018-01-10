@@ -5,6 +5,11 @@ Frans Kaashoek and Robert Morris.
 \newblock 6.828 operating system engineering course.
 \newblock \url{https://pdos.csail.mit.edu/6.828/2016/index.html}.
 
+\bibitem{lab1}
+Frans Kaashoek and Robert Morris.
+\newblock Lab 1: Booting a pc.
+\newblock \url{https://pdos.csail.mit.edu/6.828/2016/labs/lab1/}.
+
 \bibitem{gdt}
 OSDev Wiki.
 \newblock Global descriptor table.
