@@ -1,9 +1,16 @@
 
+Running the code 
+================
 
-The code in this repository is based on the MIT
-[6.828](https://pdos.csail.mit.edu/6.828/2016/) OS engineering course, which I
-have covered in full by now. I'm currently adding more advanced features, such
-as graphics, to the OS.
+Run `make` to build the project, `make run` to run it in QEMU, and `make clean` 
+to remove built objects. `make prep` will create `myos.iso` which is bootable.
+`make write-usb` will overwrite `/dev/sdb` with this ISO. (Be careful; that drive is
+assumed to be a USB.)
+
+
+
+Status of the project
+=====================
 
 The current status is:
 
@@ -16,9 +23,12 @@ The current status is:
 | lab5     | done        | file system and shell                                      |
 | lab6     | done        | networking                                                 |
 | graphics | done        | graphical user interface                                   |
-| hardware | in progress | running the OS on real hardware                            |
-| captor   | not started | capabilities and Tor                                       |
+| hardware | done        | running the OS on real hardware                            |
 
+
+
+Overview of each lab
+====================
 
 To provide an overview, here's a summary of my work so far:
 
@@ -47,5 +57,12 @@ To provide an overview, here's a summary of my work so far:
   interface. We implemented a central display server responsible for rendering
   applications. We wrote a user-mode graphics library and a PS/2 mouse driver.
   We also wrote a graphical paint application and a terminal emulator.
+- In the hardware lab we made changes to the OS to enable it to run on real
+  hardware.
 
-The writeups/ directory contains detailed writeups for each lab.
+
+Learning more
+=============
+
+The report/report.pdf file contains a detailed writeup of this work. The
+writeups/ directory contains internal writeups made during development.
