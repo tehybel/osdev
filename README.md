@@ -7,6 +7,8 @@ to remove built objects. `make prep` will create `myos.iso` which is bootable.
 `make write-usb` will overwrite `/dev/sdb` with this ISO. (Be careful; that drive is
 assumed to be a USB.)
 
+To disable graphics, change the graphics_enabled function in kern/graphics.c.
+
 
 
 Status of the project

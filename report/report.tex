@@ -51,7 +51,7 @@
 
 \title{Operating System \\ Implementation}
 \author{Thomas Hybel \\ \small{201303525@post.au.dk}}
-\date{Aarhus University \\ November 2017}
+\date{Aarhus University \\ January 2018}
 \maketitle
 
 
@@ -152,9 +152,9 @@ This first sector will typically contain a small program known as the boot
 loader. Its purpose is to load the main kernel from disk and transfer
 execution to it.
 
-Before the boot loader loads the kernel, the kernel should first run some
-initialization code which sets up a more comfortable environment for the boot
-loader and kernel to work in.
+Before the boot loader loads the kernel, the boot loader should run some
+initialization code to set up a more comfortable environment for itself and
+the kernel to work in.
 
 
 \section{Initialization code}
@@ -178,21 +178,17 @@ Descriptor Table (GDT) which is an array of descriptors \cite{gdt}. Each
 descriptor describes a segment of memory; a bit in the descriptor determines
 whether the segment contains 16-bit or 32-bit code. 
 
-We use the \texttt{ljmp} instruction to update the \texttt{cs} register and use a
-32-bit segment descriptor. Next, the boot loader is executed; since the
-processor is in 32-bit protected mode, the rest of the kernel code can be
-written in C rather than assembly.
-
-%The file \texttt{boot/boot.S} contains the code that performs the described
-%tasks.
-
+We use the \texttt{ljmp} instruction to update the \texttt{cs} register and
+use a 32-bit segment descriptor. Once the processor is in 32-bit protected
+mode, the rest of the boot loader and the kernel can be written in C rather
+than assembly.
 
 
 \section{The boot loader}
 It is the task of the boot loader to load the main kernel and transfer
 execution to it. Since the boot loader resides on the first sector of the hard
 drive, it must load the kernel using no more than 512 bytes of code, minus the
-bytes used by the initialization code.
+bytes used for the initialization code.
 
 Our kernel is compiled into an Executable and Linkable Format (ELF) file. The
 ELF file specifies the physical addresses into which the code and data of the
@@ -215,7 +211,7 @@ print a \texttt{hello, world} message and confirm that the kernel runs.
 
 Using instructions such as \texttt{inb} and \texttt{outb} to communicate with
 an input/output device is quite common. The method is known as Programmed
-Input/Output (PIO); it will be used often in the following sections.
+Input/Output (PIO). PIO will be used often in the following sections.
 
 
 %%%%% LAB 2 %%%%%
@@ -230,19 +226,19 @@ freeing pages of physical memory.
 \section{Physical page management}
 A given system has a limited amount of physical memory, depending on how much
 RAM the machine has. This memory is split up into a number of pages. On x86 a
-page is 4096 bytes, or \texttt{0x1000} in hexadecimal. Thus pages always aligned on
-\texttt{0x1000}-byte boundaries. The kernel determines the amount of RAM by using
-PIO to query a memory area called the CMOS \cite{cmos}.
+page is 4096 bytes, or \texttt{0x1000} in hexadecimal. Therefore pages are always
+aligned on \texttt{0x1000}-byte boundaries. The kernel determines the amount
+of RAM by using PIO to query a memory area called the CMOS \cite{cmos}.
 
 The physical page management subsystem will keep a reference count for each
 page. If the count is zero, the page is free and can be allocated. This
 metadata is stored in an array of \texttt{PageInfo} structs. Each entry in
 this array directly corresponds to one physical page of memory, such that the
-first \texttt{PageInfo} struct holds metadata about the first page of physical
-memory, and so on.
+$i$th \texttt{PageInfo} struct holds metadata about the $i$th page of physical
+memory.
 
-The \texttt{PageInfo} of free pages are additionally stored in a linked list,
-such that the kernel can return a free page in constant time.
+The \texttt{PageInfo} structs of free pages are additionally stored in a
+linked list, such that the kernel can return a free page in constant time.
 
 We wrote the following functions to manage physical pages:
 \begin{itemize}
@@ -276,7 +272,7 @@ To translate from a virtual to a physical address, it is necessary to walk the
 page table. Say that the process wishes to access a virtual address $v$. It
 first looks in the \texttt{cr3} register to find the Page Directory. It uses the
 10 higher-order bits of $v$ to specify a PDE. It uses the next 10 bits
-of $v$ to specify a PTE The PTE contains the address of a
+of $v$ to specify a PTE. The PTE contains the address of a
 physical page. The last 12 bits of $v$ are used as an offset into this page,
 and the address translation is complete. The processor also validates the
 permissions of the page before the access, and generates a page fault if these
@@ -397,10 +393,10 @@ physical pages, inserts them into the page table, and copies the code or data
 into the physical pages.
 
 Note that we have not yet introduced a file system, so it is not immediately
-clear where the kernel can find the programs which it should load. To solve
-this problem we embed each user-mode program into the kernel as a blob of
-binary data. In section \ref{sec:fs} we describe our implementation of a
-proper file system for storing programs and data.
+clear where the kernel can find the programs which it should load. To
+temporarily solve this problem we embed each user-mode program into the kernel
+as a blob of binary data. Later, in section \ref{sec:fs}, we describe our
+implementation of a proper file system for storing programs and data.
 
 \section{Context switching}
 Once a program has been loaded, the kernel must perform a context switch to
@@ -487,7 +483,7 @@ system call to a specific handler.
 
 We wrote kernel system call handlers for input and output of a single
 character, as well as for process termination. User-mode programs did not have
-a C standard library at this point, so we created one, adding an interface to
+a C standard library at this point, so we created one, adding an interface for
 the system calls to the library. At this point we were able to run a simple
 user-mode program and have it interact with the user. 
 
@@ -500,11 +496,11 @@ interact with one another.
 
 To spawn processes beyond the first, we implemented a simple fork system call,
 which we later made more efficient with a copy-on-write mechanism. We also
-wrote code to activate any processors beyond the first, enabling true
-concurrency on the hardware level. 
+wrote code to activate any processors beyond the single one which runs
+initially, enabling true concurrency on the hardware level. 
 
-We wrote an inter-process communication feature to let processes interact by
-sending and receiving integers and pages of memory. We also implemented a
+We wrote an inter-process communication feature to let two processes interact
+by sending and receiving integers and pages of memory. We also implemented a
 simple round-robin scheduler, which can preempt the running process when its
 time slice is up. The preemption is facilitated by a device called a LAPIC,
 which can generate periodic timer interrupts.
@@ -525,12 +521,12 @@ However for simplicity reasons, we opted for a simple round-robin scheduler.
 That is, the scheduler keeps a circular queue of all processes. The first
 runnable process in the queue is chosen to be scheduled in.
 
-The scheduler also needs to preempt each process when its time slice is used.
-To accomplish this, during kernel initialization the kernel asks a device
-called the LAPIC to raise a timer interrupt periodically, waiting some fixed
-amount of bus cycles between each raised interrupt. Our \texttt{trap} function
-recognizes this timer interrupt and reacts by asking the scheduler to schedule
-in a new process. Interaction with the LAPIC is described in section
+The scheduler also needs to preempt each process when its time slice is
+exhausted. To accomplish this, during kernel initialization the kernel asks a
+device called the LAPIC to raise a timer interrupt periodically, waiting some
+fixed amount of bus cycles between each raised interrupt. Our \texttt{trap}
+function recognizes this timer interrupt and reacts by asking the scheduler to
+schedule in a new process. Interaction with the LAPIC is described in section
 \ref{sec:mpconfig}.
 
 
@@ -632,9 +628,11 @@ ensure that a process cannot modify pages in unrelated, non-child processes.}
 \end{itemize}
 
 Besides these system calls, it is also necessary for a process to have access
-to information about the layout of its own address space. This is already the
-case; in section \ref{sec:pagetables} we set up the page table of a process
-such that part of the address space contains its page table.
+to information about the layout of its own address space.
+In section \ref{sec:pagetables} we noted that we set up the page table of a
+process such that the page table itself is mapped read-only onto the address
+space. Processes can therefore read their page table to figure out their
+address space layout.
 
 To fork, a parent process goes through the following steps:
 \begin{itemize}
@@ -721,18 +719,15 @@ efficiently fork and communicate via IPC.
 \chapter{File system}
 \label{sec:fs}
 In this lab we implemented a custom file system which can hold files and
-folders. This enabled our kernel to make changes which persisted across
+folders. This enabled processes to make changes which persisted across
 reboots, and it provided a place to store user-mode programs. We also
 implemented a user-mode shell to test interaction with the file system.
 
 \section{File system design}
-Having a file system lets programs store data persistently on disk. It also
-provides a storage place for programs, instead of embedding them directly in
-the kernel as we have done so far. In this section we describe our design of
+In this section we describe our design of
 a custom file system.\footnote{
 To keep our file system simple, we have left out many potential features, such
 as file and folder permissions, symbolic and hard links, and timestamps.}
-
 A file system can be thought of as a way to manage how files, folders, and
 their metadata are stored on a disk. A raw disk is essentially a portion of
 memory which can be read from and written to. It is customary to partition the
@@ -743,9 +738,9 @@ One of these blocks is special, since it contains metadata for the file
 system. This block is called the superblock. This metadata includes such
 things as the disk size and where to find the root folder.
 
-Our file system is laid out as follows. Block 0, is not used by our FS; it is
+Our file system is laid out as follows. Block 0 is not used by our FS; it is
 reserved for the boot loader. Block 1 is the superblock. The next few blocks,
-starting at block 2, hold a bitmap which determines whether the remaining
+starting at block 2, hold a bitmap which determines whether the 
 blocks on disk are in use or free. The remaining blocks are used to store the
 concrete files and folders. This layout is shown in figure
 \ref{fig:disklayout}.
@@ -786,8 +781,8 @@ programs, to the file system. We then attached this raw disk to QEMU.
 
 
 \section{File system daemon}
-In accord with exokernel design, we let all file system interaction go through
-a user-mode process which we call the file system daemon.
+In accord with exokernel design we let all file system interaction go through
+a user-mode process, which we call the file system daemon.
 
 The daemon interacts with the disk using PIO. However a normal user-mode
 process cannot use the \texttt{inb} and \texttt{outb} instructions to perform
@@ -866,13 +861,14 @@ In this lab we connected our kernel to the internet by writing a network card
 driver and adding a TCP/IP stack. We also wrote a small web server to test the
 new functionality.
 
-The network card, its kernel driver, and the TCP/IP stack cooperate to enable
-networking. For example, when a process transmits data over the
+The network card, its kernel driver, and the TCP/IP stack cooperate to make
+networking possible. For example, when a process transmits data over the
 network, the following steps occur: the data is first delivered to the
 TCP/IP stack, which constructs a raw packet. The network card driver then puts
 the raw packet in a transmit-queue, which the network card periodically
 drains to put the packet on the wire. Receiving data is analogous, with
-packets flowing through a receive-queue in the reverse direction.
+packets flowing through a receive-queue in the reverse direction. We describe
+the details of these components in the following sections.
 
 \section{The network card}
 The operating system connects to the network using a network card, whose task it
