@@ -1205,7 +1205,7 @@ a USB drive and inserted it into the netbook. However the USB was not
 recognized as a bootable medium. 
 
 The reason turns out to be historical \cite{bootingfromusb}: when USB
-technology was new, there was disagreement between manufacturers on whether a
+technology was new, there was disagreement between manifacturers on whether a
 USB drive should be a raw storage drive or a bootable medium. Initially the
 user could decide through a BIOS setting, but for usability reasons,
 manufacturers eventually opted to use heuristics to detect whether a USB is
@@ -1222,7 +1222,7 @@ problem was that the boot loader was programmed to load the operating system
 from a hard drive connected through an ATA cable.
 
 We realized that to continue, we would have to rewrite our boot loader to
-support loading from USB. However the boot loader is constrained to 512 bytes,
+support loading from USB. However the boot loader is contrained to 512 bytes,
 since the BIOS loads it from the first sector of the drive. Writing code that
 can load from both USB and ATA drives in 512 bytes seemed difficult.
 
@@ -1230,7 +1230,7 @@ In the end we replaced our boot loader with a better one, namely GRUB, which
 supports booting from various hard drive types, USB, and even an ethernet
 connection. 
 
-We had to modify our file system to incorporate GRUB; the file system assumes
+We had to modify our file system to encorporate GRUB; the file system assumes
 that the boot loader will fit into the first 512 bytes, with the superblock
 residing in the following sector. Since GRUB uses multiple stages it needs
 much more space. We therefore had to modify our file system such that the
@@ -1260,7 +1260,7 @@ LAPIC.
 
 We leave out the details of the method, but in essence newer machines contain
 so-called ACPI tables \cite{symm}. One of these is the APIC table, which
-contains the physical address of the LAPIC. The ACPI tables can be found by
+contains the physical addres of the LAPIC. The ACPI tables can be found by
 scanning a region of memory for a data structure called the RSDP \cite{rsdp},
 which points at another data structure, the RSDT, which finally points at the
 ACPI tables.
