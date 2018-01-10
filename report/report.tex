@@ -669,8 +669,6 @@ it will eventually be scheduled in.
 
 
 \section{Copy-on-write fork}
-% TODO: this section needs more polishing, it's a bit hard to understand
-% what's going on..
 The fork mechanism described in the previous section is slow and
 memory-inefficient, because it indiscriminately copies every page of the
 parent into the child process. This involves a lot of reading and writing of
@@ -692,14 +690,14 @@ function. Then the kernel will handle a page fault by modifying the saved
 \texttt{eip} and \texttt{esp} registers of the process, pushing the old register
 values onto an exception stack, and switching the process back in.
 
-When a process forks, \emph{all} pages are initially shared between the parent
-and child process. However writable pages have their writable bit removed from
-their page table entry (PTE). Instead we set another bit which marks the
-page as copy-on-write.
+In our implementation of copy-on-write fork, \emph{all} pages are initially
+shared between the parent and child process. Writable pages have their
+writable bit removed from their page table entry. Instead we set another
+bit which marks the page as copy-on-write.
 
 When the child or parent process attempts to write to one of the now-shared
 pages, a fault will occur since the page is not writable anymore. The kernel
-sees that the copy-on-write bit is set, and then it delegates to the
+sees that the copy-on-write bit is set, so it delegates to the
 registered user-mode handler. The handler then uses the same method as in the
 simple fork implementation to map a new writable page, copy the contents of
 the old page onto it, and replace the copy-on-write page with the new writable
@@ -1175,7 +1173,7 @@ An interaction with the two applications is displayed in figure \ref{desktop}.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.8\textwidth]{interaction}
-\caption{Interaction with the two graphical applications.}
+\caption{Interaction with two graphical applications.}
 \label{desktop}
 \end{figure}
 
@@ -1309,6 +1307,9 @@ were not necessary; thus this was another instance of QEMU not emulating
 hardware perfectly. We inserted the necessary delays in the mouse driver.
 
 
+With all the changes and fixes described so far, our operating system finally
+ran on the netbook and behaved as expected. 
+
 \section{The development process}
 The bugs and issues we have described seem rather obvious when explained in
 hindsight. But in practice, debugging a live system without a debugger was
@@ -1329,17 +1330,10 @@ time-consuming but not conceptually difficult process; the main task was
 supporting different hardware types and standards.
 
 
-\section{The final result}
-With all the changes and fixes described so far, our operating system finally
-ran on the netbook and behaved as expected. A picture of the final system is
-shown in figure \ref{TODO}.
-% TODO: include a photo.
-
-
 
 
 % \chapter{Future work}
-% TODO: we should talk about future work.
+% we could talk about future work.
 % - security: ASLR, probably many other things (it's not even a multi-user
 % system yet)
 % - capabilities?
@@ -1352,7 +1346,8 @@ shown in figure \ref{TODO}.
 % - more drivers.... e.g. network cards.
 
 
-% TODO: I moved this paragraph here from the scheduler.
+% I moved this paragraph here from the scheduler.
+
 % Our scheduler has much room for improval. Round-robin scheduling is not as
 % performant as more advanced algorithms. Additionally, it does not allow
 % adjustment of process priorities. Scheduling being a linear-time operation is
@@ -1365,26 +1360,29 @@ shown in figure \ref{TODO}.
 % that perform heavy computations.
 
 \chapter{Conclusion}
-Through writing an operating system from scratch we have gained a deep
+By writing an operating system from scratch we have gained a deep
 understanding of the many tasks that it must perform. 
 
-% TODO: this is a bit of a mess, make it clearer what we want to say.
-We have understood the boot process and the importance of a good boot loader.
-We have investigated the intricacies of physical page management and address
-translation, which were only a small part of the infrastructure needed to run
-a user space process. We have extended this infrastructure to support
-concurrent processes and enabled their interaction through an IPC mechanism.
-We also implemented a custom file system to let programs write persistent
-changes to disk.
+
+% We have understood the boot process and the importance of a good boot loader.
+We have implemented the necessary infrastructure to run a user-mode process;
+this included physical page management, page table initialization, program
+loading, context switching, interrupt handling, and much else besides. We have
+extended this infrastructure to support true concurrency, efficient forking,
+and process interaction through an IPC mechanism. We also implemented a custom
+file system and networking. Altogether, this infrastructure provides all the
+necessary primitives to build complex applications that can run in user space.
 
 By designing and implementing a graphical user interface for our system we
-have additionally seen how graphics work, from drawing a single pixel to the
-end result with a display server managing windows and rendering fonts. 
+have additionally seen how a graphics stack works from the bottom up. The end
+result is that each application may run in a separate graphical window,
+allowing interaction through the mouse and keyboard.
 
-We have seen how various features could be moved from the kernel to user space
-according to exokernel principles. Some examples of this were the network
-stack and the file system code. We have also gained experience writing drivers
-for various devices, including a networking card and a PS/2 mouse.
+We have seen techniques that allowed us to move functionality from the kernel
+to user space according to exokernel principles. Examples of this include the
+network stack, the display server, and the file system code. We have also
+gained experience writing drivers for various devices, including a networking
+card and a PS/2 mouse.
 
 By moving our operating system to a real machine rather than an emulator we
 have seen the advantages emulators bring to kernel development. We have also
@@ -1395,16 +1393,8 @@ services that an operating system must provide, and which we previously took
 entirely for granted.
 
 
-% TODO: include (a link to) the source code somehow
-
-% TODO: add more references (some links are in writeup txt files)
-
-% TODO: we should have an appendix that describes how to get and run the code.
-
-
 \bibliographystyle{unsrt}
 \bibliography{references}
-
 
 \end{document}
 
