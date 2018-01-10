@@ -1,6 +1,7 @@
 \documentclass{report}
 %\documentclass[10pt,letterpaper]{scrartcl}
 
+% TODO: some references are missing, look at the output of pdflatex.
 
 
 % Questions:
@@ -59,13 +60,9 @@
 
 
 \title{Operating System \\ Implementation}
-\author{Thomas Hybel}
+\author{Thomas Hybel \\ \small{201303525@post.au.dk}}
 \date{Aarhus University \\ November 2017}
 \maketitle
-
-
-% TODO. the numbering is off.
-%TODO: have your email in the title page
 
 
 \begin{abstract} 
@@ -101,12 +98,12 @@ their consideration facilitated learning.
 To get started on kernel development we made extensive use of material from
 the MIT 2016 Operating System Engineering course, which is
 accessible online \cite{mitcourse}. The MIT course is divided into six major
-"labs", with each lab encapsulating a set of kernel functionality. For
-example, lab 4 involves functionality needed for multitasking and concurrency,
-while lab 5 comprises the implementation of a custom file system. 
+``labs", with each lab encapsulating a subset of kernel functionality. For
+example, lab 4 involves multitasking and concurrency, while lab 5 comprises
+the implementation of a custom file system. 
 
-The kernel we wrote is for the 32-bit x86 architecture. The kernel is written
-in C, with some parts having to be hand-written in assembly. We have used GCC
+We wrote the kernel for the 32-bit x86 architecture. The kernel is written
+in C, with some parts hand-written in assembly. We have used GCC
 as our compiler, Git for version control, and GDB for debugging. Additionally,
 it was convenient to develop the kernel on emulated hardware rather than a
 real machine, since this eased debugging and increased development speed. It
@@ -115,37 +112,32 @@ processors or an extra hard drive. We have used the full-system emulator QEMU
 for this task.
 
 Each MIT lab has an associated web page which describes what needs to be done
-and provides links to resources like manuals and specifications. Since we opted
+and provides links to manuals and specifications. Since we opted
 to follow the MIT course, this also meant that some design decisions were made
-for us. One example of this is us following an exokernel philosophy, which
+for us. One example of this is following an exokernel philosophy, which
 meant that we have pushed large parts of the kernel functionality into user
 space.
 
-During kernel development, occasionally some functionality was important,
-but not technically interesting to implement. In these cases the MIT lab often
-provided the code for us, with enough code missing that we had to understand
-the concept to complete it, while still saving significant amounts of time. An
-example of this is the code for communicating with the outside world over a
-serial connection, which is used throughout the labs.
+During kernel development, occasionally some functionality was important, but
+not technically interesting to implement. An example of this is the code for
+communicating with the outside world over a serial connection, which is used
+throughout the labs. In such cases the MIT lab often provided the code for
+us, with enough parts missing that we had to understand the concept to complete
+it, while still saving significant amounts of time. This means that we have
+written most, but not all, of the kernel code.
 
 
-In addition to the six labs of the MIT course, we have decided upon two labs
-on our own. In lab 7 we designed and implemented a graphical user interface
-for the operating system. In lab 8 we made the operating system run on real
-hardware instead of QEMU. Since we were given zero guidance nor code, these
-labs were significantly more difficult and time-consuming than previous ones.
+In addition to the six labs of the MIT course, we have come up with two
+additional labs as further work. In lab 7 we designed and implemented
+a graphical user interface for the operating system. In lab 8 we made the
+operating system run on real hardware instead of QEMU. Since we were given
+zero guidance nor code, these labs were significantly more difficult and
+time-consuming than previous ones.
 
 Each of the following sections corresponds directly to one lab. They describe
-the development process, from first booting into a minimal kernel, until the end
-when we run a full graphical operating system on a real machine.
+the development process, from first booting the kernel in QEMU to the final 
+full graphical operating system running on a real machine.
 
-
-% TODO: read each of the sections' introductions and see whether they make
-% sense when read alone in sequence
-
-% TODO rewrite "the goal of this lab was", it sounds bad and repetitive
-
-% TODO: clarify OS vs kernel in the whole report.
 
 %%%%% LAB 1 %%%%%
 
@@ -155,7 +147,7 @@ when we run a full graphical operating system on a real machine.
 
 In this lab we wrote initialization code and a boot loader for our kernel. 
 The initialization code switches the processor to 32-bit protected mode. The
-boot loader loads the rest of the kernel into memory and jumps to it.
+boot loader loads the kernel into memory and jumps to it.
 
 \section{The boot process}
 To understand the purpose of a boot loader, it helps to have an overview of
@@ -227,7 +219,7 @@ C standard library, unless we write one ourselves.
 As a start, we wanted the ability to input and output text.
 Our kernel uses the \texttt{inb} and \texttt{outb} instructions to
 communicate with the outside world via a serial connection. We used this to
-print a "hello, world" message and confirm that the kernel runs.
+print a \texttt{hello, world} message and confirm that the kernel runs.
 
 Using instructions such as \texttt{inb} and \texttt{outb} to communicate with
 an input/output device is quite common. The method is known as Programmed
@@ -238,9 +230,9 @@ Input/Output (PIO); it will be used often in the following sections.
 
 \chapter{Memory management}
 \label{sec:mem}
-The goal of this lab was to enable virtual memory after setting up a page
-table. To set up the page table, we first needed to implement a subsystem
-for allocating and freeing pages of physical memory.
+In this lab we set up the kernel page table and enabled virtual memory. To set up the
+page table, we first needed to implement a subsystem for allocating and
+freeing pages of physical memory.
 
 
 \section{Physical page management}
@@ -365,7 +357,7 @@ Virtual memory map:                                  Permissions
                     +------------------------------+ 0x00000000
 \end{Verbatim}
 \end{framed}
-\caption{The virtual address space of the kernel}
+\caption{The virtual address space of the kernel.}
 \label{memlayout}
 \end{figure}
 The diagram shows that the kernel code resides starting at virtual address
@@ -389,11 +381,11 @@ corrupt the kernel.
 
 %%%%% LAB 3 %%%%%
 \chapter{User space}
-
-The goal of this lab was to run a user-mode process. This required us to write
-infrastructure for managing processes and their metadata. We also modified our
-kernel to handle any exceptions generated by user-mode processes. Finally we
-implemented a system call mechanism to let processes interact with the kernel.
+In this lab we enabled the kernel to load and run a user-mode process. This
+required us to write infrastructure for managing processes and their metadata.
+We modified our kernel to handle any exceptions generated in user mode. We
+also implemented a system call mechanism to let processes interact with the
+kernel.
 
 
 \section{Managing process metadata}
@@ -511,21 +503,22 @@ user-mode program and have it interact with the user.
 
 %%%%% LAB 4 %%%%%
 \chapter{Multiprocessing}
-In this lab we added the features necessary for running multiple processes
-concurrently and having them interact. 
+In this lab we made it possible for multiple processes to run concurrently and
+interact with one another. 
 
-We implemented a simply round-robin scheduler. The scheduler can preempt the
-running process when its time slice is up with the aid of a device called a
-LAPIC, which can generate periodic timer interrupts.
+To spawn processes beyond the first, we implemented a simple fork system call,
+which we later made more efficient with a copy-on-write mechanism. We also
+wrote code to activate any processors beyond the first, enabling true
+concurrency on the hardware level. 
 
-We also wrote code to activate any processors beyond the first, letting
-processes run truly concurrently. 
+We wrote an inter-process communication feature to let processes interact by
+sending and receiving integers and pages of memory. We also implemented a
+simple round-robin scheduler, which can preempt the running process when its
+time slice is up. The preemption is facilitated by a device called a LAPIC,
+which can generate periodic timer interrupts.
 
-We implemented a naive fork mechanism which lets proceses spawn more
-processes. We then upgraded its efficiency with a copy-on-write mechanism.
 
-Finally, we added an inter-process communication feature, letting processes
-send values and pages of memory to one another.
+
 
 
 
@@ -737,8 +730,10 @@ efficiently fork and communicate via IPC.
 %%%%% LAB 5 %%%%%
 \chapter{File system}
 \label{sec:fs}
-The goal of this lab was to implement a custom file system and a user-mode
-shell program.
+In this lab we implemented a custom file system which can hold files and
+folders. This enabled our kernel to make changes which persisted across
+reboots, and it provided a place to store user-mode programs. We also
+implemented a user-mode shell to test interaction with the file system.
 
 \section{File system design}
 Having a file system lets programs store data persistently on disk. It also
@@ -762,9 +757,15 @@ Our file system is laid out as follows. Block 0, is not used by our FS; it is
 reserved for the boot loader. Block 1 is the superblock. The next few blocks,
 starting at block 2, hold a bitmap which determines whether the remaining
 blocks on disk are in use or free. The remaining blocks are used to store the
-concrete files and folders.
+concrete files and folders. This layout is shown in figure
+\ref{fig:disklayout}.
 
-% TODO: include graphics from https://pdos.csail.mit.edu/6.828/2016/labs/lab5/disk.png
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{disk}
+\caption{The layout of the file system on the disk. From \cite{lab5}.}
+\label{fig:disklayout}
+\end{figure}
 
 A file is represented as a \texttt{struct file}, which is stored in its own
 block. Such a \texttt{file} struct contains metadata, such as the file name
@@ -772,9 +773,15 @@ and size. The struct also has 10 pointers to blocks that hold the raw file
 data. If the data cannot fit in 10 blocks, the \texttt{file} struct has a
 pointer to a block which holds another 1024 pointers to data blocks. Thus our
 file system has a maximum file size of $(10+1024)*4096 = 4235264$ bytes, i.e.,
-around 4 MB.
+around 4 MB. The structure of a \texttt{file} is displayed in figure
+\ref{fig:filestruct}.
 
-% TODO: also this https://pdos.csail.mit.edu/6.828/2016/labs/lab5/file.png
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{file}
+\caption{The representation of a file. From \cite{lab5}.}
+\label{fig:filestruct}
+\end{figure}
 
 A folder is represented as a \texttt{struct folder}, which is exactly
 identical to a \texttt{struct file}, except that the $10+1024$ block pointers
@@ -841,7 +848,7 @@ simplistic shell which allows loading and execution of programs from disk. The
 shell allows reads from and writes to the disk through input redirection
 (\texttt{<}) and output redirection (\texttt{>}). The shell additionally
 supports piping of the output of one program into another program. A small
-program, "cat", lets the user read files from the disk. A sample interaction
+program, \texttt{cat}, lets the user read files from the disk. A sample interaction
 is shown in figure \ref{fig:shellinteraction}.
 
 \begin{figure}[h]
@@ -857,7 +864,7 @@ $ cat motd
 "Hello, OS." 
 \end{Verbatim}
 \end{framed}
-\caption{A sample interaction with the shell}
+\caption{A sample interaction with the shell.}
 \label{fig:shellinteraction}
 \end{figure}
 
@@ -865,14 +872,23 @@ $ cat motd
 
 %%%%% LAB 6 %%%%%
 \chapter{Networking}
-The goal of this lab was to connect our kernel to the internet by writing a
-network card driver.
+In this lab we connected our kernel to the internet by writing a network card
+driver and adding a TCP/IP stack. We also wrote a small web server to test the
+new functionality.
+
+The network card, its kernel driver, and the TCP/IP stack cooperate to enable
+networking. For example, when a process transmits data over the
+network, the following steps occur: the data is first delivered to the
+TCP/IP stack, which constructs a raw packet. The network card driver then puts
+the raw packet in a transmit-queue, which the network card periodically
+drains to put the packet on the wire. Receiving data is analogous, with
+packets flowing through a receive-queue in the reverse direction.
 
 \section{The network card}
-The operating system connects to a network using a network card, whose task it
+The operating system connects to the network using a network card, whose task it
 is to send and receive packets by interacting with the physical layer. QEMU
 emulates the Intel e1000 network card, which we therefore targeted. We added
-the card to our emulated machine with the "-net nic,model=e1000" option to
+the card to our emulated machine with the \texttt{-net nic,model=e1000} option to
 QEMU, which creates a virtual router at IP 10.0.2.2 and assigns the guest an
 IP of 10.0.2.15. This let us hardcode the the IP address rather than having to
 implement a DHCP client or similar.
@@ -887,10 +903,10 @@ network card periodically drains. When a packet arrives on the wire, the
 network card adds it to the receive queue, which the kernel periodically
 drains.
 
-The items in the queues are not raw packets, but rather small descriptor
-structs, each of which describes an area of physical memory which can hold a
-packet. The queues are implemented as arrays, with each queue having a head
-and tail register to keep track of the head and tail of the queue.
+The items in the queues are small descriptor structs, each of which describes
+an area of physical memory which can hold a raw packet. The queues are
+implemented as arrays, with each queue having a head and tail register to keep
+track of the head and tail of the queue.
 
 
 
@@ -922,9 +938,6 @@ other hand, the receive queue is full, the e1000 is designed to simply drop
 further packets.
 
 
-% TODO: lesson: writing drivers is tricky. (debugging: QEMU source modification)
-
-
 \section{The network daemon}
 With the driver written, our kernel was capable of transmitting and receiving
 packets. However most processes only know of the data they wish to send; they
@@ -932,8 +945,8 @@ are not capable of constructing packets.
 
 We therefore needed a TCP/IP stack. Allegedly, writing such a network stack
 from scratch is an immense task. We therefore used the open-source stack lwIP
-("lightweight IP"). lwIP acts as a black box for our purposes, taking raw data
-as input, and producing packets as output.
+(``lightweight IP"). lwIP acts as a black box for our purposes, taking raw data
+as input and producing packets as output.
 
 Rather than adding lwIP to the kernel, we embedded it in a network daemon. The
 daemon is responsible for managing sockets, just as the file system daemon was
@@ -958,9 +971,6 @@ contents, and uses the network daemon to send back the HTTP response.
 We configured QEMU to forward requests at port 80 to the emulated machine. At
 this point we were able to point a browser at the machine and be served a
 working web page.
-
-% TODO: maybe insert a screenshot.
-
 
 
 
@@ -990,7 +1000,7 @@ display server, which is responsible for rendering all of the screen and which
 acts as an intermediary for input and output events.
 
 Finally we added a few sample graphical applications to demonstrate the new
-features.
+features, including a paint application and a terminal emulator.
 
 
 \section{Mapping the Linear Frame Buffer}
@@ -1052,16 +1062,14 @@ the mouse or keyboard, a driver handles these packets by putting them into an
 event queue. The display server periodically drains this queue through a
 system call, forwarding the events.
 
-Figure \ref{graphicslayout} shows an overview of the different components in
-the graphics stack and how they interact. 
-% \begin{figure}[h!]
-% \begin{framed}
-% % TODO insert a diagram.
-% TODO make this figure.
-% \end{framed}
-% \caption{The graphics stack layout}
-% \label{graphicslayout}
-% \end{figure}
+Figure \ref{graphicslayout} shows the different components in the graphics
+stack and how they interact. 
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{flow-diagram2.png}
+\caption{The graphics stack components and their interaction.}
+\label{graphicslayout}
+\end{figure}
 
 The following sequence of events exemplifies the flow of events through the
 graphics stack:
@@ -1119,7 +1127,7 @@ while (1) {
 }
 \end{Verbatim}
 \end{framed}
-\caption{The main loop of the display server}
+\caption{The main loop of the display server.}
 \label{displayserver}
 \end{figure}
 
@@ -1164,7 +1172,12 @@ in section \ref{sec:shell}. The output of this shell process is displayed to
 the user inside the terminal emulator.
 
 An interaction with the two applications is displayed in figure \ref{desktop}.
-% TODO: insert this figure.
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{interaction}
+\caption{Interaction with the two graphical applications.}
+\label{desktop}
+\end{figure}
 
 
 
@@ -1175,8 +1188,8 @@ An interaction with the two applications is displayed in figure \ref{desktop}.
 
 %%%%% HARDWARE LAB %%%%%
 \chapter{Hardware}
-In this lab we saught to run our operating system on real hardware rather than
-the QEMU emulator.
+In this lab we modified our operating system to let it run on real hardware
+rather than the QEMU emulator.
 
 The main cause of difficulty was that our chosen hardware differed from the
 hardware emulated by QEMU. Additionally, there are aspects of a machine that
@@ -1355,32 +1368,31 @@ shown in figure \ref{TODO}.
 Through writing an operating system from scratch we have gained a deep
 understanding of the many tasks that it must perform. 
 
+% TODO: this is a bit of a mess, make it clearer what we want to say.
 We have understood the boot process and the importance of a good boot loader.
 We have investigated the intricacies of physical page management and address
 translation, which were only a small part of the infrastructure needed to run
-a user space process. We have extended this infrastructure to support multiple
-interacting processes. We then wrote various user space programs and
-implemented a custom file system for them to reside on.  
-
-We then saw how various features, such as the network stack and the file
-system code, could be moved from the kernel to user space according to exokernel
-principles.
+a user space process. We have extended this infrastructure to support
+concurrent processes and enabled their interaction through an IPC mechanism.
+We also implemented a custom file system to let programs write persistent
+changes to disk.
 
 By designing and implementing a graphical user interface for our system we
-have additionally seen how graphics work, all the way from drawing a single
-pixel, to the end result with a display server managing
-windows and rendering fonts. As part of this process we gained experience
-writing drivers for various devices, including a networking card and a PS/2
-mouse.
+have additionally seen how graphics work, from drawing a single pixel to the
+end result with a display server managing windows and rendering fonts. 
+
+We have seen how various features could be moved from the kernel to user space
+according to exokernel principles. Some examples of this were the network
+stack and the file system code. We have also gained experience writing drivers
+for various devices, including a networking card and a PS/2 mouse.
 
 By moving our operating system to a real machine rather than an emulator we
-have seen the advantages emulators bring to the development process, as well
-as their limitations.
+have seen the advantages emulators bring to kernel development. We have also
+become more aware of the limitations of emulators.
 
 Throughout this process we have been repeatedly surprised by the scope of
 services that an operating system must provide, and which we previously took
 entirely for granted.
-
 
 
 % TODO: include (a link to) the source code somehow

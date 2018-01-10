@@ -47,6 +47,11 @@ Intel Corporation.
 \newblock {\em MultiProcessor Specification}.
 \newblock May 1997.
 
+\bibitem{lab5}
+Frans Kaashoek and Robert Morris.
+\newblock Lab 5: File system, spawn and shell.
+\newblock \url{https://pdos.csail.mit.edu/6.828/2016/labs/lab5/}.
+
 \bibitem{e1000manual}
 Intel Corporation.
 \newblock {\em PCI/PCI-X Family of Gigabit Ethernet Controllers Software
